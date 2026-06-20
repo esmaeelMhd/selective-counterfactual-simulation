@@ -1,0 +1,9 @@
+{
+  "claim_audit_result": "NOT_SUPPORTED",
+  "decision": "KILL_OR_DOWNGRADE_CLAIM",
+  "freeze_result": "ACCEPTED",
+  "reasoning": "Freeze=ACCEPTED; claim=NOT_SUPPORTED; seed=NOT_SUPPORTED; severity=MEANINGFUL. Decision follows the configured gate rules.",
+  "required_next_action": "Downgrade the main claim or redesign the benchmark before expansion.",
+  "seed_robustness_result": "NOT_SUPPORTED",
+  "severity_sweep_result": "MEANINGFUL"
+}

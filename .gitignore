@@ -12,5 +12,7 @@ dist/
 results/smoke_two_tank/
 results/smoke/
 results/full_v0/
+results/seed_sweep_two_tank/
+results/two_tank_severity_sweep/
 reports/smoke_report.md
 reports/full_v0_report.md

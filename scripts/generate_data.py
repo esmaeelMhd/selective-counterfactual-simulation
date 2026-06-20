@@ -4,10 +4,6 @@ import argparse
 import json
 from pathlib import Path
 
-from _bootstrap import add_src_to_path
-
-add_src_to_path()
-
 from scs.data.generate import generate_and_save_dataset
 from scs.data.schemas import save_dataset
 from scs.experiments.runner import load_config

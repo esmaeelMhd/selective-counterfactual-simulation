@@ -97,6 +97,9 @@ def write_smoke_report(
 
 ## Risk-coverage summary
 
+risk_coverage_rows: {len(risk_coverage)}
+scenario_score_rows: {summary.get("scenario_score_rows", "unknown")}
+
 ```text
 {_table(risk_summary)}
 ```

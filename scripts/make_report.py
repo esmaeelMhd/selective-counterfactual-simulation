@@ -2,10 +2,6 @@ from __future__ import annotations
 
 import argparse
 
-from _bootstrap import add_src_to_path
-
-add_src_to_path()
-
 from scs.experiments.runner import load_results
 from scs.reports.summary import write_smoke_report
 
@@ -28,4 +24,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

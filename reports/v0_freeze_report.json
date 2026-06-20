@@ -1,0 +1,54 @@
+{
+  "artifacts": {
+    "reports/smoke_report.md": {
+      "exists": true,
+      "size": 5889
+    },
+    "results/smoke_two_tank/data_summary.json": {
+      "exists": true,
+      "size": 1861
+    },
+    "results/smoke_two_tank/model_metrics.csv": {
+      "exists": true,
+      "size": 1760
+    },
+    "results/smoke_two_tank/risk_coverage.csv": {
+      "exists": true,
+      "size": 62137
+    },
+    "results/smoke_two_tank/risk_coverage.png": {
+      "exists": true,
+      "size": 97074
+    },
+    "results/smoke_two_tank/scenario_scores.csv": {
+      "exists": true,
+      "size": 226745
+    },
+    "results/smoke_two_tank/summary.json": {
+      "exists": true,
+      "size": 9032
+    }
+  },
+  "commands_run": [
+    "git status",
+    "python -m venv .venv",
+    "source .venv/bin/activate",
+    "pip install -e \".[dev]\"",
+    "pytest -q",
+    "python scripts/run_smoke.py"
+  ],
+  "commit": "02b6aa2",
+  "csv_nonempty": true,
+  "environment": {
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.13.11"
+  },
+  "forbidden_dependency_scan": [],
+  "known_failures": [],
+  "path_hack_scan": [],
+  "pytest_result": "passed",
+  "risk_no_nan": true,
+  "smoke_result": "passed",
+  "summary_valid_json": true,
+  "verdict": "ACCEPTED"
+}

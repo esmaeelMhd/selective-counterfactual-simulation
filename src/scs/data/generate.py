@@ -20,6 +20,59 @@ INTERVENTION_TYPES = {
     "combined_intervention",
 }
 
+TWO_TANK_SEVERITY_SETTINGS = {
+    "low": {
+        "action_center": 1.12,
+        "action_noise": 0.07,
+        "action_wave": 0.36,
+        "action_step": 0.35,
+        "inflow_spike": 0.35,
+        "combined_action_center": 1.15,
+        "combined_inflow_spike": 0.30,
+        "combined_demand_drop": 0.08,
+        "pump_factor": 0.75,
+    },
+    "medium": {
+        "action_center": 1.55,
+        "action_noise": 0.12,
+        "action_wave": 0.22,
+        "action_step": 0.85,
+        "inflow_spike": 1.15,
+        "combined_action_center": 1.65,
+        "combined_inflow_spike": 0.95,
+        "combined_demand_drop": 0.20,
+        "pump_factor": 0.45,
+    },
+    "high": {
+        "action_center": 2.05,
+        "action_noise": 0.14,
+        "action_wave": 0.30,
+        "action_step": 1.20,
+        "inflow_spike": 1.85,
+        "combined_action_center": 2.15,
+        "combined_inflow_spike": 1.65,
+        "combined_demand_drop": 0.32,
+        "pump_factor": 0.25,
+    },
+    "extreme": {
+        "action_center": 2.42,
+        "action_noise": 0.16,
+        "action_wave": 0.36,
+        "action_step": 1.55,
+        "inflow_spike": 2.65,
+        "combined_action_center": 2.45,
+        "combined_inflow_spike": 2.35,
+        "combined_demand_drop": 0.40,
+        "pump_factor": 0.12,
+    },
+}
+
+
+def two_tank_severity_settings(severity: str) -> dict[str, float]:
+    if severity not in TWO_TANK_SEVERITY_SETTINGS:
+        raise ValueError(f"unknown TwoTank severity: {severity}")
+    return TWO_TANK_SEVERITY_SETTINGS[severity]
+
 
 def _normal_action(state: np.ndarray, rng: np.random.Generator) -> float:
     feedback = 0.08 * (float(state[0] - state[1]) - 1.0)
@@ -39,16 +92,33 @@ def _intervention_action(
     t: int,
     horizon: int,
     rng: np.random.Generator,
+    severity: str,
 ) -> float:
+    settings = two_tank_severity_settings(severity)
     if scenario_type == "held_out_action_magnitude":
-        return float(np.clip(1.55 + rng.normal(0.0, 0.12), 1.25, 1.95))
+        phase = 2.0 * np.pi * t / max(horizon, 1)
+        return float(
+            np.clip(
+                settings["action_center"]
+                + settings["action_wave"] * np.sin(phase)
+                + rng.normal(0.0, settings["action_noise"]),
+                0.0,
+                2.7,
+            )
+        )
     if scenario_type == "action_step_change" and t >= horizon // 2:
-        return float(np.clip(base_action + 0.85, 0.0, 2.1))
+        return float(np.clip(base_action + settings["action_step"], 0.0, 2.7))
     if scenario_type == "valve_or_pump_degradation" and t >= horizon // 2:
-        return float(np.clip(base_action * 0.45, 0.0, 2.1))
+        return float(np.clip(base_action * settings["pump_factor"], 0.0, 2.7))
     if scenario_type == "combined_intervention":
         if t >= horizon // 3:
-            return float(np.clip(1.65 + rng.normal(0.0, 0.10), 1.25, 2.05))
+            return float(
+                np.clip(
+                    settings["combined_action_center"] + rng.normal(0.0, settings["action_noise"]),
+                    0.0,
+                    2.7,
+                )
+            )
         return base_action
     return base_action
 
@@ -58,17 +128,19 @@ def _intervention_disturbance(
     base_disturbance: np.ndarray,
     t: int,
     horizon: int,
+    severity: str,
 ) -> np.ndarray:
+    settings = two_tank_severity_settings(severity)
     disturbance = np.array(base_disturbance, dtype=float)
     spike_start = horizon // 3
     spike_end = min(horizon, spike_start + max(4, horizon // 8))
     if scenario_type == "inflow_spike" and spike_start <= t < spike_end:
-        disturbance[0] += 1.15
+        disturbance[0] += settings["inflow_spike"]
     if scenario_type == "combined_intervention":
         if spike_start <= t < spike_end:
-            disturbance[0] += 0.95
+            disturbance[0] += settings["combined_inflow_spike"]
         if t >= horizon // 2:
-            disturbance[1] = max(0.05, disturbance[1] - 0.20)
+            disturbance[1] = max(0.05, disturbance[1] - settings["combined_demand_drop"])
     return disturbance
 
 
@@ -78,6 +150,7 @@ def _simulate_two_tank_one(
     horizon: int,
     dt: float,
     rng: np.random.Generator,
+    severity: str,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     if scenario_type not in INTERVENTION_TYPES:
         raise ValueError(f"unknown scenario_type: {scenario_type}")
@@ -89,12 +162,13 @@ def _simulate_two_tank_one(
 
     for t in range(horizon):
         base_action = _normal_action(states[t], rng)
-        action = _intervention_action(scenario_type, base_action, t, horizon, rng)
+        action = _intervention_action(scenario_type, base_action, t, horizon, rng, severity)
         disturbance = _intervention_disturbance(
             scenario_type,
             _normal_disturbance(t, horizon, rng),
             t,
             horizon,
+            severity,
         )
         actions[t] = np.array([action], dtype=float)
         disturbances[t] = disturbance
@@ -110,6 +184,7 @@ def _simulate_two_tank_batch(
     horizon: int,
     dt: float,
     seed: int,
+    severity: str = "medium",
 ) -> TrajectoryBatch:
     system = TwoTankSystem()
     rng = np.random.default_rng(seed)
@@ -125,6 +200,7 @@ def _simulate_two_tank_batch(
             horizon=horizon,
             dt=dt,
             rng=rng,
+            severity=severity,
         )
         scenario_type_list.append(scenario_type)
 
@@ -261,6 +337,8 @@ def _generate_two_tank_dataset(
     horizon: int,
     dt: float,
     seed: int,
+    severity: str = "medium",
+    include_pump_degradation: bool = False,
 ) -> dict[str, TrajectoryBatch]:
     seeds = {
         "train": seed + 101,
@@ -269,7 +347,7 @@ def _generate_two_tank_dataset(
         "ood_inflow_spike": seed + 404,
         "ood_combined": seed + 505,
     }
-    return {
+    dataset = {
         "train": _simulate_two_tank_batch("train", "normal_policy", n_train, horizon, dt, seeds["train"]),
         "id_test": _simulate_two_tank_batch("id_test", "normal_policy", n_id_test, horizon, dt, seeds["id_test"]),
         "ood_action_magnitude": _simulate_two_tank_batch(
@@ -279,6 +357,7 @@ def _generate_two_tank_dataset(
             horizon,
             dt,
             seeds["ood_action_magnitude"],
+            severity=severity,
         ),
         "ood_inflow_spike": _simulate_two_tank_batch(
             "ood_inflow_spike",
@@ -287,6 +366,7 @@ def _generate_two_tank_dataset(
             horizon,
             dt,
             seeds["ood_inflow_spike"],
+            severity=severity,
         ),
         "ood_combined": _simulate_two_tank_batch(
             "ood_combined",
@@ -295,8 +375,20 @@ def _generate_two_tank_dataset(
             horizon,
             dt,
             seeds["ood_combined"],
+            severity=severity,
         ),
     }
+    if include_pump_degradation:
+        dataset["pump_degradation"] = _simulate_two_tank_batch(
+            "pump_degradation",
+            "valve_or_pump_degradation",
+            n_ood_test,
+            horizon,
+            dt,
+            seed + 606,
+            severity=severity,
+        )
+    return dataset
 
 
 def _generate_cstr_dataset(
@@ -517,9 +609,20 @@ def generate_dataset(
     horizon: int,
     dt: float,
     seed: int,
+    severity: str = "medium",
+    include_pump_degradation: bool = False,
 ) -> dict[str, TrajectoryBatch]:
     if system_id == "two_tank":
-        return _generate_two_tank_dataset(n_train, n_id_test, n_ood_test, horizon, dt, seed)
+        return _generate_two_tank_dataset(
+            n_train,
+            n_id_test,
+            n_ood_test,
+            horizon,
+            dt,
+            seed,
+            severity=severity,
+            include_pump_degradation=include_pump_degradation,
+        )
     if system_id == "cstr":
         return _generate_cstr_dataset(n_train, n_id_test, n_ood_test, horizon, dt, seed)
     if system_id == "heat_exchanger":
@@ -556,6 +659,8 @@ def generate_and_save_dataset(config: dict, output_dir: str | Path) -> dict[str,
         horizon=int(config["horizon"]),
         dt=float(config["dt"]),
         seed=int(config["seed"]),
+        severity=str(config.get("severity", "medium")),
+        include_pump_degradation=bool(config.get("include_pump_degradation", False)),
     )
     data_dir = Path(output_dir) / "data"
     save_dataset(dataset, data_dir)

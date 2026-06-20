@@ -458,7 +458,7 @@ def run_experiment(
     bad_threshold = float(config["bad_threshold"]["value"])
     coverages = [float(value) for value in config["coverages"]]
     risk_rows = []
-    for model_id, model_df in scenario_scores.groupby("model_id", sort=False):
+    for (model_id, split), model_df in scenario_scores.groupby(["model_id", "split"], sort=False):
         for judge_id in judge_ids:
             curve = risk_coverage_curve(
                 errors=model_df["error"].to_numpy(dtype=float),
@@ -467,6 +467,7 @@ def run_experiment(
                 coverages=coverages,
             )
             curve.insert(0, "judge_id", judge_id)
+            curve.insert(0, "split", split)
             curve.insert(0, "model_id", model_id)
             curve.insert(0, "system_id", system.system_id)
             risk_rows.append(curve)
