@@ -14,5 +14,7 @@ results/smoke/
 results/full_v0/
 results/seed_sweep_two_tank/
 results/two_tank_severity_sweep/
+results/smoke_cstr/
+results/seed_sweep_cstr/
 reports/smoke_report.md
 reports/full_v0_report.md

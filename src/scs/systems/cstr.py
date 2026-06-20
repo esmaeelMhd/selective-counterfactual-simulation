@@ -12,7 +12,7 @@ class CSTRSystem:
     system_id: str = "cstr"
     state_dim: int = 2
     action_dim: int = 1
-    disturbance_dim: int = 1
+    disturbance_dim: int = 3
     concentration_bounds: tuple[float, float] = (0.0, 2.0)
     temperature_bounds: tuple[float, float] = (250.0, 500.0)
 
@@ -30,9 +30,14 @@ class CSTRSystem:
         concentration, temperature = np.asarray(state, dtype=float)
         cooling = float(action[0])
         feed_concentration = float(disturbance[0])
+        feed_temperature = float(disturbance[1])
+        flow_rate = float(disturbance[2])
         reaction_rate = 0.18 * concentration * np.exp((temperature - 330.0) / 80.0)
-        d_concentration = 0.6 * (feed_concentration - concentration) - reaction_rate
-        d_temperature = 0.8 * reaction_rate * 40.0 - 0.45 * cooling - 0.08 * (temperature - 340.0)
+        d_concentration = flow_rate * (feed_concentration - concentration) - reaction_rate
+        heat_release = 0.8 * reaction_rate * 40.0
+        heat_removal = 0.45 * cooling
+        heat_exchange = 0.08 * (feed_temperature - temperature)
+        d_temperature = flow_rate * heat_exchange + heat_release - heat_removal
         return np.array(
             [
                 concentration + dt * d_concentration,

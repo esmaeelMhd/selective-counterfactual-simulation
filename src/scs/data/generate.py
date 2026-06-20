@@ -18,6 +18,12 @@ INTERVENTION_TYPES = {
     "inflow_spike",
     "valve_or_pump_degradation",
     "combined_intervention",
+    "feed_concentration_spike",
+    "feed_temperature_spike",
+    "cooling_step_change",
+    "reaction_rate_shift",
+    "combined_feed_and_cooling_shift",
+    "unsafe_temperature_event",
 }
 
 TWO_TANK_SEVERITY_SETTINGS = {
@@ -222,8 +228,17 @@ def _normal_cstr_action(state: np.ndarray, rng: np.random.Generator) -> float:
 
 def _normal_cstr_disturbance(t: int, horizon: int, rng: np.random.Generator) -> np.ndarray:
     phase = 2.0 * np.pi * t / max(horizon, 1)
-    feed = 1.0 + 0.035 * np.sin(phase * 0.8) + rng.normal(0.0, 0.025)
-    return np.array([np.clip(feed, 0.88, 1.12)], dtype=float)
+    feed_concentration = 1.0 + 0.035 * np.sin(phase * 0.8) + rng.normal(0.0, 0.025)
+    feed_temperature = 340.0 + 2.5 * np.sin(phase * 0.6) + rng.normal(0.0, 1.2)
+    flow_rate = 0.60 + 0.025 * np.cos(phase * 0.7) + rng.normal(0.0, 0.015)
+    return np.array(
+        [
+            np.clip(feed_concentration, 0.88, 1.12),
+            np.clip(feed_temperature, 334.0, 346.0),
+            np.clip(flow_rate, 0.52, 0.68),
+        ],
+        dtype=float,
+    )
 
 
 def _intervention_cstr_action(
@@ -233,17 +248,19 @@ def _intervention_cstr_action(
     horizon: int,
     rng: np.random.Generator,
 ) -> float:
-    if scenario_type == "held_out_action_magnitude":
+    if scenario_type in {"held_out_action_magnitude", "cooling_step_change"}:
         phase = 2.0 * np.pi * t / max(horizon, 1)
         return float(np.clip(14.5 + 1.8 * np.sin(phase) + rng.normal(0.0, 0.35), 11.8, 17.2))
     if scenario_type == "action_step_change" and t >= horizon // 2:
         return float(np.clip(base_action + 4.0, 6.0, 16.0))
     if scenario_type == "valve_or_pump_degradation" and t >= horizon // 2:
         return float(np.clip(base_action * 0.55, 4.0, 16.0))
-    if scenario_type == "combined_intervention":
+    if scenario_type in {"combined_intervention", "combined_feed_and_cooling_shift"}:
         if t >= horizon // 3:
             return float(np.clip(5.6 + rng.normal(0.0, 0.25), 4.6, 6.6))
         return base_action
+    if scenario_type == "unsafe_temperature_event" and t >= horizon // 4:
+        return float(np.clip(base_action * 0.35, 3.0, 12.0))
     return base_action
 
 
@@ -256,11 +273,22 @@ def _intervention_cstr_disturbance(
     disturbance = np.array(base_disturbance, dtype=float)
     spike_start = horizon // 3
     spike_end = min(horizon, spike_start + max(4, horizon // 8))
-    if scenario_type == "inflow_spike" and spike_start <= t < spike_end:
+    if scenario_type in {"inflow_spike", "feed_concentration_spike"} and spike_start <= t < spike_end:
         disturbance[0] += 0.58
-    if scenario_type == "combined_intervention":
+    if scenario_type == "feed_temperature_spike" and spike_start <= t < spike_end:
+        disturbance[1] += 34.0
+    if scenario_type == "reaction_rate_shift" and t >= horizon // 2:
+        disturbance[2] = np.clip(disturbance[2] * 1.75, 0.4, 1.25)
+    if scenario_type in {"combined_intervention", "combined_feed_and_cooling_shift"}:
         if spike_start <= t < spike_end:
             disturbance[0] += 0.44
+            disturbance[1] += 22.0
+        if t >= horizon // 2:
+            disturbance[2] = np.clip(disturbance[2] * 1.45, 0.4, 1.25)
+    if scenario_type == "unsafe_temperature_event":
+        if t >= horizon // 4:
+            disturbance[1] += 46.0
+            disturbance[2] = np.clip(disturbance[2] * 1.55, 0.4, 1.25)
     return disturbance
 
 
@@ -405,13 +433,16 @@ def _generate_cstr_dataset(
         "ood_action_magnitude": seed + 1303,
         "ood_inflow_spike": seed + 1404,
         "ood_combined": seed + 1505,
+        "ood_feed_temperature_spike": seed + 1606,
+        "ood_reaction_rate_shift": seed + 1707,
+        "ood_unsafe_temperature_event": seed + 1808,
     }
     return {
         "train": _simulate_cstr_batch("train", "normal_policy", n_train, horizon, dt, seeds["train"]),
         "id_test": _simulate_cstr_batch("id_test", "normal_policy", n_id_test, horizon, dt, seeds["id_test"]),
         "ood_action_magnitude": _simulate_cstr_batch(
             "ood_action_magnitude",
-            "held_out_action_magnitude",
+            "cooling_step_change",
             n_ood_test,
             horizon,
             dt,
@@ -419,7 +450,7 @@ def _generate_cstr_dataset(
         ),
         "ood_inflow_spike": _simulate_cstr_batch(
             "ood_inflow_spike",
-            "inflow_spike",
+            "feed_concentration_spike",
             n_ood_test,
             horizon,
             dt,
@@ -427,11 +458,35 @@ def _generate_cstr_dataset(
         ),
         "ood_combined": _simulate_cstr_batch(
             "ood_combined",
-            "combined_intervention",
+            "combined_feed_and_cooling_shift",
             n_ood_test,
             horizon,
             dt,
             seeds["ood_combined"],
+        ),
+        "ood_feed_temperature_spike": _simulate_cstr_batch(
+            "ood_feed_temperature_spike",
+            "feed_temperature_spike",
+            n_ood_test,
+            horizon,
+            dt,
+            seeds["ood_feed_temperature_spike"],
+        ),
+        "ood_reaction_rate_shift": _simulate_cstr_batch(
+            "ood_reaction_rate_shift",
+            "reaction_rate_shift",
+            n_ood_test,
+            horizon,
+            dt,
+            seeds["ood_reaction_rate_shift"],
+        ),
+        "ood_unsafe_temperature_event": _simulate_cstr_batch(
+            "ood_unsafe_temperature_event",
+            "unsafe_temperature_event",
+            n_ood_test,
+            horizon,
+            dt,
+            seeds["ood_unsafe_temperature_event"],
         ),
     }
 

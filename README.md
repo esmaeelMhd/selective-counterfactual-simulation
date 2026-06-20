@@ -41,4 +41,7 @@ python scripts/make_report.py --results results/smoke_two_tank
 python scripts/run_smoke.py
 python scripts/audit_claim.py --results results/smoke_two_tank
 python scripts/make_decision_gate.py
+python scripts/run_smoke.py --config configs/experiments/smoke_cstr.yaml
+python scripts/audit_claim.py --results results/smoke_cstr --report reports/cstr_claim_audit.md
+python scripts/make_multi_system_report.py --results results/smoke_two_tank results/smoke_cstr --output reports/multi_system_report.md
 ```

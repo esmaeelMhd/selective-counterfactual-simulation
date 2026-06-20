@@ -1,0 +1,54 @@
+{
+  "claim_status_by_system": [
+    {
+      "claim_verdict": "NOT_SUPPORTED",
+      "seed_verdict": "NOT_SUPPORTED",
+      "severity_verdict": "MEANINGFUL",
+      "system": "two_tank"
+    },
+    {
+      "claim_verdict": "NOT_SUPPORTED",
+      "seed_verdict": "NOT_SUPPORTED",
+      "severity_verdict": "NOT_RUN",
+      "system": "cstr"
+    }
+  ],
+  "combined_vs_best_simple": [
+    {
+      "best_simple_judge": "support_only",
+      "combined_win_rate": 0.0,
+      "system": "two_tank"
+    },
+    {
+      "best_simple_judge": "support_only",
+      "combined_win_rate": 0.0,
+      "system": "cstr"
+    }
+  ],
+  "decision_gate": "KILL_OR_DOWNGRADE_CLAIM",
+  "explanation": "The v0 decision gate is KILL_OR_DOWNGRADE_CLAIM, so expansion outputs are reported as diagnostics only.",
+  "judges": [
+    "combined_linear",
+    "disagreement_only",
+    "invariant_only",
+    "oracle_error_rank",
+    "random_baseline",
+    "repair_only",
+    "support_only",
+    "uncertainty_only"
+  ],
+  "known_failures": [
+    "Decision gate is KILL_OR_DOWNGRADE_CLAIM; expansion is diagnostic, not claim support.",
+    "At least one system has claim_verdict=NOT_SUPPORTED."
+  ],
+  "models": [
+    "hold_last",
+    "linear_narx",
+    "mlp_state_space"
+  ],
+  "overall_claim_status": "NOT_SUPPORTED",
+  "systems": [
+    "cstr",
+    "two_tank"
+  ]
+}

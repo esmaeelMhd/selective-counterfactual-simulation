@@ -141,7 +141,8 @@ def run_seed_sweep(config_path: str, seeds: list[int], output: str) -> dict:
     }
     (out_dir / "seed_sweep_summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
 
-    report_path = Path("reports/seed_sweep_report.md")
+    report_name = "cstr_seed_sweep_report.md" if base_config.get("system_id") == "cstr" else "seed_sweep_report.md"
+    report_path = Path("reports") / report_name
     report_path.parent.mkdir(parents=True, exist_ok=True)
     aggregate_df = pd.DataFrame(
         [{"metric": metric, **values} for metric, values in aggregate.items()]
@@ -206,4 +207,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

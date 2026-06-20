@@ -44,7 +44,18 @@ def test_cstr_dataset_splits_and_shift() -> None:
     assert_not_identical(dataset["train"], dataset["id_test"])
     assert action_range(dataset["ood_action_magnitude"]) > action_range(dataset["train"]) * 1.25
     assert max_inflow(dataset["ood_inflow_spike"]) > max_inflow(dataset["train"]) * 1.25
-    assert set(dataset["ood_inflow_spike"].scenario_type) == {"inflow_spike"}
+    assert dataset["train"].disturbances.shape[-1] == 3
+    assert {
+        "ood_feed_temperature_spike",
+        "ood_reaction_rate_shift",
+        "ood_unsafe_temperature_event",
+    } <= set(dataset)
+    assert set(dataset["ood_action_magnitude"].scenario_type) == {"cooling_step_change"}
+    assert set(dataset["ood_inflow_spike"].scenario_type) == {"feed_concentration_spike"}
+    assert set(dataset["ood_combined"].scenario_type) == {"combined_feed_and_cooling_shift"}
+    assert set(dataset["ood_feed_temperature_spike"].scenario_type) == {"feed_temperature_spike"}
+    assert set(dataset["ood_reaction_rate_shift"].scenario_type) == {"reaction_rate_shift"}
+    assert set(dataset["ood_unsafe_temperature_event"].scenario_type) == {"unsafe_temperature_event"}
 
 
 def test_heat_exchanger_dataset_splits_and_shift() -> None:
@@ -62,4 +73,3 @@ def test_heat_exchanger_dataset_splits_and_shift() -> None:
     assert action_range(dataset["ood_action_magnitude"]) > action_range(dataset["train"]) * 1.25
     assert max_inflow(dataset["ood_inflow_spike"]) > max_inflow(dataset["train"]) * 1.15
     assert set(dataset["ood_combined"].scenario_type) == {"combined_intervention"}
-
