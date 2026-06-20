@@ -37,7 +37,7 @@
     "pytest -q",
     "python scripts/run_smoke.py"
   ],
-  "commit": "02b6aa2",
+  "commit": "3617cdd",
   "csv_nonempty": true,
   "environment": {
     "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
