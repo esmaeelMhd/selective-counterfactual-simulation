@@ -6,7 +6,7 @@ The v0 combined_linear claim was not supported. This gate tests whether calibrat
 
 ## Single-run result
 
-MIXED
+SUPPORTED_LOW_COVERAGE
 
 ## Seed-sweep result
 
@@ -22,15 +22,15 @@ False
 
 ## Decision
 
-KEEP_WITH_LOW_COVERAGE_CLAIM
+PROCEED_TO_CSTR
 
 ## Allowed next actions
 
-replace calibrated judge and rerun TwoTank evidence
+run a separately gated CSTR replication
 
 ## Forbidden next actions
 
-CSTR evidence, RSSM, new systems, platform/product work
+RSSM, platform/product work
 
 ## Explanation
 

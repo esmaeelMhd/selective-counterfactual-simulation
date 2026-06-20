@@ -447,6 +447,7 @@ def _plot_calibrated_risk(risk: pd.DataFrame, output: Path) -> None:
     judges = [
         "best_single_signal_selected_on_calibration",
         "rank_normalized_linear",
+        "calibration_selected_candidate_ranker",
         "logistic_calibrated_judge",
         "isotonic_calibrated_judge",
         "quantile_rule_judge",
@@ -596,8 +597,8 @@ def evaluate_calibrated_tables(
             {
                 "judge_id": item["judge_id"],
                 "available": item["available"],
-                "unavailable_reason": item["unavailable_reason"],
-                "selected_signal_if_any": item["selected_signal_if_any"],
+                "unavailable_reason": item["unavailable_reason"] or "none",
+                "selected_signal_if_any": item["selected_signal_if_any"] or "none",
                 "selected_hyperparameters": json.dumps(item["selected_hyperparameters"], sort_keys=True),
                 "used_test_labels_during_fit": item["used_test_labels_during_fit"],
             }

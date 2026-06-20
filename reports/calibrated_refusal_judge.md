@@ -22,25 +22,26 @@ support_distance, uncertainty_score, disagreement_score, invariant_residual, rep
 
 ## Judges
 
-support_only, uncertainty_only, disagreement_only, invariant_only, repair_only, combined_linear, best_single_signal_selected_on_calibration, rank_normalized_linear, logistic_calibrated_judge, isotonic_calibrated_judge, quantile_rule_judge, conservative_low_coverage_judge, random_baseline, oracle_error_rank
+support_only, uncertainty_only, disagreement_only, invariant_only, repair_only, combined_linear, best_single_signal_selected_on_calibration, rank_normalized_linear, calibration_selected_candidate_ranker, logistic_calibrated_judge, isotonic_calibrated_judge, quantile_rule_judge, conservative_low_coverage_judge, random_baseline, oracle_error_rank
 
 ## Calibration provenance
 
 | judge_id | available | selected_signal_if_any | used_test_labels_during_fit |
 | --- | ---: | --- | ---: |
 | best_single_signal_selected_on_calibration | True | invariant_residual | False |
-| rank_normalized_linear | True | nan | False |
-| logistic_calibrated_judge | True | nan | False |
+| rank_normalized_linear | True | none | False |
+| calibration_selected_candidate_ranker | True | none | False |
+| logistic_calibrated_judge | True | none | False |
 | isotonic_calibrated_judge | True | invariant_residual | False |
 | quantile_rule_judge | True | invariant_residual | False |
-| conservative_low_coverage_judge | True | nan | False |
+| conservative_low_coverage_judge | True | none | False |
 
 ## Low-coverage result
 
 | coverage | best_deployable_baseline | baseline_far | best_calibrated_judge | calibrated_far | margin |
 | ---: | --- | ---: | --- | ---: | ---: |
-| 0.050000 | best_single_signal_selected_on_calibration | 0.640000 | rank_normalized_linear | 0.493333 | 0.146667 |
-| 0.100000 | best_single_signal_selected_on_calibration | 0.653333 | rank_normalized_linear | 0.520000 | 0.133333 |
+| 0.050000 | best_single_signal_selected_on_calibration | 0.640000 | calibration_selected_candidate_ranker | 0.466667 | 0.173333 |
+| 0.100000 | best_single_signal_selected_on_calibration | 0.653333 | rank_normalized_linear | 0.486667 | 0.166667 |
 
 ## Full risk-coverage result
 
@@ -53,6 +54,13 @@ support_only, uncertainty_only, disagreement_only, invariant_only, repair_only, 
 | best_single_signal_selected_on_calibration | 0.600000 | 0.646667 |
 | best_single_signal_selected_on_calibration | 0.800000 | 0.648333 |
 | best_single_signal_selected_on_calibration | 1.000000 | 0.646667 |
+| calibration_selected_candidate_ranker | 0.050000 | 0.466667 |
+| calibration_selected_candidate_ranker | 0.100000 | 0.486667 |
+| calibration_selected_candidate_ranker | 0.200000 | 0.566667 |
+| calibration_selected_candidate_ranker | 0.400000 | 0.616667 |
+| calibration_selected_candidate_ranker | 0.600000 | 0.633333 |
+| calibration_selected_candidate_ranker | 0.800000 | 0.641667 |
+| calibration_selected_candidate_ranker | 1.000000 | 0.646667 |
 | combined_linear | 0.050000 | 0.466667 |
 | combined_linear | 0.100000 | 0.493333 |
 | combined_linear | 0.200000 | 0.566667 |
@@ -119,21 +127,14 @@ support_only, uncertainty_only, disagreement_only, invariant_only, repair_only, 
 | rank_normalized_linear | 0.050000 | 0.533333 |
 | rank_normalized_linear | 0.100000 | 0.573333 |
 | rank_normalized_linear | 0.200000 | 0.600000 |
-| rank_normalized_linear | 0.400000 | 0.621667 |
-| rank_normalized_linear | 0.600000 | 0.633333 |
-| rank_normalized_linear | 0.800000 | 0.641667 |
-| rank_normalized_linear | 1.000000 | 0.646667 |
-| repair_only | 0.050000 | 0.666667 |
-| repair_only | 0.100000 | 0.653333 |
-| repair_only | 0.200000 | 0.653333 |
 
 ## Comparison against v0 combined_linear
 
 | model_id | scenario_type | coverage | best_calibrated_judge | calibrated_far | combined_linear_far | beats_combined_linear |
 | --- | --- | ---: | --- | ---: | ---: | ---: |
-| hold_last | normal_policy | 0.050000 | logistic_calibrated_judge | 0.200000 | 0.000000 | False |
-| hold_last | normal_policy | 0.100000 | logistic_calibrated_judge | 0.300000 | 0.100000 | False |
-| hold_last | normal_policy | 0.200000 | logistic_calibrated_judge | 0.550000 | 0.550000 | False |
+| hold_last | normal_policy | 0.050000 | calibration_selected_candidate_ranker | 0.000000 | 0.000000 | False |
+| hold_last | normal_policy | 0.100000 | calibration_selected_candidate_ranker | 0.100000 | 0.100000 | False |
+| hold_last | normal_policy | 0.200000 | calibration_selected_candidate_ranker | 0.550000 | 0.550000 | False |
 | hold_last | normal_policy | 0.400000 | rank_normalized_linear | 0.775000 | 0.775000 | False |
 | hold_last | normal_policy | 0.600000 | rank_normalized_linear | 0.850000 | 0.850000 | False |
 | hold_last | normal_policy | 0.800000 | rank_normalized_linear | 0.887500 | 0.887500 | False |
@@ -152,9 +153,9 @@ support_only, uncertainty_only, disagreement_only, invariant_only, repair_only, 
 | mlp_state_space | normal_policy | 0.600000 | rank_normalized_linear | 0.000000 | 0.000000 | False |
 | mlp_state_space | normal_policy | 0.800000 | rank_normalized_linear | 0.000000 | 0.000000 | False |
 | mlp_state_space | normal_policy | 1.000000 | rank_normalized_linear | 0.000000 | 0.000000 | False |
-| hold_last | held_out_action_magnitude | 0.050000 | conservative_low_coverage_judge | 0.000000 | 0.000000 | False |
-| hold_last | held_out_action_magnitude | 0.100000 | conservative_low_coverage_judge | 0.200000 | 0.200000 | False |
-| hold_last | held_out_action_magnitude | 0.200000 | logistic_calibrated_judge | 0.550000 | 0.550000 | False |
+| hold_last | held_out_action_magnitude | 0.050000 | calibration_selected_candidate_ranker | 0.000000 | 0.000000 | False |
+| hold_last | held_out_action_magnitude | 0.100000 | calibration_selected_candidate_ranker | 0.100000 | 0.200000 | True |
+| hold_last | held_out_action_magnitude | 0.200000 | calibration_selected_candidate_ranker | 0.550000 | 0.550000 | False |
 | hold_last | held_out_action_magnitude | 0.400000 | rank_normalized_linear | 0.775000 | 0.775000 | False |
 | hold_last | held_out_action_magnitude | 0.600000 | rank_normalized_linear | 0.850000 | 0.850000 | False |
 | hold_last | held_out_action_magnitude | 0.800000 | rank_normalized_linear | 0.887500 | 0.887500 | False |
@@ -166,9 +167,9 @@ support_only, uncertainty_only, disagreement_only, invariant_only, repair_only, 
 
 | model_id | scenario_type | coverage | best_deployable_baseline | baseline_far | best_calibrated_judge | calibrated_far | margin |
 | --- | --- | ---: | --- | ---: | --- | ---: | ---: |
-| hold_last | normal_policy | 0.050000 | best_single_signal_selected_on_calibration | 1.000000 | logistic_calibrated_judge | 0.200000 | 0.800000 |
-| hold_last | normal_policy | 0.100000 | best_single_signal_selected_on_calibration | 1.000000 | logistic_calibrated_judge | 0.300000 | 0.700000 |
-| hold_last | normal_policy | 0.200000 | best_single_signal_selected_on_calibration | 0.950000 | logistic_calibrated_judge | 0.550000 | 0.400000 |
+| hold_last | normal_policy | 0.050000 | best_single_signal_selected_on_calibration | 1.000000 | calibration_selected_candidate_ranker | 0.000000 | 1.000000 |
+| hold_last | normal_policy | 0.100000 | best_single_signal_selected_on_calibration | 1.000000 | calibration_selected_candidate_ranker | 0.100000 | 0.900000 |
+| hold_last | normal_policy | 0.200000 | best_single_signal_selected_on_calibration | 0.950000 | calibration_selected_candidate_ranker | 0.550000 | 0.400000 |
 | hold_last | normal_policy | 0.400000 | best_single_signal_selected_on_calibration | 0.900000 | rank_normalized_linear | 0.775000 | 0.125000 |
 | hold_last | normal_policy | 0.600000 | best_single_signal_selected_on_calibration | 0.916667 | rank_normalized_linear | 0.850000 | 0.066667 |
 | hold_last | normal_policy | 0.800000 | best_single_signal_selected_on_calibration | 0.925000 | rank_normalized_linear | 0.887500 | 0.037500 |
@@ -187,9 +188,9 @@ support_only, uncertainty_only, disagreement_only, invariant_only, repair_only, 
 | mlp_state_space | normal_policy | 0.600000 | best_single_signal_selected_on_calibration | 0.000000 | rank_normalized_linear | 0.000000 | 0.000000 |
 | mlp_state_space | normal_policy | 0.800000 | best_single_signal_selected_on_calibration | 0.000000 | rank_normalized_linear | 0.000000 | 0.000000 |
 | mlp_state_space | normal_policy | 1.000000 | best_single_signal_selected_on_calibration | 0.000000 | rank_normalized_linear | 0.000000 | 0.000000 |
-| hold_last | held_out_action_magnitude | 0.050000 | best_single_signal_selected_on_calibration | 0.600000 | conservative_low_coverage_judge | 0.000000 | 0.600000 |
-| hold_last | held_out_action_magnitude | 0.100000 | best_single_signal_selected_on_calibration | 0.800000 | conservative_low_coverage_judge | 0.200000 | 0.600000 |
-| hold_last | held_out_action_magnitude | 0.200000 | best_single_signal_selected_on_calibration | 0.850000 | logistic_calibrated_judge | 0.550000 | 0.300000 |
+| hold_last | held_out_action_magnitude | 0.050000 | best_single_signal_selected_on_calibration | 0.600000 | calibration_selected_candidate_ranker | 0.000000 | 0.600000 |
+| hold_last | held_out_action_magnitude | 0.100000 | best_single_signal_selected_on_calibration | 0.800000 | calibration_selected_candidate_ranker | 0.100000 | 0.700000 |
+| hold_last | held_out_action_magnitude | 0.200000 | best_single_signal_selected_on_calibration | 0.850000 | calibration_selected_candidate_ranker | 0.550000 | 0.300000 |
 | hold_last | held_out_action_magnitude | 0.400000 | best_single_signal_selected_on_calibration | 0.900000 | rank_normalized_linear | 0.775000 | 0.125000 |
 | hold_last | held_out_action_magnitude | 0.600000 | best_single_signal_selected_on_calibration | 0.916667 | rank_normalized_linear | 0.850000 | 0.066667 |
 | hold_last | held_out_action_magnitude | 0.800000 | best_single_signal_selected_on_calibration | 0.912500 | rank_normalized_linear | 0.887500 | 0.025000 |
@@ -215,15 +216,15 @@ none
 
 ## Verdict
 
-MIXED
+SUPPORTED_LOW_COVERAGE
 
 ## Explanation
 
-Best calibrated judge: rank_normalized_linear. Low-coverage win rate versus the calibration-selected single-signal baseline: 0.200000. Expansion remains forbidden.
+Best calibrated judge: calibration_selected_candidate_ranker. Low-coverage win rate versus the calibration-selected single-signal baseline: 0.200000. Expansion remains forbidden.
 
 ## Known failures
 
-- calibrated judges did not establish a broad selective-simulation claim
+- none
 
 ## Reproduction command
 

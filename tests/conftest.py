@@ -182,6 +182,7 @@ def write_tiny_calibrated_config(path: Path, seed: int = 11) -> Path:
             "combined_linear",
             "best_single_signal_selected_on_calibration",
             "rank_normalized_linear",
+            "calibration_selected_candidate_ranker",
             "logistic_calibrated_judge",
             "isotonic_calibrated_judge",
             "quantile_rule_judge",

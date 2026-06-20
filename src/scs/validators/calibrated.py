@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import itertools
 import json
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -279,6 +280,276 @@ class RankNormalizedLinearJudge(BaseCalibratedJudge):
         return rank_matrix @ weights
 
 
+class CalibrationSelectedCandidateRanker(BaseCalibratedJudge):
+    """Select a deployable low-coverage ranker using calibration false accepts only."""
+
+    def __init__(self, primary_coverages: list[float], bad_threshold: float) -> None:
+        super().__init__("calibration_selected_candidate_ranker", primary_coverages, bad_threshold)
+        self.global_params_: dict | None = None
+        self.group_params_: dict[str, dict] = {}
+
+    @staticmethod
+    def _group_key(model_id: object, scenario_type: object) -> str:
+        return f"{model_id}\t{scenario_type}"
+
+    @staticmethod
+    def _has_group_columns(table: pd.DataFrame) -> bool:
+        return {"model_id", "scenario_type"}.issubset(table.columns)
+
+    def _candidate_score(self, table: pd.DataFrame, params: dict) -> np.ndarray:
+        kind = params["kind"]
+        if kind == "signal":
+            return int(params["orientation"]) * table[str(params["signal"])].to_numpy(dtype=float)
+        if kind == "combined_minmax_natural":
+            columns = list(params["signal_columns"])
+            scores = []
+            for signal in columns:
+                values = table[signal].to_numpy(dtype=float)
+                low, high = params["normalizer"][signal]
+                denom = max(float(high) - float(low), 1e-12)
+                scores.append((values - float(low)) / denom)
+            return np.mean(np.vstack(scores), axis=0)
+        if kind in {"rank_mean_oriented", "rank_grid_oriented"}:
+            columns = list(params["signal_columns"])
+            scores = []
+            for signal in columns:
+                oriented = int(params["orientation"][signal]) * table[signal].to_numpy(dtype=float)
+                scores.append(_empirical_percentile(np.asarray(params["reference_values"][signal], dtype=float), oriented))
+            matrix = np.vstack(scores).T
+            if kind == "rank_mean_oriented":
+                return np.mean(matrix, axis=1)
+            weights = np.asarray([params["weights"][signal] for signal in columns], dtype=float)
+            return matrix @ weights
+        raise ValueError(f"unknown calibrated candidate kind: {kind}")
+
+    def _candidate_objective(self, table: pd.DataFrame, params: dict, error_column: str) -> tuple[float, float]:
+        scores = self._candidate_score(table, params)
+        errors = table[error_column].to_numpy(dtype=float)
+        fars = [
+            _acceptance_false_accept_rate(errors, scores, self.bad_threshold, coverage)
+            for coverage in self.primary_coverages
+        ]
+        order = np.argsort(scores, kind="mergesort")
+        accepted = order[: min(max(int(np.ceil(min(self.primary_coverages) * len(table))), 1), len(table))]
+        return float(np.mean(fars)), float(np.mean(errors[accepted]))
+
+    def _best_orientation(self, table: pd.DataFrame, signal: str, error_column: str) -> int:
+        objectives = []
+        for orientation in [1, -1]:
+            params = {
+                "candidate_id": f"signal:{signal}:{'high' if orientation == 1 else 'low'}",
+                "kind": "signal",
+                "signal": signal,
+                "orientation": orientation,
+            }
+            objective, accepted_error = self._candidate_objective(table, params, error_column)
+            objectives.append((objective, accepted_error, 0 if orientation == 1 else 1, orientation))
+        return int(sorted(objectives)[0][3])
+
+    def _candidate_priority(self, candidate_id: str) -> int:
+        priorities = {
+            "signal:disagreement_score:high": 0,
+            "combined_minmax_natural": 1,
+            "rank_grid_oriented": 2,
+            "rank_mean_oriented": 3,
+        }
+        if candidate_id.startswith("signal:"):
+            return priorities.get(candidate_id, 10)
+        return priorities.get(candidate_id, 20)
+
+    def _build_candidates(self, table: pd.DataFrame, signal_columns: list[str], error_column: str) -> list[dict]:
+        candidates: list[dict] = []
+        for signal in signal_columns:
+            for orientation in [1, -1]:
+                candidates.append(
+                    {
+                        "candidate_id": f"signal:{signal}:{'high' if orientation == 1 else 'low'}",
+                        "kind": "signal",
+                        "signal": signal,
+                        "orientation": orientation,
+                    }
+                )
+
+        candidates.append(
+            {
+                "candidate_id": "combined_minmax_natural",
+                "kind": "combined_minmax_natural",
+                "signal_columns": list(signal_columns),
+                "normalizer": {
+                    signal: [
+                        float(table[signal].to_numpy(dtype=float).min()),
+                        float(table[signal].to_numpy(dtype=float).max()),
+                    ]
+                    for signal in signal_columns
+                },
+            }
+        )
+
+        orientation = {signal: self._best_orientation(table, signal, error_column) for signal in signal_columns}
+        reference_values = {
+            signal: orientation[signal] * table[signal].to_numpy(dtype=float)
+            for signal in signal_columns
+        }
+        rank_mean = {
+            "candidate_id": "rank_mean_oriented",
+            "kind": "rank_mean_oriented",
+            "signal_columns": list(signal_columns),
+            "orientation": dict(orientation),
+            "reference_values": reference_values,
+        }
+        candidates.append(rank_mean)
+
+        rank_scores = []
+        for signal in signal_columns:
+            oriented = reference_values[signal]
+            rank_scores.append(_empirical_percentile(oriented, oriented))
+        rank_matrix = np.vstack(rank_scores).T
+        grid = [0.0, 0.25, 0.5, 0.75, 1.0]
+        best_weights: np.ndarray | None = None
+        best_objective: tuple[float, float] | None = None
+        errors = table[error_column].to_numpy(dtype=float)
+        for weights in itertools.product(grid, repeat=len(signal_columns)):
+            weight_array = np.asarray(weights, dtype=float)
+            if float(weight_array.sum()) <= 0.0:
+                continue
+            weight_array = weight_array / weight_array.sum()
+            score = rank_matrix @ weight_array
+            fars = [
+                _acceptance_false_accept_rate(errors, score, self.bad_threshold, coverage)
+                for coverage in self.primary_coverages
+            ]
+            accepted_count = min(max(int(np.ceil(min(self.primary_coverages) * len(table))), 1), len(table))
+            accepted_error = float(np.mean(errors[np.argsort(score, kind="mergesort")[:accepted_count]]))
+            objective = (float(np.mean(fars)), accepted_error)
+            if best_objective is None or objective < best_objective:
+                best_objective = objective
+                best_weights = weight_array
+        if best_weights is not None:
+            candidates.append(
+                {
+                    "candidate_id": "rank_grid_oriented",
+                    "kind": "rank_grid_oriented",
+                    "signal_columns": list(signal_columns),
+                    "orientation": dict(orientation),
+                    "reference_values": reference_values,
+                    "weights": {
+                        signal: float(weight)
+                        for signal, weight in zip(signal_columns, best_weights)
+                    },
+                    "weight_grid": grid,
+                }
+            )
+        return candidates
+
+    def _select_params(self, table: pd.DataFrame, signal_columns: list[str], error_column: str, bad_label_column: str) -> dict:
+        labels = table[bad_label_column].astype(int)
+        if labels.nunique() < 2:
+            raise ValueError("bad labels are degenerate for candidate selection")
+        rows = []
+        for params in self._build_candidates(table, signal_columns, error_column):
+            objective, accepted_error = self._candidate_objective(table, params, error_column)
+            rows.append(
+                {
+                    "params": params,
+                    "candidate_id": params["candidate_id"],
+                    "calibration_primary_far": objective,
+                    "calibration_lowest_coverage_mean_error_accepted": accepted_error,
+                    "priority": self._candidate_priority(str(params["candidate_id"])),
+                }
+            )
+        best = sorted(
+            rows,
+            key=lambda row: (
+                row["calibration_primary_far"],
+                row["priority"],
+                row["calibration_lowest_coverage_mean_error_accepted"],
+                row["candidate_id"],
+            ),
+        )[0]
+        params = best["params"]
+        params["calibration_primary_far"] = float(best["calibration_primary_far"])
+        params["calibration_lowest_coverage_mean_error_accepted"] = float(best["calibration_lowest_coverage_mean_error_accepted"])
+        return params
+
+    @staticmethod
+    def _serializable_param_summary(params: dict) -> dict:
+        summary = {
+            "candidate_id": params.get("candidate_id"),
+            "kind": params.get("kind"),
+            "calibration_primary_far": params.get("calibration_primary_far"),
+            "calibration_lowest_coverage_mean_error_accepted": params.get(
+                "calibration_lowest_coverage_mean_error_accepted"
+            ),
+        }
+        if params.get("kind") == "signal":
+            summary["signal"] = params.get("signal")
+            summary["orientation"] = params.get("orientation")
+        if params.get("kind") == "rank_grid_oriented":
+            summary["weights"] = params.get("weights")
+            summary["orientation"] = params.get("orientation")
+        if params.get("kind") == "rank_mean_oriented":
+            summary["orientation"] = params.get("orientation")
+        return summary
+
+    def fit(self, calibration_table: pd.DataFrame, signal_columns: list[str], error_column: str, bad_label_column: str) -> None:
+        self._begin_fit(calibration_table, signal_columns, error_column, bad_label_column)
+        try:
+            self.global_params_ = self._select_params(calibration_table, signal_columns, error_column, bad_label_column)
+        except ValueError as exc:
+            self._mark_unavailable(str(exc))
+            return
+
+        self.group_params_ = {}
+        fallback_groups = []
+        if self._has_group_columns(calibration_table):
+            for (model_id, scenario_type), group in calibration_table.groupby(["model_id", "scenario_type"], sort=False):
+                key = self._group_key(model_id, scenario_type)
+                if group[bad_label_column].astype(int).nunique() < 2:
+                    fallback_groups.append(key)
+                    continue
+                try:
+                    self.group_params_[key] = self._select_params(group, signal_columns, error_column, bad_label_column)
+                except ValueError:
+                    fallback_groups.append(key)
+
+        selected_counts = Counter(
+            params["candidate_id"]
+            for params in [self.global_params_, *self.group_params_.values()]
+            if params is not None
+        )
+        global_summary = self._serializable_param_summary(self.global_params_)
+        group_summary = {
+            key: self._serializable_param_summary(params)
+            for key, params in self.group_params_.items()
+        }
+        self.selected_signal_if_any = (
+            str(self.global_params_["signal"])
+            if self.global_params_ is not None and self.global_params_.get("kind") == "signal"
+            else None
+        )
+        self.selected_hyperparameters = {
+            "selection_metric": "lowest_calibration_false_accept_rate_at_primary_coverages",
+            "group_columns": ["model_id", "scenario_type"],
+            "global_selection": global_summary,
+            "group_selection": group_summary,
+            "fallback_group_count": len(fallback_groups),
+            "fallback_groups": fallback_groups,
+            "selected_candidate_counts": dict(selected_counts),
+            "oracle_used": False,
+        }
+
+    def score(self, scenario_table: pd.DataFrame) -> np.ndarray:
+        if not self.available or self.global_params_ is None:
+            return np.ones(len(scenario_table), dtype=float)
+        if not self._has_group_columns(scenario_table):
+            return self._candidate_score(scenario_table, self.global_params_)
+        result = pd.Series(index=scenario_table.index, dtype=float)
+        for (model_id, scenario_type), group in scenario_table.groupby(["model_id", "scenario_type"], sort=False):
+            params = self.group_params_.get(self._group_key(model_id, scenario_type), self.global_params_)
+            result.loc[group.index] = self._candidate_score(group, params)
+        return result.to_numpy(dtype=float)
+
+
 class LogisticCalibratedJudge(BaseCalibratedJudge):
     def __init__(self, primary_coverages: list[float], bad_threshold: float) -> None:
         super().__init__("logistic_calibrated_judge", primary_coverages, bad_threshold)
@@ -418,6 +689,7 @@ class ConservativeLowCoverageJudge(BaseCalibratedJudge):
 CALIBRATED_JUDGE_IDS = [
     "best_single_signal_selected_on_calibration",
     "rank_normalized_linear",
+    "calibration_selected_candidate_ranker",
     "logistic_calibrated_judge",
     "isotonic_calibrated_judge",
     "quantile_rule_judge",
@@ -429,6 +701,7 @@ def make_calibrated_judges(primary_coverages: list[float], bad_threshold: float)
     return [
         BestSingleSignalJudge(primary_coverages, bad_threshold),
         RankNormalizedLinearJudge(primary_coverages, bad_threshold),
+        CalibrationSelectedCandidateRanker(primary_coverages, bad_threshold),
         LogisticCalibratedJudge(primary_coverages, bad_threshold),
         IsotonicCalibratedJudge(primary_coverages, bad_threshold),
         QuantileRuleJudge(primary_coverages, bad_threshold),

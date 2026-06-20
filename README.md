@@ -19,12 +19,12 @@ The v0 evidence audit downgraded the primary claim. `combined_linear` did not ro
 
 The calibrated refusal-judge milestone replaces the failed `combined_linear` claim with a narrower low-coverage claim. Current calibrated evidence status:
 
-- single calibrated TwoTank run: `MIXED`
+- single calibrated TwoTank run: `SUPPORTED_LOW_COVERAGE`
 - calibrated seed sweep: `ROBUST_LOW_COVERAGE`
 - threshold/coverage stress: `ROBUST_LOW_COVERAGE_ONLY`
-- calibrated decision gate: `KEEP_WITH_LOW_COVERAGE_CLAIM`
+- calibrated decision gate: `PROCEED_TO_CSTR`
 
-Expansion to CSTR/RSSM/new systems remains forbidden by the calibrated decision gate. The supported working scope is a low-coverage calibrated refusal claim on TwoTank only.
+The gate allows only a separately gated CSTR replication next. RSSM, product/platform work, and any frontend/API expansion remain out of scope.
 
 ## Non-goals
 

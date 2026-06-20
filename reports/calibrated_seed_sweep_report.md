@@ -14,29 +14,30 @@ python scripts/run_calibrated_seed_sweep.py --config configs/experiments/calibra
 
 | seed | verdict | best_calibrated_judge | low_coverage_win | leakage_detected |
 | ---: | --- | --- | ---: | ---: |
-| 0 | MIXED | rank_normalized_linear | True | False |
-| 1 | SUPPORTED_LOW_COVERAGE | rank_normalized_linear | True | False |
+| 0 | SUPPORTED_LOW_COVERAGE | calibration_selected_candidate_ranker | True | False |
+| 1 | SUPPORTED_LOW_COVERAGE | calibration_selected_candidate_ranker | True | False |
 | 2 | SUPPORTED_LOW_COVERAGE | rank_normalized_linear | True | False |
-| 3 | SUPPORTED_LOW_COVERAGE | rank_normalized_linear | True | False |
-| 4 | MIXED | rank_normalized_linear | True | False |
-| 5 | MIXED | rank_normalized_linear | True | False |
-| 6 | SUPPORTED_LOW_COVERAGE | rank_normalized_linear | True | False |
-| 7 | MIXED | logistic_calibrated_judge | True | False |
-| 8 | MIXED | rank_normalized_linear | True | False |
-| 9 | MIXED | rank_normalized_linear | True | False |
+| 3 | SUPPORTED_LOW_COVERAGE | calibration_selected_candidate_ranker | True | False |
+| 4 | SUPPORTED_LOW_COVERAGE | rank_normalized_linear | True | False |
+| 5 | SUPPORTED_LOW_COVERAGE | calibration_selected_candidate_ranker | True | False |
+| 6 | SUPPORTED_LOW_COVERAGE | calibration_selected_candidate_ranker | True | False |
+| 7 | SUPPORTED_LOW_COVERAGE | calibration_selected_candidate_ranker | True | False |
+| 8 | SUPPORTED_LOW_COVERAGE | rank_normalized_linear | True | False |
+| 9 | SUPPORTED_LOW_COVERAGE | calibration_selected_candidate_ranker | True | False |
 
 ## Low-coverage aggregate
 
 | coverage | win_rate_vs_calibration_selected_single_signal | mean_margin | std_margin |
 | ---: | ---: | ---: | ---: |
-| 0.050000 | 1.000000 | 0.141333 | 0.033307 |
-| 0.100000 | 1.000000 | 0.101333 | 0.024000 |
+| 0.050000 | 1.000000 | 0.172000 | 0.019276 |
+| 0.100000 | 1.000000 | 0.132667 | 0.015333 |
 
 ## Judge robustness
 
 | judge | win_count | mean_far | std_far |
 | --- | ---: | ---: | ---: |
 | best_single_signal_selected_on_calibration | 300 | 0.649000 | 0.463048 |
+| calibration_selected_candidate_ranker | 300 | 0.508000 | 0.484201 |
 | combined_linear | 300 | 0.512667 | 0.473272 |
 | conservative_low_coverage_judge | 300 | 0.565000 | 0.455301 |
 | disagreement_only | 300 | 0.495333 | 0.484659 |
