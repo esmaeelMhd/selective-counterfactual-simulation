@@ -17,6 +17,15 @@ The primary metric is false accept rate at fixed coverage. A false accept occurs
 
 The v0 evidence audit downgraded the primary claim. `combined_linear` did not robustly beat the strongest simple judge in the claim audit or seed sweep, so it should be treated as an exploratory baseline until v0 is fixed and re-audited.
 
+The calibrated refusal-judge milestone replaces the failed `combined_linear` claim with a narrower low-coverage claim. Current calibrated evidence status:
+
+- single calibrated TwoTank run: `MIXED`
+- calibrated seed sweep: `ROBUST_LOW_COVERAGE`
+- threshold/coverage stress: `ROBUST_LOW_COVERAGE_ONLY`
+- calibrated decision gate: `KEEP_WITH_LOW_COVERAGE_CLAIM`
+
+Expansion to CSTR/RSSM/new systems remains forbidden by the calibrated decision gate. The supported working scope is a low-coverage calibrated refusal claim on TwoTank only.
+
 ## Non-goals
 
 This is not a product, service, plant-wide digital twin, control stack, API, frontend, or safety certification workflow. The v0 scope is a runnable benchmark with explicit failures and measured risk-coverage curves.
@@ -41,7 +50,9 @@ python scripts/make_report.py --results results/smoke_two_tank
 python scripts/run_smoke.py
 python scripts/audit_claim.py --results results/smoke_two_tank
 python scripts/make_decision_gate.py
-python scripts/run_smoke.py --config configs/experiments/smoke_cstr.yaml
-python scripts/audit_claim.py --results results/smoke_cstr --report reports/cstr_claim_audit.md
-python scripts/make_multi_system_report.py --results results/smoke_two_tank results/smoke_cstr --output reports/multi_system_report.md
+python scripts/verify_calibrated_judge_preconditions.py
+python scripts/run_calibrated_judge.py --config configs/experiments/calibrated_two_tank.yaml --output results/calibrated_two_tank
+python scripts/run_calibrated_seed_sweep.py --config configs/experiments/calibrated_two_tank.yaml --seeds 0 1 2 3 4 5 6 7 8 9 --output results/calibrated_seed_sweep_two_tank
+python scripts/run_calibrated_stress.py --config configs/experiments/calibrated_two_tank.yaml --thresholds 0.05 0.10 0.15 0.20 0.30 0.50 --coverages 0.05 0.10 0.20 0.40 0.60 0.80 1.00 --seeds 0 1 2 3 4 --output results/calibrated_stress_two_tank
+python scripts/make_calibrated_judge_decision_gate.py --single-run results/calibrated_two_tank/calibrated_judge_summary.json --seed-sweep results/calibrated_seed_sweep_two_tank/seed_sweep_calibrated_summary.json --stress results/calibrated_stress_two_tank/stress_summary.json --output reports/calibrated_judge_decision_gate.md
 ```

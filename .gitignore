@@ -15,6 +15,9 @@ results/full_v0/
 results/seed_sweep_two_tank/
 results/two_tank_severity_sweep/
 results/failure_analysis/
+results/calibrated_two_tank/
+results/calibrated_seed_sweep_two_tank/
+results/calibrated_stress_two_tank/
 results/smoke_cstr/
 results/seed_sweep_cstr/
 reports/smoke_report.md

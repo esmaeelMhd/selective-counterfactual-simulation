@@ -685,6 +685,51 @@ def generate_dataset(
     raise ValueError("dataset generation supports system_id='two_tank', system_id='cstr', or system_id='heat_exchanger'")
 
 
+def generate_calibrated_two_tank_dataset(
+    n_model_train: int,
+    n_calibration_id: int,
+    n_calibration_ood: int,
+    n_test_id: int,
+    n_test_ood: int,
+    horizon: int,
+    dt: float,
+    seed: int,
+    severity: str = "medium",
+) -> dict[str, TrajectoryBatch]:
+    """Generate separated TwoTank data roles for calibrated judge evaluation.
+
+    Split roles:
+    - ``model_train`` fits simulator models only.
+    - ``judge_calibration_*`` fits/selects refusal judges only.
+    - ``judge_test_*`` evaluates fixed refusal judges only.
+    """
+    split_specs = [
+        ("model_train", "normal_policy", n_model_train, seed + 1001),
+        ("judge_calibration_id", "normal_policy", n_calibration_id, seed + 2001),
+        ("judge_calibration_ood_action_magnitude", "held_out_action_magnitude", n_calibration_ood, seed + 2101),
+        ("judge_calibration_ood_inflow_spike", "inflow_spike", n_calibration_ood, seed + 2201),
+        ("judge_calibration_ood_combined", "combined_intervention", n_calibration_ood, seed + 2301),
+        ("judge_calibration_pump_degradation", "valve_or_pump_degradation", n_calibration_ood, seed + 2401),
+        ("judge_test_id", "normal_policy", n_test_id, seed + 3001),
+        ("judge_test_ood_action_magnitude", "held_out_action_magnitude", n_test_ood, seed + 3101),
+        ("judge_test_ood_inflow_spike", "inflow_spike", n_test_ood, seed + 3201),
+        ("judge_test_ood_combined", "combined_intervention", n_test_ood, seed + 3301),
+        ("judge_test_pump_degradation", "valve_or_pump_degradation", n_test_ood, seed + 3401),
+    ]
+    return {
+        split: _simulate_two_tank_batch(
+            split=split,
+            scenario_type=scenario_type,
+            n_trajectories=n_trajectories,
+            horizon=horizon,
+            dt=dt,
+            seed=split_seed,
+            severity=severity,
+        )
+        for split, scenario_type, n_trajectories, split_seed in split_specs
+    }
+
+
 def summarize_dataset(dataset: dict[str, TrajectoryBatch]) -> dict[str, dict[str, float | int | str]]:
     summary: dict[str, dict[str, float | int | str]] = {}
     for split, batch in dataset.items():

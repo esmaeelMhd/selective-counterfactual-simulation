@@ -1,0 +1,16 @@
+{
+  "allowed_next_actions": [
+    "replace calibrated judge and rerun TwoTank evidence"
+  ],
+  "decision": "KEEP_WITH_LOW_COVERAGE_CLAIM",
+  "forbidden_next_actions": [
+    "CSTR evidence",
+    "RSSM",
+    "new systems",
+    "platform/product work"
+  ],
+  "leakage_detected": false,
+  "seed_sweep_verdict": "ROBUST_LOW_COVERAGE",
+  "single_run_verdict": "MIXED",
+  "stress_verdict": "ROBUST_LOW_COVERAGE_ONLY"
+}
