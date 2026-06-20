@@ -1,0 +1,9 @@
+system_id: two_tank
+state_dim: 2
+action_dim: 1
+disturbance_dim: 2
+capacity:
+  - 10.0
+  - 10.0
+pump_gain: 1.15
+

@@ -1,0 +1,44 @@
+experiment_id: full_v0
+seed: 42
+systems:
+  - system_id: two_tank
+  - system_id: cstr
+  - system_id: heat_exchanger
+horizon: 45
+dt: 0.1
+n_train: 180
+n_id_test: 40
+n_ood_test: 40
+output_dir: results/full_v0
+uncertainty_samples: 6
+
+models:
+  - hold_last
+  - linear_narx
+  - mlp_state_space
+
+judges:
+  - support_only
+  - uncertainty_only
+  - disagreement_only
+  - invariant_only
+  - repair_only
+  - combined_linear
+  - random_baseline
+  - oracle_error_rank
+
+bad_threshold:
+  metric: rmse
+  value: 0.15
+  per_system:
+    two_tank: 0.15
+    cstr: 0.8
+    heat_exchanger: 0.8
+
+coverages:
+  - 0.1
+  - 0.2
+  - 0.4
+  - 0.6
+  - 0.8
+  - 1.0

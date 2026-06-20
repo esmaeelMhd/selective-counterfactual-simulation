@@ -1,0 +1,2 @@
+"""Refusal and validity signals."""
+

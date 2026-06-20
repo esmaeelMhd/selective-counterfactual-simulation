@@ -1,0 +1,12 @@
+system_id: heat_exchanger
+state_dim: 2
+action_dim: 1
+disturbance_dim: 2
+hot_bounds:
+  - 40.0
+  - 140.0
+cold_bounds:
+  - 5.0
+  - 95.0
+heat_transfer_gain: 0.018
+
