@@ -1,0 +1,47 @@
+{
+  "diagnosis": "JUDGE_PROBLEM",
+  "evidence": [
+    {
+      "analysis": "gate",
+      "key_finding": "BLOCKED",
+      "verdict": "READY_FOR_FAILURE_ANALYSIS"
+    },
+    {
+      "analysis": "signal_error_correlation",
+      "key_finding": "Best RMSE-failure AUROC was 0.891903",
+      "verdict": "USEFUL_SIGNALS_FOUND"
+    },
+    {
+      "analysis": "per_split_failure",
+      "key_finding": "Worst split by mean RMSE: ood_combined",
+      "verdict": "GLOBAL_FAILURE"
+    },
+    {
+      "analysis": "threshold_sensitivity",
+      "key_finding": "combined_linear worked at 0 of 6 thresholds",
+      "verdict": "UNSUPPORTED_ACROSS_THRESHOLDS"
+    },
+    {
+      "analysis": "coverage_sensitivity",
+      "key_finding": "combined_linear worked at 1 coverage points",
+      "verdict": "WORKS_AT_LOW_COVERAGE"
+    },
+    {
+      "analysis": "score_ablation",
+      "key_finding": "Best ablation/calibration win rate was 0.000000",
+      "verdict": "SIGNAL_PROBLEM"
+    },
+    {
+      "analysis": "model_diversity",
+      "key_finding": "Mean oracle gap was 0.000278",
+      "verdict": "ORACLE_GAP_SMALL"
+    },
+    {
+      "analysis": "benchmark_sanity",
+      "key_finding": "OOD mean error 0.388781 vs ID mean error 0.171247",
+      "verdict": "VALID_BENCHMARK"
+    }
+  ],
+  "expansion_forbidden": true,
+  "recommended_next_action": "REPLACE_JUDGE"
+}
