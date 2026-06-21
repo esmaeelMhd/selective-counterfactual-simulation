@@ -196,3 +196,50 @@ def write_tiny_calibrated_config(path: Path, seed: int = 11) -> Path:
     }
     path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
     return path
+
+
+def write_tiny_calibrated_cstr_config(path: Path, seed: int = 11) -> Path:
+    config = {
+        "experiment_id": "calibrated_cstr_tiny",
+        "seed": seed,
+        "system_id": "cstr",
+        "horizon": 12,
+        "dt": 0.1,
+        "n_model_train": 24,
+        "n_calibration_id": 8,
+        "n_calibration_ood": 8,
+        "n_test_id": 10,
+        "n_test_ood": 10,
+        "output_dir": str(path.parent / "calibrated_cstr"),
+        "uncertainty_samples": 1,
+        "models": ["hold_last", "linear_narx"],
+        "signals": [
+            "support_distance",
+            "uncertainty_score",
+            "disagreement_score",
+            "invariant_residual",
+            "repair_amount",
+        ],
+        "judges": [
+            "support_only",
+            "uncertainty_only",
+            "disagreement_only",
+            "invariant_only",
+            "repair_only",
+            "combined_linear",
+            "best_single_signal_selected_on_calibration",
+            "rank_normalized_linear",
+            "calibration_selected_candidate_ranker",
+            "logistic_calibrated_judge",
+            "isotonic_calibrated_judge",
+            "quantile_rule_judge",
+            "conservative_low_coverage_judge",
+            "random_baseline",
+            "oracle_error_rank",
+        ],
+        "bad_threshold": {"metric": "rmse", "value": 0.15},
+        "coverages": [0.05, 0.10, 0.20, 0.40, 1.00],
+        "primary_coverages": [0.05, 0.10],
+    }
+    path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+    return path

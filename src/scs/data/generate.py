@@ -730,6 +730,147 @@ def generate_calibrated_two_tank_dataset(
     }
 
 
+def _simulate_cstr_calibrated_batch(
+    split: str,
+    simulator_scenario_type: str,
+    reported_scenario_type: str,
+    n_trajectories: int,
+    horizon: int,
+    dt: float,
+    seed: int,
+) -> TrajectoryBatch:
+    batch = _simulate_cstr_batch(
+        split=split,
+        scenario_type=simulator_scenario_type,
+        n_trajectories=n_trajectories,
+        horizon=horizon,
+        dt=dt,
+        seed=seed,
+    )
+    return TrajectoryBatch(
+        states=batch.states,
+        actions=batch.actions,
+        disturbances=batch.disturbances,
+        scenario_type=[reported_scenario_type] * batch.n_trajectories,
+        split=split,
+        system_id=batch.system_id,
+    )
+
+
+def generate_calibrated_cstr_dataset(
+    n_model_train: int,
+    n_calibration_id: int,
+    n_calibration_ood: int,
+    n_test_id: int,
+    n_test_ood: int,
+    horizon: int,
+    dt: float,
+    seed: int,
+) -> dict[str, TrajectoryBatch]:
+    """Generate separated CSTR data roles for frozen calibrated replication."""
+    split_specs = [
+        ("model_train", "normal_policy", "id", n_model_train, seed + 1001),
+        ("judge_calibration_id", "normal_policy", "id", n_calibration_id, seed + 2001),
+        (
+            "judge_calibration_feed_concentration_spike",
+            "feed_concentration_spike",
+            "feed_concentration_spike",
+            n_calibration_ood,
+            seed + 2101,
+        ),
+        (
+            "judge_calibration_feed_temperature_spike",
+            "feed_temperature_spike",
+            "feed_temperature_spike",
+            n_calibration_ood,
+            seed + 2201,
+        ),
+        (
+            "judge_calibration_cooling_step_change",
+            "cooling_step_change",
+            "cooling_step_change",
+            n_calibration_ood,
+            seed + 2301,
+        ),
+        (
+            "judge_calibration_reaction_rate_shift",
+            "reaction_rate_shift",
+            "reaction_rate_shift",
+            n_calibration_ood,
+            seed + 2401,
+        ),
+        (
+            "judge_calibration_combined_feed_and_cooling_shift",
+            "combined_feed_and_cooling_shift",
+            "combined_feed_and_cooling_shift",
+            n_calibration_ood,
+            seed + 2501,
+        ),
+        (
+            "judge_calibration_unsafe_temperature_event",
+            "unsafe_temperature_event",
+            "unsafe_temperature_event",
+            n_calibration_ood,
+            seed + 2601,
+        ),
+        ("judge_test_id", "normal_policy", "id", n_test_id, seed + 3001),
+        (
+            "judge_test_feed_concentration_spike",
+            "feed_concentration_spike",
+            "feed_concentration_spike",
+            n_test_ood,
+            seed + 3101,
+        ),
+        (
+            "judge_test_feed_temperature_spike",
+            "feed_temperature_spike",
+            "feed_temperature_spike",
+            n_test_ood,
+            seed + 3201,
+        ),
+        (
+            "judge_test_cooling_step_change",
+            "cooling_step_change",
+            "cooling_step_change",
+            n_test_ood,
+            seed + 3301,
+        ),
+        (
+            "judge_test_reaction_rate_shift",
+            "reaction_rate_shift",
+            "reaction_rate_shift",
+            n_test_ood,
+            seed + 3401,
+        ),
+        (
+            "judge_test_combined_feed_and_cooling_shift",
+            "combined_feed_and_cooling_shift",
+            "combined_feed_and_cooling_shift",
+            n_test_ood,
+            seed + 3501,
+        ),
+        (
+            "judge_test_unsafe_temperature_event",
+            "unsafe_temperature_event",
+            "unsafe_temperature_event",
+            n_test_ood,
+            seed + 3601,
+        ),
+    ]
+    return {
+        split: _simulate_cstr_calibrated_batch(
+            split=split,
+            simulator_scenario_type=simulator_scenario_type,
+            reported_scenario_type=reported_scenario_type,
+            n_trajectories=n_trajectories,
+            horizon=horizon,
+            dt=dt,
+            seed=split_seed,
+        )
+        for split, simulator_scenario_type, reported_scenario_type, n_trajectories, split_seed in split_specs
+    }
+
+
 def summarize_dataset(dataset: dict[str, TrajectoryBatch]) -> dict[str, dict[str, float | int | str]]:
     summary: dict[str, dict[str, float | int | str]] = {}
     for split, batch in dataset.items():

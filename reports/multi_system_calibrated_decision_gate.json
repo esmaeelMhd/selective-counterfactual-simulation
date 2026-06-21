@@ -1,0 +1,28 @@
+{
+  "allowed_claim": "A calibrated low-coverage refusal result replicated on TwoTank and CSTR under the frozen protocol.",
+  "allowed_next_actions": [
+    "write up the bounded evidence",
+    "inspect failure modes",
+    "only then consider separately gated expansion"
+  ],
+  "cstr_sanity_verdict": "VALID_CSTR_BENCHMARK",
+  "cstr_seed_verdict": "ROBUST_LOW_COVERAGE",
+  "cstr_single_verdict": "SUPPORTED_LOW_COVERAGE",
+  "cstr_stress_verdict": "ROBUST_LOW_COVERAGE_ONLY",
+  "decision": "TWO_SYSTEM_LOW_COVERAGE_SUPPORTED",
+  "forbidden_claims": [
+    "product readiness",
+    "safety certification",
+    "autonomous control",
+    "broad plant-wide validity"
+  ],
+  "forbidden_next_actions": [
+    "RSSM evidence in this milestone",
+    "heat_exchanger evidence in this milestone",
+    "API/frontend/product work"
+  ],
+  "leakage_detected": false,
+  "twotank_seed_verdict": "ROBUST_LOW_COVERAGE",
+  "twotank_single_verdict": "SUPPORTED_LOW_COVERAGE",
+  "twotank_stress_verdict": "ROBUST_LOW_COVERAGE_ONLY"
+}

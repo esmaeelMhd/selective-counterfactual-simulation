@@ -18,6 +18,11 @@ results/failure_analysis/
 results/calibrated_two_tank/
 results/calibrated_seed_sweep_two_tank/
 results/calibrated_stress_two_tank/
+results/cstr_preconditions/
+results/cstr_sanity/
+results/calibrated_cstr/
+results/calibrated_seed_sweep_cstr/
+results/calibrated_stress_cstr/
 results/smoke_cstr/
 results/seed_sweep_cstr/
 reports/smoke_report.md

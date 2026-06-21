@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from scs.data.generate import generate_calibrated_two_tank_dataset, summarize_dataset
+from scs.data.generate import generate_calibrated_cstr_dataset, generate_calibrated_two_tank_dataset, summarize_dataset
 from scs.data.schemas import save_dataset
 from scs.experiments.registry import make_model, make_system
 from scs.metrics.trajectory import final_state_error, mae, max_abs_error, rmse
@@ -81,6 +81,27 @@ SPLIT_SEED_OFFSETS = {
     "judge_test_ood_inflow_spike": 3201,
     "judge_test_ood_combined": 3301,
     "judge_test_pump_degradation": 3401,
+    "judge_calibration_feed_concentration_spike": 2101,
+    "judge_calibration_feed_temperature_spike": 2201,
+    "judge_calibration_cooling_step_change": 2301,
+    "judge_calibration_reaction_rate_shift": 2401,
+    "judge_calibration_combined_feed_and_cooling_shift": 2501,
+    "judge_calibration_unsafe_temperature_event": 2601,
+    "judge_test_feed_concentration_spike": 3101,
+    "judge_test_feed_temperature_spike": 3201,
+    "judge_test_cooling_step_change": 3301,
+    "judge_test_reaction_rate_shift": 3401,
+    "judge_test_combined_feed_and_cooling_shift": 3501,
+    "judge_test_unsafe_temperature_event": 3601,
+}
+CSTR_REQUIRED_SCENARIO_TYPES = {
+    "id",
+    "feed_concentration_spike",
+    "feed_temperature_spike",
+    "cooling_step_change",
+    "reaction_rate_shift",
+    "combined_feed_and_cooling_shift",
+    "unsafe_temperature_event",
 }
 
 
@@ -95,6 +116,28 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
 
 def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _default_calibrated_report_path(config: dict[str, Any]) -> Path:
+    if config["system_id"] == "cstr":
+        return Path("reports/calibrated_cstr_report.md")
+    return Path("reports/calibrated_refusal_judge.md")
+
+
+def _system_report_path(config: dict[str, Any], two_tank_name: str, cstr_name: str) -> Path:
+    return Path("reports") / (cstr_name if config["system_id"] == "cstr" else two_tank_name)
+
+
+def _check_cstr_sanity_gate(config: dict[str, Any]) -> dict[str, Any] | None:
+    if config["system_id"] != "cstr" or config.get("experiment_id") != "calibrated_cstr":
+        return None
+    sanity_path = Path("results/cstr_sanity/cstr_label_checks.json")
+    if not sanity_path.exists():
+        raise RuntimeError("CSTR sanity must run before calibrated CSTR evidence")
+    sanity = _load_json(sanity_path)
+    if sanity.get("verdict") != "VALID_CSTR_BENCHMARK":
+        raise RuntimeError(f"CSTR sanity is not valid: {sanity.get('verdict')}")
+    return sanity
 
 
 def _markdown_table(df: pd.DataFrame, columns: list[str], max_rows: int | None = None) -> str:
@@ -127,9 +170,9 @@ def load_calibrated_config(path: str | Path) -> dict[str, Any]:
     missing = sorted(REQUIRED_CONFIG_KEYS - set(config))
     if missing:
         raise ValueError(f"missing calibrated config keys: {missing}")
-    if config["system_id"] != "two_tank":
-        raise ValueError("calibrated judge evidence is restricted to system_id='two_tank'")
-    forbidden = {"cstr", "heat_exchanger", "rssm"}
+    if config["system_id"] not in {"two_tank", "cstr"}:
+        raise ValueError("calibrated judge evidence is restricted to system_id='two_tank' or system_id='cstr'")
+    forbidden = {"heat_exchanger", "rssm"}
     serialized = yaml.safe_dump(config).lower()
     used_forbidden = sorted(item for item in forbidden if re.search(rf"\b{re.escape(item)}\b", serialized))
     if used_forbidden:
@@ -163,9 +206,21 @@ def _split_group(split: str) -> str:
     if "inflow_spike" in split:
         return "inflow_spike"
     if "combined" in split:
+        if "feed_and_cooling_shift" in split:
+            return "combined_feed_and_cooling_shift"
         return "combined_intervention"
     if "pump_degradation" in split:
         return "valve_or_pump_degradation"
+    if "feed_concentration_spike" in split:
+        return "feed_concentration_spike"
+    if "feed_temperature_spike" in split:
+        return "feed_temperature_spike"
+    if "cooling_step_change" in split:
+        return "cooling_step_change"
+    if "reaction_rate_shift" in split:
+        return "reaction_rate_shift"
+    if "unsafe_temperature_event" in split:
+        return "unsafe_temperature_event"
     if split == "model_train":
         return "normal_policy"
     return split
@@ -196,7 +251,7 @@ def _build_split_summary(config: dict[str, Any], dataset: dict) -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values(["role", "split"])
 
 
-def _validate_calibrated_splits(dataset: dict, split_summary: pd.DataFrame) -> dict[str, Any]:
+def _validate_calibrated_splits(config: dict[str, Any], dataset: dict, split_summary: pd.DataFrame) -> dict[str, Any]:
     scenario_ids: dict[str, set[str]] = {}
     trajectory_hashes: dict[str, set[str]] = {}
     for split, batch in dataset.items():
@@ -209,22 +264,10 @@ def _validate_calibrated_splits(dataset: dict, split_summary: pd.DataFrame) -> d
     test_ids = set().union(*(scenario_ids[name] for name in scenario_ids if name.startswith("judge_test")))
     calibration_hashes = set().union(*(trajectory_hashes[name] for name in trajectory_hashes if name.startswith("judge_calibration")))
     test_hashes = set().union(*(trajectory_hashes[name] for name in trajectory_hashes if name.startswith("judge_test")))
-    id_action_range = float(
-        split_summary.loc[split_summary["split"] == "judge_calibration_id", "action_max"].iloc[0]
-        - split_summary.loc[split_summary["split"] == "judge_calibration_id", "action_min"].iloc[0]
-    )
-    ood_action_range = float(
-        split_summary.loc[split_summary["split"] == "judge_calibration_ood_action_magnitude", "action_max"].iloc[0]
-        - split_summary.loc[split_summary["split"] == "judge_calibration_ood_action_magnitude", "action_min"].iloc[0]
-    )
-    id_inflow = float(split_summary.loc[split_summary["split"] == "judge_calibration_id", "disturbance_0_max"].iloc[0])
-    ood_inflow = float(split_summary.loc[split_summary["split"] == "judge_calibration_ood_inflow_spike", "disturbance_0_max"].iloc[0])
     result = {
         "scenario_overlap_count": len(calibration_ids & test_ids),
         "trajectory_overlap_count": len(calibration_hashes & test_hashes),
         "seed_streams_unique": bool(split_summary["seed_stream"].nunique() == len(split_summary)),
-        "ood_action_range_ratio": ood_action_range / max(id_action_range, 1e-12),
-        "ood_inflow_ratio": ood_inflow / max(id_inflow, 1e-12),
     }
     if result["scenario_overlap_count"] != 0:
         raise RuntimeError("calibration/test scenario IDs overlap")
@@ -232,39 +275,83 @@ def _validate_calibrated_splits(dataset: dict, split_summary: pd.DataFrame) -> d
         raise RuntimeError("calibration/test trajectories overlap")
     if not result["seed_streams_unique"]:
         raise RuntimeError("calibrated split seed streams are not unique")
-    if result["ood_action_range_ratio"] <= 1.25:
-        raise RuntimeError("calibration OOD action split is not measurably different from ID")
-    if result["ood_inflow_ratio"] <= 1.25:
-        raise RuntimeError("calibration OOD inflow split is not measurably different from ID")
+    id_row = split_summary.loc[split_summary["split"] == "judge_calibration_id"].iloc[0]
+    id_action_range = float(id_row["action_max"] - id_row["action_min"])
+    id_disturbance_0 = float(id_row["disturbance_0_max"])
+    id_disturbance_1 = float(id_row["disturbance_1_max"])
+    if config["system_id"] == "two_tank":
+        ood_action = split_summary.loc[split_summary["split"] == "judge_calibration_ood_action_magnitude"].iloc[0]
+        ood_inflow = split_summary.loc[split_summary["split"] == "judge_calibration_ood_inflow_spike"].iloc[0]
+        result["ood_action_range_ratio"] = float((ood_action["action_max"] - ood_action["action_min"]) / max(id_action_range, 1e-12))
+        result["ood_inflow_ratio"] = float(ood_inflow["disturbance_0_max"] / max(id_disturbance_0, 1e-12))
+        if result["ood_action_range_ratio"] <= 1.25:
+            raise RuntimeError("calibration OOD action split is not measurably different from ID")
+        if result["ood_inflow_ratio"] <= 1.25:
+            raise RuntimeError("calibration OOD inflow split is not measurably different from ID")
+    elif config["system_id"] == "cstr":
+        scenario_types = set().union(*(set(batch.scenario_type) for batch in dataset.values()))
+        missing = sorted(CSTR_REQUIRED_SCENARIO_TYPES - scenario_types)
+        if missing:
+            raise RuntimeError(f"missing calibrated CSTR scenario types: {missing}")
+        cooling = split_summary.loc[split_summary["split"] == "judge_calibration_cooling_step_change"].iloc[0]
+        feed_concentration = split_summary.loc[
+            split_summary["split"] == "judge_calibration_feed_concentration_spike"
+        ].iloc[0]
+        feed_temperature = split_summary.loc[
+            split_summary["split"] == "judge_calibration_feed_temperature_spike"
+        ].iloc[0]
+        result["ood_action_range_ratio"] = float((cooling["action_max"] - cooling["action_min"]) / max(id_action_range, 1e-12))
+        result["ood_feed_concentration_ratio"] = float(feed_concentration["disturbance_0_max"] / max(id_disturbance_0, 1e-12))
+        result["ood_feed_temperature_delta"] = float(feed_temperature["disturbance_1_max"] - id_disturbance_1)
+        if result["ood_action_range_ratio"] <= 1.25:
+            raise RuntimeError("calibration CSTR cooling split is not measurably different from ID")
+        if result["ood_feed_concentration_ratio"] <= 1.25:
+            raise RuntimeError("calibration CSTR feed concentration split is not measurably different from ID")
+        if result["ood_feed_temperature_delta"] <= 10.0:
+            raise RuntimeError("calibration CSTR feed temperature split is not measurably different from ID")
     return result
 
 
 def generate_calibrated_data(config: dict[str, Any], output_dir: str | Path) -> dict:
     out_dir = Path(output_dir)
-    dataset = generate_calibrated_two_tank_dataset(
-        n_model_train=int(config["n_model_train"]),
-        n_calibration_id=int(config["n_calibration_id"]),
-        n_calibration_ood=int(config["n_calibration_ood"]),
-        n_test_id=int(config["n_test_id"]),
-        n_test_ood=int(config["n_test_ood"]),
-        horizon=int(config["horizon"]),
-        dt=float(config["dt"]),
-        seed=int(config["seed"]),
-        severity=str(config.get("severity", "medium")),
-    )
+    if config["system_id"] == "two_tank":
+        dataset = generate_calibrated_two_tank_dataset(
+            n_model_train=int(config["n_model_train"]),
+            n_calibration_id=int(config["n_calibration_id"]),
+            n_calibration_ood=int(config["n_calibration_ood"]),
+            n_test_id=int(config["n_test_id"]),
+            n_test_ood=int(config["n_test_ood"]),
+            horizon=int(config["horizon"]),
+            dt=float(config["dt"]),
+            seed=int(config["seed"]),
+            severity=str(config.get("severity", "medium")),
+        )
+    elif config["system_id"] == "cstr":
+        dataset = generate_calibrated_cstr_dataset(
+            n_model_train=int(config["n_model_train"]),
+            n_calibration_id=int(config["n_calibration_id"]),
+            n_calibration_ood=int(config["n_calibration_ood"]),
+            n_test_id=int(config["n_test_id"]),
+            n_test_ood=int(config["n_test_ood"]),
+            horizon=int(config["horizon"]),
+            dt=float(config["dt"]),
+            seed=int(config["seed"]),
+        )
+    else:
+        raise ValueError(f"unsupported calibrated system_id: {config['system_id']}")
     _ensure_dir(out_dir)
     save_dataset(dataset, out_dir / "data")
     data_summary = summarize_dataset(dataset)
     _write_json(out_dir / "data_summary.json", data_summary)
     split_summary = _build_split_summary(config, dataset)
     split_summary.to_csv(out_dir / "split_summary.csv", index=False)
-    integrity = _validate_calibrated_splits(dataset, split_summary)
+    integrity = _validate_calibrated_splits(config, dataset, split_summary)
     _write_json(out_dir / "split_integrity.json", integrity)
     return dataset
 
 
 def _score_scenarios(config: dict[str, Any], dataset: dict, role: str, models: list, support: SupportDistance) -> pd.DataFrame:
-    system = make_system("two_tank")
+    system = make_system(str(config["system_id"]))
     split_names = [name for name in dataset if _split_role(name) == role]
     predictions: dict[str, dict[tuple[str, int], np.ndarray]] = {model.model_id: {} for model in models}
     true_by_key: dict[tuple[str, int], np.ndarray] = {}
@@ -648,6 +735,9 @@ def run_calibrated_judge(
     command: str | None = None,
 ) -> dict[str, Any]:
     config = load_calibrated_config(config_path)
+    cstr_sanity = _check_cstr_sanity_gate(config)
+    if report_path == "reports/calibrated_refusal_judge.md":
+        report_path = _default_calibrated_report_path(config)
     out_dir = Path(output)
     command = command or f"python scripts/run_calibrated_judge.py --config {config_path} --output {output}"
     np.random.seed(int(config["seed"]))
@@ -660,6 +750,9 @@ def run_calibrated_judge(
     calibration_table = _score_scenarios(config, dataset, "judge_calibration", models, support)
     test_table = _score_scenarios(config, dataset, "judge_test", models, support)
     summary = evaluate_calibrated_tables(config, calibration_table, test_table, out_dir, report_path, command)
+    if cstr_sanity is not None:
+        summary["benchmark_sanity_verdict"] = cstr_sanity["verdict"]
+        _write_json(out_dir / "calibrated_judge_summary.json", summary)
     required = [
         out_dir / "data_summary.json",
         out_dir / "split_summary.csv",
@@ -703,7 +796,39 @@ def write_calibrated_report(
     oracle_gap = oracle.merge(best_real, on="coverage_requested", how="inner")
     oracle_gap["oracle_gap"] = oracle_gap["best_real_far"] - oracle_gap["oracle_far"]
     unavailable = selection[~selection["available"]]
-    text = f"""# Calibrated Refusal Judge Report
+    is_cstr = config["system_id"] == "cstr"
+    title = "Calibrated CSTR Refusal Judge Report" if is_cstr else "Calibrated Refusal Judge Report"
+    protocol_section = (
+        "## Protocol lock\n\n"
+        "docs/calibrated_protocol_lock_v1.md freezes candidate judges, baseline judges, signal columns, models, coverage grid, threshold grid, seed rules, stress rules, and decision rules before CSTR evidence.\n\n"
+        if is_cstr
+        else ""
+    )
+    data_split_summary = ", ".join(sorted(risk["scenario_type"].astype(str).unique()))
+    twotank_comparison = ""
+    if is_cstr:
+        twotank_path = Path("results/calibrated_two_tank/calibrated_judge_summary.json")
+        if twotank_path.exists():
+            twotank_summary = _load_json(twotank_path)
+            twotank_text = (
+                f"TwoTank single-run verdict: {twotank_summary.get('verdict')}; "
+                f"best calibrated judge: {twotank_summary.get('best_calibrated_judge')}."
+            )
+        else:
+            twotank_text = "TwoTank calibrated summary was not present when this report was generated."
+        twotank_comparison = f"""
+## Comparison against TwoTank result
+
+{twotank_text}
+"""
+    benchmark_note = (
+        "\nCSTR sanity must be `VALID_CSTR_BENCHMARK` before the full `calibrated_cstr` evidence run reports claim evidence.\n"
+        if is_cstr
+        else ""
+    )
+    text = f"""# {title}
+
+{protocol_section}
 
 ## Research question
 
@@ -712,10 +837,11 @@ Can a calibrated refusal judge identify a low-coverage subset of counterfactual 
 ## Strict leakage statement
 
 Simulator models are fit on `model_train`; calibrated judges are selected or fit on `judge_calibration_*`; final risk-coverage is computed on `judge_test_*`. Test labels are not used during judge fitting. Oracle is diagnostic only.
+{benchmark_note}
 
 ## Data splits
 
-model_train, judge_calibration_id, judge_calibration_ood_action_magnitude, judge_calibration_ood_inflow_spike, judge_calibration_ood_combined, judge_calibration_pump_degradation, judge_test_id, judge_test_ood_action_magnitude, judge_test_ood_inflow_spike, judge_test_ood_combined, judge_test_pump_degradation.
+{data_split_summary}
 
 ## Models
 
@@ -744,6 +870,7 @@ model_train, judge_calibration_id, judge_calibration_ood_action_magnitude, judge
 ## Comparison against v0 combined_linear
 
 {_markdown_table(comparison, ["model_id", "scenario_type", "coverage", "best_calibrated_judge", "calibrated_far", "combined_linear_far", "beats_combined_linear"], max_rows=30)}
+{twotank_comparison}
 
 ## Comparison against best single signal selected on calibration
 
@@ -864,6 +991,7 @@ Path hack hits: {path_hacks if path_hacks else "none"}
 
 def run_calibrated_seed_sweep(config_path: str | Path, seeds: list[int], output: str | Path) -> dict[str, Any]:
     base_config = load_calibrated_config(config_path)
+    _check_cstr_sanity_gate(base_config)
     out_dir = Path(output)
     _ensure_dir(out_dir)
     all_risk = []
@@ -954,6 +1082,7 @@ def run_calibrated_seed_sweep(config_path: str | Path, seeds: list[int], output:
     )
     summary = {
         "command": f"python scripts/run_calibrated_seed_sweep.py --config {config_path} --seeds {' '.join(map(str, seeds))} --output {output}",
+        "system_id": base_config["system_id"],
         "seeds": seeds,
         "verdict": verdict,
         "winning_seed_count": win_count,
@@ -963,7 +1092,12 @@ def run_calibrated_seed_sweep(config_path: str | Path, seeds: list[int], output:
         "judge_robustness": judge_robustness.to_dict(orient="records"),
     }
     _write_json(out_dir / "seed_sweep_calibrated_summary.json", summary)
-    write_calibrated_seed_sweep_report(summary, seed_df, low_aggregate, judge_robustness, Path("reports/calibrated_seed_sweep_report.md"))
+    report_path = _system_report_path(
+        base_config,
+        "calibrated_seed_sweep_report.md",
+        "calibrated_cstr_seed_sweep_report.md",
+    )
+    write_calibrated_seed_sweep_report(summary, seed_df, low_aggregate, judge_robustness, report_path)
     if failures:
         raise RuntimeError(f"calibrated seed sweep failed for {len(failures)} seeds")
     return summary
@@ -972,7 +1106,8 @@ def run_calibrated_seed_sweep(config_path: str | Path, seeds: list[int], output:
 def write_calibrated_seed_sweep_report(summary: dict[str, Any], seed_df: pd.DataFrame, low: pd.DataFrame, judge: pd.DataFrame, output: Path) -> None:
     _ensure_dir(output.parent)
     failures = summary.get("failures", [])
-    text = f"""# Calibrated Judge Seed Sweep Report
+    title = "Calibrated CSTR Seed Sweep Report" if summary.get("system_id") == "cstr" else "Calibrated Judge Seed Sweep Report"
+    text = f"""# {title}
 
 ## Command
 
@@ -1019,6 +1154,7 @@ def run_calibrated_stress(
     output: str | Path,
 ) -> dict[str, Any]:
     base_config = load_calibrated_config(config_path)
+    _check_cstr_sanity_gate(base_config)
     out_dir = Path(output)
     _ensure_dir(out_dir)
     rows = []
@@ -1094,6 +1230,7 @@ def run_calibrated_stress(
         verdict = "NO_STABLE_REGION"
     summary = {
         "command": f"python scripts/run_calibrated_stress.py --config {config_path} --thresholds {' '.join(map(str, thresholds))} --coverages {' '.join(map(str, coverages))} --seeds {' '.join(map(str, seeds))} --output {output}",
+        "system_id": base_config["system_id"],
         "thresholds": thresholds,
         "coverages": coverages,
         "seeds": seeds,
@@ -1104,7 +1241,12 @@ def run_calibrated_stress(
         "result_by_coverage": by_coverage.to_dict(orient="records"),
     }
     _write_json(out_dir / "stress_summary.json", summary)
-    write_calibrated_stress_report(summary, by_threshold, by_coverage, Path("reports/calibrated_threshold_coverage_stress.md"))
+    report_path = _system_report_path(
+        base_config,
+        "calibrated_threshold_coverage_stress.md",
+        "calibrated_cstr_threshold_coverage_stress.md",
+    )
+    write_calibrated_stress_report(summary, by_threshold, by_coverage, report_path)
     return summary
 
 
@@ -1112,7 +1254,8 @@ def write_calibrated_stress_report(summary: dict[str, Any], by_threshold: pd.Dat
     _ensure_dir(output.parent)
     works = by_threshold[by_threshold["low_coverage_win_rate"] >= 0.6]["threshold"].tolist() if not by_threshold.empty else []
     fails = by_threshold[by_threshold["low_coverage_win_rate"] < 0.6]["threshold"].tolist() if not by_threshold.empty else []
-    text = f"""# Calibrated Judge Threshold/Coverage Stress Report
+    title = "Calibrated CSTR Threshold/Coverage Stress Report" if summary.get("system_id") == "cstr" else "Calibrated Judge Threshold/Coverage Stress Report"
+    text = f"""# {title}
 
 ## Thresholds tested
 
