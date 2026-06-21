@@ -1,0 +1,29 @@
+audit_id: event_risk_audit_v1
+
+systems:
+  cstr:
+    event_labels:
+      - temperature_above_limit
+      - concentration_out_of_safe_range
+      - unsafe_reactor_state
+    thresholds:
+      temperature_high: 390.0
+      concentration_low: 0.25
+      concentration_high: 1.80
+
+  two_tank:
+    event_labels:
+      - overflow_event
+      - underflow_event
+    thresholds:
+      level_min: 0.0
+      level_max: 10.0
+
+primary_coverages:
+  - 0.05
+  - 0.10
+
+bad_label_modes:
+  - bad_rmse
+  - bad_event
+  - bad_rmse_or_event

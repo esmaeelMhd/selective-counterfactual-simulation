@@ -1,0 +1,16 @@
+{
+  "allowed_claim": "A weak but positive low-coverage result under the frozen protocol.",
+  "decision": "NARROW_TO_WEAK_LOW_COVERAGE_CLAIM",
+  "effect_size_verdict": "WEAK_TWO_SYSTEM_EFFECT",
+  "event_risk_verdict": "EVENT_SUPPORTS_CLAIM",
+  "expansion_allowed": false,
+  "false_accept_forensics_verdict": "INCONCLUSIVE",
+  "forbidden_claims": [
+    "safety certification",
+    "product readiness",
+    "plant-wide generalization",
+    "autonomous control",
+    "universal simulator reliability"
+  ],
+  "recommended_next_action": "Use weaker wording and diagnose the small CSTR margin before expansion."
+}
