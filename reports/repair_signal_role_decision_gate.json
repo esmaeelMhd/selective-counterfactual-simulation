@@ -1,0 +1,67 @@
+{
+  "allowed_claim": "A weak but positive low-coverage result under the frozen protocol, with repair_amount treated according to the role decision gate.",
+  "allowed_next_action": "UPDATE_SIGNAL_SEMANTICS_ONLY",
+  "decision": "MARK_REPAIR_DIAGNOSTIC_ONLY_FOR_CSTR",
+  "expansion_allowed": false,
+  "forbidden_claims": [
+    "general reliability",
+    "safety certification",
+    "product readiness",
+    "strong two-system support"
+  ],
+  "forbidden_next_actions": [
+    "ADD_RSSM",
+    "ADD_THIRD_SYSTEM",
+    "ADD_NEW_JUDGE_FAMILY",
+    "MUTATE_FROZEN_PROTOCOL"
+  ],
+  "inputs": {
+    "repair_validation": {
+      "bad_rmse_threshold": 0.15,
+      "cstr_repair_semantic_status": "within-bound CSTR errors are high-RMSE but near-zero repair",
+      "cstr_repair_status": "REPAIR_BOUNDS_ONLY",
+      "epsilon": 1e-09,
+      "failed_cases": [],
+      "two_tank_repair_status": "REPAIR_BOUNDS_ONLY",
+      "verdict": "REPAIR_CORRECT_BUT_CSTR_IRRELEVANT"
+    },
+    "repair_vs_invariant": {
+      "cstr_invariant_auroc": 0.9540608311161304,
+      "cstr_repair_auroc": 0.5,
+      "low_repair_high_invariant_bad_count_total": 94,
+      "two_tank_invariant_auroc": 0.871416066913052,
+      "two_tank_repair_auroc": 0.5,
+      "verdict": "INVARIANT_DOMINATES_REPAIR"
+    },
+    "seed_sweep": {
+      "cstr_improve_seed_count": 0,
+      "cstr_mean_delta_margin": 0.0004761904761904745,
+      "cstr_win_rate": 0.0,
+      "failed_seeds": [],
+      "seeds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "twotank_harm_rate": 0.0,
+      "twotank_harm_seed_count": 0,
+      "twotank_mean_delta_margin": 0.0,
+      "verdict": "NO_SEED_STABLE_BENEFIT"
+    },
+    "signal_ablation": {
+      "configured_max_allowed_twotank_margin_drop": 0.02,
+      "configured_min_cstr_absolute_margin_improvement": 0.02,
+      "cstr_no_repair_mean_delta_margin_vs_full": 0.0,
+      "leakage_detected": false,
+      "two_tank_no_repair_mean_delta_margin_vs_full": 0.0,
+      "verdict": "NO_REPAIR_NO_BENEFIT"
+    }
+  }
+}
