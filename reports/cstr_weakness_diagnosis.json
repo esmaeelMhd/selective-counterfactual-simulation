@@ -1,0 +1,21 @@
+{
+  "allowed_claim": "A weak but positive low-coverage result under the frozen protocol.",
+  "analysis_verdicts": {
+    "diagnosis_table": "ACCEPTED",
+    "model_scenario_failure": "DIFFUSE_CSTR_FAILURE",
+    "preconditions": "READY_FOR_CSTR_WEAKNESS_AUDIT",
+    "repair_signal": "REPAIR_SIGNAL_BLIND_SPOT",
+    "rmse_target": "CSTR_ACCEPTED_REGION_TOO_RISKY",
+    "signal_overlap": "SIGNALS_SEPARATE_ACCEPTED_FAILURES",
+    "statewise_error": "BOTH_STATES"
+  },
+  "expansion_allowed": false,
+  "final_diagnosis": "REPAIR_SIGNAL_BLIND_SPOT",
+  "forbidden_claims": [
+    "strong two-system support",
+    "safety certification",
+    "product readiness",
+    "general reliable counterfactual simulation"
+  ],
+  "recommended_next_action": "FIX_REPAIR_SIGNAL"
+}

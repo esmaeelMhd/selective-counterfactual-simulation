@@ -1,0 +1,69 @@
+audit_id: cstr_weakness_audit_v1
+
+system_id: cstr
+
+source_artifacts:
+  calibrated_cstr: results/calibrated_cstr
+  effect_size_audit: results/effect_size_audit
+  practical_gate: reports/practical_utility_decision_gate.md
+  protocol_lock: docs/calibrated_protocol_lock_v1.md
+
+primary_coverages:
+  - 0.05
+  - 0.10
+
+granular_coverages:
+  - 0.01
+  - 0.02
+  - 0.03
+  - 0.04
+  - 0.05
+  - 0.075
+  - 0.10
+  - 0.15
+  - 0.20
+
+bad_rmse_threshold: 0.15
+
+practical_thresholds:
+  minimum_absolute_far_reduction: 0.05
+  minimum_relative_far_reduction: 0.10
+
+required_signals:
+  - support_distance
+  - uncertainty_score
+  - disagreement_score
+  - invariant_residual
+  - repair_amount
+
+allowed_models:
+  - hold_last
+  - linear_narx
+  - mlp_state_space
+
+allowed_judges:
+  - best_single_signal_selected_on_calibration
+  - rank_normalized_linear
+  - logistic_calibrated_judge
+  - isotonic_calibrated_judge
+  - quantile_rule_judge
+  - conservative_low_coverage_judge
+  - calibration_selected_candidate_ranker
+  - support_only
+  - uncertainty_only
+  - disagreement_only
+  - invariant_only
+  - repair_only
+  - combined_linear
+  - random_baseline
+  - oracle_error_rank
+
+diagnostic_oracle: oracle_error_rank
+
+forbidden:
+  allow_new_models: false
+  allow_new_judges: false
+  allow_new_signals: false
+  allow_new_systems: false
+  allow_protocol_mutation: false
+  allow_overwrite_prior_artifacts: false

@@ -24,6 +24,7 @@ results/calibrated_cstr/
 results/calibrated_seed_sweep_cstr/
 results/calibrated_stress_cstr/
 results/effect_size_audit/
+results/cstr_weakness_audit/
 results/smoke_cstr/
 results/seed_sweep_cstr/
 reports/smoke_report.md
