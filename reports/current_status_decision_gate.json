@@ -1,0 +1,33 @@
+{
+  "allowed_claim": "A weak but positive low-coverage result under the frozen protocol.",
+  "allowed_next_action": "MAINTAIN_REPO_AS_WEAK_POSITIVE_BENCHMARK",
+  "decision": "CURRENT_STATUS_SYNCED",
+  "expansion_allowed": false,
+  "forbidden_claims": [
+    "strong two-system support",
+    "broad simulator reliability",
+    "trustworthy counterfactual simulation",
+    "safety certification",
+    "autonomous control",
+    "product readiness",
+    "plant-wide digital twin",
+    "industrial AI breakthrough",
+    "high-coverage reliability"
+  ],
+  "forbidden_next_actions": [
+    "RSSM",
+    "heat_exchanger evidence",
+    "third system evidence",
+    "new judge family",
+    "new simulator model",
+    "protocol mutation",
+    "product/API/frontend work"
+  ],
+  "inputs": {
+    "claim_language": "CLAIM_LANGUAGE_OK",
+    "manifest_status_id": "current_evidence_status_v1",
+    "preconditions": "READY_FOR_STATUS_SYNC",
+    "readme_sync": "README_SYNCED",
+    "signal_sync": "SIGNAL_SEMANTICS_SYNCED"
+  }
+}

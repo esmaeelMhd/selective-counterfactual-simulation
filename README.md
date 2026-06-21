@@ -1,5 +1,33 @@
 # Selective Counterfactual Simulation
 
+<!-- SCS_CURRENT_STATUS_START -->
+## Current Evidence Status
+
+**Current allowed claim:** A weak but positive low-coverage result under the frozen protocol.
+
+**Expansion status:** Expansion is currently blocked.
+
+**Controlling gates:**
+- Practical utility gate: `NARROW_TO_WEAK_LOW_COVERAGE_CLAIM`
+- Repair signal role gate: `MARK_REPAIR_DIAGNOSTIC_ONLY_FOR_CSTR`
+
+**What is supported:**
+- TwoTank: calibrated low-coverage refusal has a practically meaningful positive effect.
+- CSTR: calibrated low-coverage refusal has a positive but practically weak effect.
+- `repair_amount` is correct as a bounds/projection signal but diagnostic-only for CSTR.
+- `invariant_residual` is much more informative than repair on CSTR.
+
+**What is not supported:**
+- strong general selective simulation
+- high-coverage reliability
+- safety certification
+- product readiness
+- autonomous control
+- plant-wide digital twin claims
+- RSSM or third-system evidence
+<!-- SCS_CURRENT_STATUS_END -->
+
+
 This repository tests one research question:
 
 > Can a learned or hybrid simulator identify which counterfactual intervention scenarios it can answer reliably and abstain on the rest?
@@ -13,7 +41,9 @@ The first milestone is an end-to-end smoke benchmark on a simulated TwoTank syst
 
 The primary metric is false accept rate at fixed coverage. A false accept occurs when a judge accepts a scenario whose simulator prediction is materially wrong under the configured error threshold.
 
-## Current Evidence Status
+## Historical Evidence Milestones
+
+The marker block above is the authoritative current status. The milestones below are retained as evidence history, not as permission to expand beyond the current weak low-coverage claim.
 
 The v0 evidence audit downgraded the primary claim. `combined_linear` did not robustly beat the strongest simple judge in the claim audit or seed sweep, so it should be treated as an exploratory baseline until v0 is fixed and re-audited.
 

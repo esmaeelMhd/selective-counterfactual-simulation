@@ -3,12 +3,12 @@
 ## Command
 
 ```bash
-python scripts/run_seed_sweep.py --config configs/experiments/smoke_two_tank.yaml --seeds 0 1 2 3 4 5 6 7 8 9 --output results/seed_sweep_two_tank
+python scripts/run_seed_sweep.py --config /tmp/pytest-of-ismayil/pytest-147/test_seed_sweep_tiny_two_seed_0/tiny.yaml --seeds 0 1 --output /tmp/pytest-of-ismayil/pytest-147/test_seed_sweep_tiny_two_seed_0/seed_sweep
 ```
 
 ## Seeds
 
-0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+0, 1
 
 ## Per-seed verdict
 
@@ -16,14 +16,6 @@ python scripts/run_seed_sweep.py --config configs/experiments/smoke_two_tank.yam
 | ---: | --- | ---: | --- | --- |
 | 0 | NOT_SUPPORTED | 0.000000 | support_only |  |
 | 1 | NOT_SUPPORTED | 0.000000 | support_only |  |
-| 2 | NOT_SUPPORTED | 0.000000 | support_only |  |
-| 3 | NOT_SUPPORTED | 0.000000 | support_only |  |
-| 4 | NOT_SUPPORTED | 0.000000 | support_only |  |
-| 5 | NOT_SUPPORTED | 0.000000 | support_only |  |
-| 6 | NOT_SUPPORTED | 0.000000 | support_only |  |
-| 7 | NOT_SUPPORTED | 0.000000 | support_only |  |
-| 8 | NOT_SUPPORTED | 0.000000 | support_only |  |
-| 9 | NOT_SUPPORTED | 0.000000 | support_only |  |
 
 ## Aggregate result
 
@@ -33,7 +25,7 @@ python scripts/run_seed_sweep.py --config configs/experiments/smoke_two_tank.yam
 
 ## Combined judge robustness
 
-Combined_linear reached the >= 0.70 per-seed win-rate threshold on 0 of 10 seeds.
+Combined_linear reached the >= 0.70 per-seed win-rate threshold on 0 of 2 seeds.
 
 ## Split-level robustness
 

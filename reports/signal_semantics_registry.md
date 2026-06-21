@@ -16,8 +16,13 @@ Expected higher means: trajectory is farther from the empirical training action/
 | requires_bounds | False |
 | requires_repair_operator | False |
 | requires_ensemble | False |
+| cstr_role | candidate_context_signal |
+| twotank_role | candidate_context_signal |
+| universal_refusal_signal | False |
 | is_universal_candidate | False |
 | is_system_specific_candidate | True |
+
+CSTR note: Useful for CSTR support shift, but not a universal refusal signal.
 
 System applicability:
 - two_tank: applicable when action/disturbance support shift is a failure driver
@@ -50,8 +55,13 @@ Expected higher means: model sample rollouts disagree with each other
 | requires_bounds | False |
 | requires_repair_operator | False |
 | requires_ensemble | True |
+| cstr_role | candidate_model_uncertainty_signal |
+| twotank_role | candidate_model_uncertainty_signal |
+| universal_refusal_signal | False |
 | is_universal_candidate | False |
 | is_system_specific_candidate | True |
+
+CSTR note: Not selected as the strongest current CSTR accepted-region separator.
 
 System applicability:
 - two_tank: applicable if model sampling captures epistemic or rollout uncertainty
@@ -84,8 +94,13 @@ Expected higher means: available simulator models predict meaningfully different
 | requires_bounds | False |
 | requires_repair_operator | False |
 | requires_ensemble | True |
+| cstr_role | candidate_model_disagreement_signal |
+| twotank_role | candidate_model_disagreement_signal |
+| universal_refusal_signal | False |
 | is_universal_candidate | False |
 | is_system_specific_candidate | True |
+
+CSTR note: Mixed CSTR separability in the CSTR weakness audit.
 
 System applicability:
 - two_tank: applicable when model class diversity exposes intervention-shift failure
@@ -117,8 +132,13 @@ Expected higher means: predicted trajectory is inconsistent with known system dy
 | requires_bounds | False |
 | requires_repair_operator | False |
 | requires_ensemble | False |
+| cstr_role | informative_refusal_signal |
+| twotank_role | informative_refusal_signal |
+| universal_refusal_signal | False |
 | is_universal_candidate | False |
 | is_system_specific_candidate | True |
+
+CSTR note: Best accepted-region signal in CSTR weakness audit.
 
 System applicability:
 - two_tank: inventory accounting residual for external inflow/outflow consistency
@@ -151,8 +171,13 @@ Expected higher means: predicted states violate configured physical bounds and r
 | requires_bounds | True |
 | requires_repair_operator | True |
 | requires_ensemble | False |
+| cstr_role | diagnostic_only |
+| twotank_role | diagnostic_constraint_signal |
+| universal_refusal_signal | False |
 | is_universal_candidate | False |
 | is_system_specific_candidate | True |
+
+CSTR note: Correct as a bounds/projection signal but irrelevant for within-bound CSTR dynamic errors.
 
 System applicability:
 - two_tank: applicable to negative inventory and over-capacity predictions

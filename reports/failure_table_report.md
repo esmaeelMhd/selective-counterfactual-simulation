@@ -2,27 +2,27 @@
 
 ## Input files
 
-- results/smoke_two_tank/risk_coverage.csv
-- results/smoke_two_tank/scenario_scores.csv
-- results/smoke_two_tank/model_metrics.csv
-- results/smoke_two_tank/summary.json
+- /tmp/pytest-of-ismayil/pytest-147/test_threshold_sensitivity_mar0/results/risk_coverage.csv
+- /tmp/pytest-of-ismayil/pytest-147/test_threshold_sensitivity_mar0/results/scenario_scores.csv
+- /tmp/pytest-of-ismayil/pytest-147/test_threshold_sensitivity_mar0/results/model_metrics.csv
+- /tmp/pytest-of-ismayil/pytest-147/test_threshold_sensitivity_mar0/results/summary.json
 
 ## Output files
 
-- results/failure_analysis/failure_table.csv
-- results/failure_analysis/failure_table_schema.json
+- /tmp/pytest-of-ismayil/pytest-147/test_threshold_sensitivity_mar0/failure_analysis/failure_table.csv
+- /tmp/pytest-of-ismayil/pytest-147/test_threshold_sensitivity_mar0/failure_analysis/failure_table_schema.json
 
 ## Row count
 
-28800
+1152
 
 ## Scenario count
 
-600
+48
 
 ## Models
 
-hold_last, linear_narx, mlp_state_space
+hold_last, linear_narx
 
 ## Judges
 

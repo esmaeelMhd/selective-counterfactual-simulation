@@ -16,12 +16,12 @@ rmse, mae, max_abs_error, final_state_error, event_error, bad_rmse_label, bad_ev
 
 | signal | auroc | auprc | spearman | n |
 | --- | ---: | ---: | ---: | ---: |
-| combined_linear_score | 0.891903 | 0.962067 | 0.600351 | 600 |
-| support_distance | 0.877131 | 0.943126 | 0.577727 | 600 |
-| invariant_residual | 0.858437 | 0.950888 | 0.549085 | 600 |
-| disagreement_score | 0.776648 | 0.903705 | 0.423797 | 600 |
-| uncertainty_score | 0.284908 | 0.632190 | -0.330276 | 600 |
-| repair_amount | nan | nan | nan | 600 |
+| uncertainty_score | 1.000000 | 1.000000 | 0.854191 | 48 |
+| invariant_residual | 1.000000 | 1.000000 | 0.854446 | 48 |
+| repair_amount | 1.000000 | 1.000000 | 0.872575 | 48 |
+| combined_linear_score | 0.971429 | 0.979663 | 0.805292 | 48 |
+| support_distance | 0.960714 | 0.970875 | 0.787675 | 48 |
+| disagreement_score | 0.917857 | 0.942355 | 0.714247 | 48 |
 
 ## Best signals for event failure
 
@@ -40,11 +40,11 @@ none
 
 ## Signals that are negatively correlated
 
-uncertainty_score
+none
 
 ## Interpretation
 
-Best RMSE-failure AUROC was 0.891903. Event labels are unavailable in current v0 artifacts, so event AUROC/AUPRC are not fabricated.
+Best RMSE-failure AUROC was 1.000000. Event labels are unavailable in current v0 artifacts, so event AUROC/AUPRC are not fabricated.
 
 ## Verdict
 

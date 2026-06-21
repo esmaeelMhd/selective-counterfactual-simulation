@@ -17,6 +17,10 @@ class SignalSemantics:
     requires_repair_operator: bool
     requires_ensemble: bool
     system_applicability: dict[str, str]
+    cstr_role: str
+    twotank_role: str
+    cstr_note: str
+    universal_refusal_signal: bool
     failure_type_detected: list[str]
     failure_type_not_detected: list[str]
     known_blind_spots: list[str]
@@ -47,6 +51,10 @@ SIGNAL_SEMANTICS: dict[str, SignalSemantics] = {
             "two_tank": "applicable when action/disturbance support shift is a failure driver",
             "cstr": "applicable when feed/cooling disturbance support shift is a failure driver",
         },
+        cstr_role="candidate_context_signal",
+        twotank_role="candidate_context_signal",
+        cstr_note="Useful for CSTR support shift, but not a universal refusal signal.",
+        universal_refusal_signal=False,
         failure_type_detected=[
             "extrapolation outside observed action/disturbance support",
             "intervention magnitude shift",
@@ -76,6 +84,10 @@ SIGNAL_SEMANTICS: dict[str, SignalSemantics] = {
             "two_tank": "applicable if model sampling captures epistemic or rollout uncertainty",
             "cstr": "applicable if model sampling captures reaction/temperature uncertainty",
         },
+        cstr_role="candidate_model_uncertainty_signal",
+        twotank_role="candidate_model_uncertainty_signal",
+        cstr_note="Not selected as the strongest current CSTR accepted-region separator.",
+        universal_refusal_signal=False,
         failure_type_detected=[
             "model self-uncertainty",
             "unstable sampled rollouts",
@@ -105,6 +117,10 @@ SIGNAL_SEMANTICS: dict[str, SignalSemantics] = {
             "two_tank": "applicable when model class diversity exposes intervention-shift failure",
             "cstr": "applicable when model class diversity exposes reaction or thermal dynamics failure",
         },
+        cstr_role="candidate_model_disagreement_signal",
+        twotank_role="candidate_model_disagreement_signal",
+        cstr_note="Mixed CSTR separability in the CSTR weakness audit.",
+        universal_refusal_signal=False,
         failure_type_detected=[
             "model-class disagreement",
             "ambiguous rollout behavior under the same intervention",
@@ -133,6 +149,10 @@ SIGNAL_SEMANTICS: dict[str, SignalSemantics] = {
             "two_tank": "inventory accounting residual for external inflow/outflow consistency",
             "cstr": "one-step CSTR concentration/temperature dynamics residual under known equations",
         },
+        cstr_role="informative_refusal_signal",
+        twotank_role="informative_refusal_signal",
+        cstr_note="Best accepted-region signal in CSTR weakness audit.",
+        universal_refusal_signal=False,
         failure_type_detected=[
             "dynamics/accounting inconsistency",
             "trajectory that cannot be reproduced by the known system step",
@@ -162,6 +182,10 @@ SIGNAL_SEMANTICS: dict[str, SignalSemantics] = {
             "two_tank": "applicable to negative inventory and over-capacity predictions",
             "cstr": "applicable only to concentration/temperature predictions outside configured bounds",
         },
+        cstr_role="diagnostic_only",
+        twotank_role="diagnostic_constraint_signal",
+        cstr_note="Correct as a bounds/projection signal but irrelevant for within-bound CSTR dynamic errors.",
+        universal_refusal_signal=False,
         failure_type_detected=[
             "state-bound violation",
             "projection or clipping correction amount",
@@ -215,8 +239,13 @@ def render_signal_semantics_markdown(registry: dict[str, dict[str, Any]] | None 
                 f"| requires_bounds | {item['requires_bounds']} |",
                 f"| requires_repair_operator | {item['requires_repair_operator']} |",
                 f"| requires_ensemble | {item['requires_ensemble']} |",
+                f"| cstr_role | {item['cstr_role']} |",
+                f"| twotank_role | {item['twotank_role']} |",
+                f"| universal_refusal_signal | {item['universal_refusal_signal']} |",
                 f"| is_universal_candidate | {item['is_universal_candidate']} |",
                 f"| is_system_specific_candidate | {item['is_system_specific_candidate']} |",
+                "",
+                f"CSTR note: {item['cstr_note']}",
                 "",
                 "System applicability:",
             ]

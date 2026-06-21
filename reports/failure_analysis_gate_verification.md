@@ -8,10 +8,10 @@ KILL_OR_DOWNGRADE_CLAIM
 
 | artifact | exists | size |
 | --- | ---: | ---: |
-| risk_coverage.csv | True | 62137 |
-| scenario_scores.csv | True | 226745 |
-| model_metrics.csv | True | 1760 |
-| summary.json | True | 9032 |
+| risk_coverage.csv | True | 14873 |
+| scenario_scores.csv | True | 12371 |
+| model_metrics.csv | True | 101 |
+| summary.json | True | 431 |
 
 ## Data integrity checks
 

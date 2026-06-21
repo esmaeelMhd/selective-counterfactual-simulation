@@ -1,0 +1,63 @@
+status_id: current_evidence_status_v1
+
+source_commit: 7ba9cdecff1b7fa32bd028c3c4d835ee0b7eb98c
+source_tag: v1-repair-signal-semantics
+
+controlling_reports:
+  practical_utility_gate: reports/practical_utility_decision_gate.md
+  cstr_weakness_diagnosis: reports/cstr_weakness_diagnosis.md
+  repair_signal_role_gate: reports/repair_signal_role_decision_gate.md
+
+source_artifacts:
+  twotank_calibrated_summary: results/calibrated_two_tank/calibrated_judge_summary.json
+  twotank_low_coverage: results/calibrated_two_tank/low_coverage_summary.csv
+  cstr_calibrated_summary: results/calibrated_cstr/calibrated_judge_summary.json
+  cstr_low_coverage: results/calibrated_cstr/low_coverage_summary.csv
+  effect_size_summary: results/effect_size_audit/effect_size/effect_size_summary.json
+  cstr_weakness_summary: results/cstr_weakness_audit/repair_signal/repair_signal_metrics.json
+  repair_role_summary: results/repair_signal_semantics_audit/repair_validation/repair_validation_summary.json
+  repair_vs_invariant_summary: results/repair_signal_semantics_audit/repair_vs_invariant/repair_vs_invariant_summary.json
+  repair_signal_decision: reports/repair_signal_role_decision_gate.md
+
+current_allowed_claim:
+  label: WEAK_LOW_COVERAGE_CLAIM
+  text: "A weak but positive low-coverage result under the frozen protocol."
+
+current_forbidden_claims:
+  - strong two-system support
+  - broad simulator reliability
+  - trustworthy counterfactual simulation
+  - safety certification
+  - autonomous control
+  - product readiness
+  - plant-wide digital twin
+  - industrial AI breakthrough
+  - high-coverage reliability
+
+expansion_allowed: false
+
+forbidden_directions:
+  - RSSM
+  - heat_exchanger evidence
+  - third system evidence
+  - new judge family
+  - new simulator model
+  - protocol mutation
+  - product/API/frontend work
+
+signal_role_decisions:
+  repair_amount:
+    cstr_role: diagnostic_only
+    cstr_reason: "Correct as a bounds/projection signal but irrelevant for within-bound CSTR dynamic errors."
+    twotank_role: diagnostic_constraint_signal
+    universal_refusal_signal: false
+
+  invariant_residual:
+    cstr_role: informative_refusal_signal
+    cstr_reason: "Dominates repair_amount on CSTR accepted-region separation."
+    universal_refusal_signal: false
+
+required_readme_status:
+  controlling_status: NARROW_TO_WEAK_LOW_COVERAGE_CLAIM
+  expansion_allowed: false
+  repair_amount_cstr_role: diagnostic_only

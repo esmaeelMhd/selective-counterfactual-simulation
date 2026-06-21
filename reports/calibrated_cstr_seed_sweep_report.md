@@ -3,7 +3,7 @@
 ## Command
 
 ```bash
-python scripts/run_calibrated_seed_sweep.py --config /tmp/pytest-of-ismayil/pytest-118/test_tiny_cstr_seed_sweep_keep0/tiny_cstr.yaml --seeds 0 1 --output /tmp/pytest-of-ismayil/pytest-118/test_tiny_cstr_seed_sweep_keep0/seed_sweep
+python scripts/run_calibrated_seed_sweep.py --config /tmp/pytest-of-ismayil/pytest-147/test_tiny_cstr_seed_sweep_keep0/tiny_cstr.yaml --seeds 0 1 --output /tmp/pytest-of-ismayil/pytest-147/test_tiny_cstr_seed_sweep_keep0/seed_sweep
 ```
 
 ## Seeds

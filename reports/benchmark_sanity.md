@@ -4,25 +4,25 @@
 
 | check | passed | value | threshold |
 | --- | ---: | ---: | ---: |
-| ood_action_magnitude_action_range_ratio | True | 2.363897 | 1.250000 |
-| ood_action_magnitude_disturbance0_max_ratio | False | 0.975155 | 1.250000 |
-| ood_inflow_spike_action_range_ratio | False | 0.888760 | 1.250000 |
-| ood_inflow_spike_disturbance0_max_ratio | True | 2.764866 | 1.250000 |
-| ood_combined_action_range_ratio | True | 3.234316 | 1.250000 |
-| ood_combined_disturbance0_max_ratio | True | 2.450301 | 1.250000 |
+| ood_action_magnitude_action_range_ratio | True | 3.000000 | 1.250000 |
+| ood_action_magnitude_disturbance0_max_ratio | False | 1.000000 | 1.250000 |
+| ood_inflow_spike_action_range_ratio | False | 1.000000 | 1.250000 |
+| ood_inflow_spike_disturbance0_max_ratio | True | 3.200000 | 1.250000 |
+| ood_combined_action_range_ratio | True | 3.000000 | 1.250000 |
+| ood_combined_disturbance0_max_ratio | True | 3.300000 | 1.250000 |
 
 ## Error separation
 
 | split | mean_error | bad_rate |
 | --- | ---: | ---: |
-| id_test | 0.171247 | 0.300000 |
-| ood_action_magnitude | 0.420843 | 0.966667 |
-| ood_combined | 0.474653 | 1.000000 |
-| ood_inflow_spike | 0.270846 | 0.666667 |
+| id_test | 1.000000 | 1.000000 |
+| ood_action_magnitude | 1.000000 | 1.000000 |
+| ood_combined | 1.000000 | 1.000000 |
+| ood_inflow_spike | 1.000000 | 1.000000 |
 
 ## Label degeneracy
 
-Bad label rate: 0.733333; non-degenerate: True; enough bad scenarios: True; enough accepted bad scenarios: True.
+Bad label rate: 1.000000; non-degenerate: False; enough bad scenarios: True; enough accepted bad scenarios: True.
 
 ## Event degeneracy
 
@@ -30,12 +30,12 @@ Event labels available: False. Current v0 artifacts do not store raw event traje
 
 ## Benchmark verdict
 
-VALID_BENCHMARK
+WEAK_BENCHMARK
 
 ## Explanation
 
-OOD mean error 0.388781 vs ID mean error 0.171247.
+OOD mean error 1.000000 vs ID mean error 1.000000.
 
 ## Required fixes if weak or invalid
 
-- none
+- Improve error separation and store event trajectories for event-label analysis.
