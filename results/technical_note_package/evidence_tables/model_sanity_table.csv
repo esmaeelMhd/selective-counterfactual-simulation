@@ -1,0 +1,4 @@
+model,id_rmse_mean
+hold_last,0.5048064156567844
+linear_narx,0.0077536064125858
+mlp_state_space,0.001179968125772

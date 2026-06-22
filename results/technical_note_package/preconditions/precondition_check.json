@@ -1,0 +1,60 @@
+{
+  "allowed_next_action": "MAINTAIN_REPO_AS_WEAK_POSITIVE_BENCHMARK",
+  "current_status_gate": "CURRENT_STATUS_SYNCED",
+  "dirty_state": [],
+  "expansion_allowed": false,
+  "forbidden_dependency_scan": {
+    "old_repo_runtime_import_hits": [],
+    "path_hack_hits": []
+  },
+  "forbidden_evidence_refs": [],
+  "package_id": "limitations_first_technical_note_v1",
+  "practical_utility_gate": "NARROW_TO_WEAK_LOW_COVERAGE_CLAIM",
+  "reasons": [],
+  "repair_signal_role_gate": "MARK_REPAIR_DIAGNOSTIC_ONLY_FOR_CSTR",
+  "required_source_artifacts": [
+    {
+      "exists": true,
+      "name": "current_manifest",
+      "path": "results/current_status/evidence_manifest/current_evidence_manifest.json"
+    },
+    {
+      "exists": true,
+      "name": "twotank_low_coverage",
+      "path": "results/calibrated_two_tank/low_coverage_summary.csv"
+    },
+    {
+      "exists": true,
+      "name": "cstr_low_coverage",
+      "path": "results/calibrated_cstr/low_coverage_summary.csv"
+    },
+    {
+      "exists": true,
+      "name": "effect_size_summary",
+      "path": "results/effect_size_audit/effect_size/effect_size_summary.json"
+    },
+    {
+      "exists": true,
+      "name": "cstr_weakness_diagnosis",
+      "path": "reports/cstr_weakness_diagnosis.md"
+    },
+    {
+      "exists": true,
+      "name": "repair_signal_role_decision",
+      "path": "reports/repair_signal_role_decision_gate.md"
+    },
+    {
+      "exists": true,
+      "name": "signal_semantics_registry",
+      "path": "results/current_status/evidence_manifest/current_evidence_manifest.json"
+    },
+    {
+      "exists": true,
+      "name": "smoke_model_metrics",
+      "path": "results/smoke_two_tank/model_metrics.csv"
+    }
+  ],
+  "source_artifact_hash_manifest": "results/technical_note_package/preconditions/source_artifact_hashes.json",
+  "verdict": "READY_FOR_TECHNICAL_NOTE_PACKAGE",
+  "working_tree_dirty": false
+}

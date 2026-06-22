@@ -1,0 +1,3 @@
+signal,system,role,key_finding
+repair_amount,cstr,diagnostic_only,AUROC 0.500000; diagnostic-only for within-bound CSTR errors
+invariant_residual,cstr,informative_refusal_signal,AUROC 0.954061; much more informative for CSTR

@@ -1,0 +1,60 @@
+package_id: limitations_first_technical_note_v1
+
+source_commit: e0dbdc2
+source_tag: v1-current-status-sync
+
+controlling_status:
+  current_status_gate: reports/current_status_decision_gate.md
+  practical_utility_gate: reports/practical_utility_decision_gate.md
+  repair_signal_role_gate: reports/repair_signal_role_decision_gate.md
+
+source_artifacts:
+  current_manifest: results/current_status/evidence_manifest/current_evidence_manifest.json
+  twotank_low_coverage: results/calibrated_two_tank/low_coverage_summary.csv
+  cstr_low_coverage: results/calibrated_cstr/low_coverage_summary.csv
+  effect_size_summary: results/effect_size_audit/effect_size/effect_size_summary.json
+  cstr_weakness_diagnosis: reports/cstr_weakness_diagnosis.md
+  repair_signal_role_decision: reports/repair_signal_role_decision_gate.md
+  signal_semantics_registry: results/current_status/evidence_manifest/current_evidence_manifest.json
+  smoke_model_metrics: results/smoke_two_tank/model_metrics.csv
+
+allowed_claim:
+  label: WEAK_LOW_COVERAGE_BENCHMARK
+  text: "A weak but positive low-coverage refusal benchmark under a frozen protocol."
+
+required_caveats:
+  - "TwoTank is practically meaningful; CSTR is positive but weak."
+  - "The result is low-coverage only."
+  - "repair_amount is diagnostic-only for CSTR."
+  - "invariant_residual is much more informative for CSTR."
+  - "Expansion is blocked."
+  - "No safety, product, or general reliability claim is supported."
+
+forbidden_claims:
+  - strong support
+  - broad simulator reliability
+  - trustworthy counterfactual simulation
+  - safety certification
+  - autonomous control
+  - product readiness
+  - plant-wide digital twin
+  - industrial AI breakthrough
+  - high-coverage reliability
+  - universal simulator
+
+outputs:
+  technical_note: docs/technical_note_limitations_first.md
+  one_page_summary: docs/one_page_project_summary.md
+  portfolio_summary: docs/portfolio_summary.md
+  claim_audit_table: docs/claim_audit_table.md
+  reproducibility_card: docs/reproducibility_card.md
+  figure_dir: docs/figures
+  package_manifest: results/technical_note_package/package_manifest.json
+
+forbidden:
+  allow_new_experiments: false
+  allow_new_systems: false
+  allow_new_models: false
+  allow_new_judges: false
+  allow_protocol_mutation: false
+  allow_prior_artifact_overwrite: false

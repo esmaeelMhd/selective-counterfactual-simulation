@@ -1,0 +1,130 @@
+{
+  "claim_language": {
+    "allowed_mentions": [
+      {
+        "context_heading": "non-claims",
+        "line": 13,
+        "path": "docs/technical_note_limitations_first.md",
+        "phrase": "safety certification"
+      },
+      {
+        "context_heading": "non-claims",
+        "line": 14,
+        "path": "docs/technical_note_limitations_first.md",
+        "phrase": "product-ready"
+      },
+      {
+        "context_heading": "non-claims",
+        "line": 15,
+        "path": "docs/technical_note_limitations_first.md",
+        "phrase": "general simulator reliability"
+      },
+      {
+        "context_heading": "non-claims",
+        "line": 16,
+        "path": "docs/technical_note_limitations_first.md",
+        "phrase": "high-coverage reliability"
+      },
+      {
+        "context_heading": "what it does not claim",
+        "line": 25,
+        "path": "docs/one_page_project_summary.md",
+        "phrase": "autonomous control"
+      },
+      {
+        "context_heading": "what it does not claim",
+        "line": 25,
+        "path": "docs/one_page_project_summary.md",
+        "phrase": "high-coverage reliability"
+      },
+      {
+        "context_heading": "what it does not claim",
+        "line": 25,
+        "path": "docs/one_page_project_summary.md",
+        "phrase": "plant-wide simulation"
+      },
+      {
+        "context_heading": "what it does not claim",
+        "line": 25,
+        "path": "docs/one_page_project_summary.md",
+        "phrase": "product readiness"
+      },
+      {
+        "context_heading": "what it does not claim",
+        "line": 25,
+        "path": "docs/one_page_project_summary.md",
+        "phrase": "safety certification"
+      },
+      {
+        "context_heading": "claim audit table",
+        "line": 10,
+        "path": "docs/claim_audit_table.md",
+        "phrase": "general simulator reliability"
+      },
+      {
+        "context_heading": "claim audit table",
+        "line": 11,
+        "path": "docs/claim_audit_table.md",
+        "phrase": "product readiness"
+      },
+      {
+        "context_heading": "claim audit table",
+        "line": 11,
+        "path": "docs/claim_audit_table.md",
+        "phrase": "product-ready"
+      },
+      {
+        "context_heading": "what not to do next",
+        "line": 37,
+        "path": "reports/release_note_v1_current_status.md",
+        "phrase": "high-coverage reliability"
+      },
+      {
+        "context_heading": "what not to do next",
+        "line": 37,
+        "path": "reports/release_note_v1_current_status.md",
+        "phrase": "product readiness"
+      },
+      {
+        "context_heading": "what not to do next",
+        "line": 37,
+        "path": "reports/release_note_v1_current_status.md",
+        "phrase": "safety certification"
+      }
+    ],
+    "paths_scanned": [
+      "docs/technical_note_limitations_first.md",
+      "docs/one_page_project_summary.md",
+      "docs/portfolio_summary.md",
+      "docs/claim_audit_table.md",
+      "docs/reproducibility_card.md",
+      "reports/release_note_v1_current_status.md"
+    ],
+    "risk_phrases": [
+      "autonomous control",
+      "broad simulator reliability",
+      "general selective simulation",
+      "general simulator reliability",
+      "high-coverage reliability",
+      "industrial ai breakthrough",
+      "plant-wide digital twin",
+      "plant-wide simulation",
+      "product readiness",
+      "product-ready",
+      "safety certification",
+      "strong support",
+      "trustworthy counterfactual simulation",
+      "trustworthy simulator",
+      "universal simulator",
+      "validated digital twin"
+    ],
+    "violations": []
+  },
+  "missing": [],
+  "prior_artifact_mutation_detected": false,
+  "readme_synced": true,
+  "reasons": [],
+  "source_hash_mismatches": [],
+  "table_mismatches": [],
+  "verdict": "TECHNICAL_NOTE_PACKAGE_ACCEPTED"
+}

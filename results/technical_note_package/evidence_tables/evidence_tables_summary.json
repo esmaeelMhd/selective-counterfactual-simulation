@@ -1,0 +1,19 @@
+{
+  "allowed_claim": "A weak but positive low-coverage refusal benchmark under a frozen protocol.",
+  "effect_size_verdict": "WEAK_TWO_SYSTEM_EFFECT",
+  "invariant_residual_auroc_cstr": 0.9540608311161304,
+  "package_id": "limitations_first_technical_note_v1",
+  "practical_utility_gate_decision": "NARROW_TO_WEAK_LOW_COVERAGE_CLAIM",
+  "repair_auroc_cstr": 0.5,
+  "repair_signal_role_decision": "MARK_REPAIR_DIAGNOSTIC_ONLY_FOR_CSTR",
+  "source_artifacts": {
+    "cstr_low_coverage": "results/calibrated_cstr/low_coverage_summary.csv",
+    "cstr_weakness_diagnosis": "reports/cstr_weakness_diagnosis.md",
+    "current_manifest": "results/current_status/evidence_manifest/current_evidence_manifest.json",
+    "effect_size_summary": "results/effect_size_audit/effect_size/effect_size_summary.json",
+    "repair_signal_role_decision": "reports/repair_signal_role_decision_gate.md",
+    "signal_semantics_registry": "results/current_status/evidence_manifest/current_evidence_manifest.json",
+    "smoke_model_metrics": "results/smoke_two_tank/model_metrics.csv",
+    "twotank_low_coverage": "results/calibrated_two_tank/low_coverage_summary.csv"
+  }
+}

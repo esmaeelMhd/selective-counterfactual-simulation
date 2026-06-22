@@ -1,0 +1,44 @@
+{
+  "artifacts": {
+    "cstr_low_coverage": {
+      "bytes": 479,
+      "path": "results/calibrated_cstr/low_coverage_summary.csv",
+      "sha256": "5340cd70ab7f5107f96574210180779b44c023530a3b7dc7af50cf5965a9f3e1"
+    },
+    "cstr_weakness_diagnosis": {
+      "bytes": 1601,
+      "path": "reports/cstr_weakness_diagnosis.md",
+      "sha256": "504c9c34b8dbae9a256c50b30c3b6532efd663db97ee7f5c4be5f1b7112f3a45"
+    },
+    "current_manifest": {
+      "bytes": 3440,
+      "path": "results/current_status/evidence_manifest/current_evidence_manifest.json",
+      "sha256": "72da4ab0c23f5beae00b2cb91e535085fea364c95a254ff84d3d4840dae3e431"
+    },
+    "effect_size_summary": {
+      "bytes": 3792,
+      "path": "results/effect_size_audit/effect_size/effect_size_summary.json",
+      "sha256": "76e1bfd4ea45351e4b340191d243cd4e4f117b8775325612a549e07c3206119f"
+    },
+    "repair_signal_role_decision": {
+      "bytes": 820,
+      "path": "reports/repair_signal_role_decision_gate.md",
+      "sha256": "85137212bb273ad0b3055c723778246d242b1251d8e6e69aee26a98677bfde99"
+    },
+    "signal_semantics_registry": {
+      "bytes": 3440,
+      "path": "results/current_status/evidence_manifest/current_evidence_manifest.json",
+      "sha256": "72da4ab0c23f5beae00b2cb91e535085fea364c95a254ff84d3d4840dae3e431"
+    },
+    "smoke_model_metrics": {
+      "bytes": 1760,
+      "path": "results/smoke_two_tank/model_metrics.csv",
+      "sha256": "d8cd468983b8f666a8894b1814f282152984da162cded8e53dc0e887311b5378"
+    },
+    "twotank_low_coverage": {
+      "bytes": 430,
+      "path": "results/calibrated_two_tank/low_coverage_summary.csv",
+      "sha256": "05ad2459a61ca93c8a46b49ebd1a352ac1c1a2ca59f5d067c3c47b9b4b16b72b"
+    }
+  }
+}

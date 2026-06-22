@@ -1,0 +1,8 @@
+claim,status,evidence,allowed_wording
+combined_linear works,not supported as the original broad claim,v0 decision gate killed or downgraded the original combined_linear claim,combined_linear is an exploratory baseline
+calibrated low-coverage works on TwoTank,supported,TwoTank low-coverage margins are practically meaningful,TwoTank shows a practically meaningful low-coverage result
+calibrated low-coverage weakly replicates on CSTR,weak positive,CSTR margins are positive but small,CSTR weakly replicates the low-coverage direction
+repair_amount is universal,false,CSTR repair AUROC is 0.5 and role gate marks repair diagnostic-only,repair_amount is diagnostic-only for CSTR
+invariant_residual is informative on CSTR,supported,CSTR invariant residual AUROC is high in the repair-vs-invariant audit,invariant_residual is informative for CSTR
+general simulator reliability,forbidden,Current status gate blocks expansion and general reliability claims,No general simulator reliability claim is supported
+product readiness,forbidden,The repo has no product layer and the current status forbids product claims,This is not product-ready
