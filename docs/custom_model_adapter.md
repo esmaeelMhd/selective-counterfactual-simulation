@@ -35,12 +35,37 @@ The adapter validates rollout shape and finite values. Shape errors fail loudly.
 
 See `examples/custom_model_example.py::DampedLinearUserModel`.
 
+For a blank starting point, copy `examples/my_model_template.py`.
+
+```python
+class MySimulatorModel:
+    model_id = "my_simulator"
+
+    def fit(self, train_batch):
+        ...
+
+    def predict_rollout(self, initial_state, actions, disturbances):
+        ...
+```
+
 ## How to run
 
 ```bash
 python examples/custom_model_example.py --output results/custom_model_example
 python scripts/compare_models.py --config configs/experiments/calibrated_two_tank.yaml --models linear_narx mlp_state_space --custom-model examples/custom_model_example.py:DampedLinearUserModel --output results/model_comparison_custom
 ```
+
+The runnable example writes:
+
+- `results/custom_model_example/custom_model_smoke.json`
+- `results/custom_model_example/custom_model_report.md`
+
+## Common errors
+
+- Returning `(horizon, state_dim)` instead of `(horizon + 1, state_dim)`.
+- Returning non-finite values.
+- Changing the initial state instead of placing it at `rollout[0]`.
+- Training on test or evidence artifacts instead of the generated train split.
 
 ## What this does not prove
 

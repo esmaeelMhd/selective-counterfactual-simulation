@@ -1,0 +1,33 @@
+{
+  "allowed_claim": "A weak but positive low-coverage result under the frozen protocol.",
+  "known_limitations": [
+    "Current evidence remains weak-positive and low-coverage only.",
+    "TwoTank is stronger than CSTR.",
+    "CSTR effect is positive but weak.",
+    "Custom model outputs are local-only and not benchmark evidence.",
+    "Expansion remains blocked."
+  ],
+  "output": "results/public_benchmark_v1_2/public_package_manifest.json",
+  "package_id": "public_benchmark_v1_2",
+  "public_outputs": {
+    "benchmark_task": "docs/tasks/refusal_benchmark_task.md",
+    "failure_gallery": "docs/failure_gallery.md",
+    "main_readme_figure": "docs/figures/readme_low_coverage_result.png",
+    "public_package_manifest": "results/public_benchmark_v1_2/public_package_manifest.json",
+    "public_release_note": "reports/release_note_v1_2_public_benchmark.md",
+    "quickstart": "docs/quickstart.md",
+    "readme": "README.md"
+  },
+  "release_name": "v1.2-public-benchmark-strengthening",
+  "release_type": "public_packaging_only",
+  "scientific_claim_changed": false,
+  "source_artifacts": {
+    "benchmark_card": "docs/benchmark_card.md",
+    "cstr_low_coverage": "results/calibrated_cstr/low_coverage_summary.csv",
+    "current_manifest": "results/current_status/evidence_manifest/current_evidence_manifest.json",
+    "custom_model_adapter": "docs/custom_model_adapter.md",
+    "twotank_low_coverage": "results/calibrated_two_tank/low_coverage_summary.csv",
+    "usability_manifest": "results/benchmark_usability/release/benchmark_usability_manifest.json"
+  },
+  "verdict": "PUBLIC_BENCHMARK_PACKAGE_ACCEPTED"
+}

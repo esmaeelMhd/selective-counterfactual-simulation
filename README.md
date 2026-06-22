@@ -1,4 +1,72 @@
-# Selective Counterfactual Simulation
+# Selective Counterfactual Simulation Benchmark
+
+A benchmark for testing whether learned dynamical simulators know when to refuse counterfactual predictions.
+
+Plug in a simulator, run OOD/intervention scenarios, and compare false-accept rate versus coverage.
+
+**Current evidence:** weak-positive, synthetic, low-coverage only. Meaningful on TwoTank, weak on CSTR. Not a safety tool.
+
+<!-- SCS_PUBLIC_LANDING_START -->
+
+## Why this exists
+
+Learned simulators can look accurate in-distribution and still fail under counterfactual intervention shift. This benchmark asks a narrower question: can a simulator or refusal judge rank scenarios by answerability and abstain on risky ones?
+
+## Quickstart
+
+```bash
+pip install -e ".[dev]"
+pytest -q
+python scripts/run_smoke_demo.py --output results/smoke_demo
+python scripts/reproduce_main_twotank_result.py --output results/reproduce_twotank
+python scripts/compare_models.py --config configs/experiments/calibrated_two_tank.yaml --models hold_last linear_narx mlp_state_space --output results/model_comparison
+```
+
+## Reproduce the main TwoTank result
+
+```bash
+python scripts/reproduce_main_twotank_result.py --output results/reproduce_twotank
+```
+
+This reads the frozen TwoTank low-coverage artifact and writes a small reproduction table and figure with the nonzero margins.
+
+## Plug in your own simulator
+
+Start from `examples/my_model_template.py` or the runnable example in `examples/custom_model_example.py`, then compare locally:
+
+```bash
+python examples/custom_model_example.py --output results/custom_model_example
+python scripts/compare_models.py --config configs/experiments/calibrated_two_tank.yaml --models linear_narx mlp_state_space --custom-model examples/custom_model_example.py:DampedLinearUserModel --output results/model_comparison_custom
+```
+
+Custom model outputs are local comparison results only; they are not added to the frozen evidence claim.
+
+## Main result
+
+![Low-coverage false-accept reduction](docs/figures/readme_low_coverage_result.png)
+
+The effect is meaningful on TwoTank and weak on CSTR; this is low-coverage synthetic benchmark evidence only.
+
+Current allowed claim: A weak but positive low-coverage result under the frozen protocol.
+
+## What this does not claim
+
+This benchmark does not claim simulator safety, product readiness, broad simulator reliability, high-coverage reliability, plant-wide deployment, autonomous control, RSSM evidence, heat-exchanger evidence, or third-system evidence.
+
+## Repository map
+
+- `src/scs/systems/`: synthetic systems.
+- `src/scs/models/`: benchmark model interface and built-in baselines.
+- `src/scs/validators/`: refusal/risk signals and judges.
+- `src/scs/metrics/`: trajectory, event, and risk-coverage metrics.
+- `src/scs/experiments/`: reproducible experiment and packaging logic.
+- `configs/`: frozen experiment, audit, and status configs.
+- `docs/`: benchmark card, task definition, failure gallery, and reproducibility notes.
+- `reports/` and `results/`: generated evidence artifacts.
+
+<!-- SCS_PUBLIC_LANDING_END -->
+
+## Detailed generated status blocks
 
 <!-- SCS_CURRENT_STATUS_START -->
 ## Current Evidence Status
@@ -84,7 +152,6 @@ Run the install, test, demo, and comparison commands above from the repository r
 
 This usability release does not change the scientific claim. It does not add RSSM, third-system evidence, new benchmark systems, product API, frontend, or deployment work.
 <!-- SCS_USABILITY_END -->
-
 
 This repository tests one research question:
 

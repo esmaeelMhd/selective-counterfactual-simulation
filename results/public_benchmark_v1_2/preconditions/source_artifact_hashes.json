@@ -1,0 +1,28 @@
+{
+  "artifacts": {
+    "README.md": {
+      "bytes": 11253,
+      "sha256": "a88f6a5109e6cf1c3fdbd67582e3cd0d177c9a39b9c81d5a3fcec3b4ab4b0d05"
+    },
+    "docs/benchmark_card.md": {
+      "bytes": 2636,
+      "sha256": "52864095fdbef2bd4702fd18a5157b8933bebd9ef4078836b8ca22aca009612d"
+    },
+    "docs/custom_model_adapter.md": {
+      "bytes": 2377,
+      "sha256": "bac4e57d15bc4ab9ea5da58bb827108a43f228ae6055fb6e10c6811806e486e5"
+    },
+    "reports/benchmark_usability_package_check.md": {
+      "bytes": 381,
+      "sha256": "47069e7af34e1a4e087a21710d0e8e7daa964dce113738a6d5ab2cc8f287f478"
+    },
+    "results/benchmark_usability/release/benchmark_usability_manifest.json": {
+      "bytes": 1295,
+      "sha256": "808447f9e73f43f0dc5e459c0b2bd5f5a64e780f2a504670e462c280c626577c"
+    },
+    "results/current_status/evidence_manifest/current_evidence_manifest.json": {
+      "bytes": 3440,
+      "sha256": "72da4ab0c23f5beae00b2cb91e535085fea364c95a254ff84d3d4840dae3e431"
+    }
+  }
+}

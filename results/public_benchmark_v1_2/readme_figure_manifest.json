@@ -1,0 +1,29 @@
+{
+  "output": "docs/figures/readme_low_coverage_result.png",
+  "rows": [
+    {
+      "coverage": 0.05,
+      "margin": 0.1733333333333333,
+      "system": "TwoTank"
+    },
+    {
+      "coverage": 0.1,
+      "margin": 0.1666666666666668,
+      "system": "TwoTank"
+    },
+    {
+      "coverage": 0.05,
+      "margin": 0.038095238095238,
+      "system": "CSTR"
+    },
+    {
+      "coverage": 0.1,
+      "margin": 0.038095238095238,
+      "system": "CSTR"
+    }
+  ],
+  "source_manifest": "results/current_status/evidence_manifest/current_evidence_manifest.json",
+  "subtitle": "Weak-positive synthetic benchmark result; not safety evidence.",
+  "title": "Low-coverage false-accept reduction",
+  "verdict": "README_MAIN_FIGURE_BUILT"
+}

@@ -28,6 +28,10 @@ results/cstr_weakness_audit/
 results/repair_signal_semantics_audit/
 results/current_status/
 results/benchmark_usability/package_check_runs/
+results/public_benchmark_v1_2/package_check_runs/
+results/ci_smoke_demo/
+results/ci_custom_model_example/
+results/ci_model_comparison/
 results/smoke_cstr/
 results/seed_sweep_cstr/
 reports/smoke_report.md

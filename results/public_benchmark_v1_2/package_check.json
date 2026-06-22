@@ -1,0 +1,16 @@
+{
+  "builtin_model_comparison": "MODEL_COMPARISON_BUILT",
+  "claim_language_violations": [],
+  "custom_model_comparison": "MODEL_COMPARISON_BUILT",
+  "custom_model_returncode": 0,
+  "missing": [],
+  "preconditions": "READY_FOR_PUBLIC_BENCHMARK_PACKAGING",
+  "prior_artifact_mutation_detected": false,
+  "public_package_manifest": "results/public_benchmark_v1_2/public_package_manifest.json",
+  "readme_check": "README_PUBLIC_LANDING_SYNCED",
+  "reasons": [],
+  "smoke_demo": "SMOKE_DEMO_BUILT",
+  "source_hash_mismatches": [],
+  "twotank_reproduction": "TWOTANK_MAIN_RESULT_REPRODUCED",
+  "verdict": "PUBLIC_BENCHMARK_PACKAGE_ACCEPTED"
+}

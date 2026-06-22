@@ -1,0 +1,8 @@
+{
+  "check_mode": true,
+  "missing": [],
+  "readme": "README.md",
+  "stale": false,
+  "starts_with_public_hook": true,
+  "verdict": "README_PUBLIC_LANDING_SYNCED"
+}

@@ -924,6 +924,8 @@ def scan_forbidden_claim_language(paths: list[str | Path], forbidden_claims: lis
         for path in candidates:
             if path.suffix.lower() not in {".md", ".json", ".yaml", ".yml", ".txt"}:
                 continue
+            if path == Path("reports/claim_language_scan.md"):
+                continue
             scanned.append(str(path))
             if path.suffix.lower() == ".json":
                 try:

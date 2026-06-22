@@ -1,0 +1,7 @@
+{
+  "is_evidence_for_current_claim": false,
+  "model_id": "damped_linear_user",
+  "n_scenarios": 32,
+  "output": "results/custom_model_example",
+  "rmse_mean": 0.11683656801623664
+}

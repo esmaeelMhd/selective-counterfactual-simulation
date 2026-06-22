@@ -1,0 +1,62 @@
+{
+  "allowed_claim": "A weak but positive low-coverage result under the frozen protocol.",
+  "benchmark_usability_package": "BENCHMARK_USABILITY_PACKAGE_ACCEPTED",
+  "current_manifest_claim": "A weak but positive low-coverage result under the frozen protocol.",
+  "current_manifest_expansion_allowed": false,
+  "dirty_state": [],
+  "forbidden_dependency_scan": {
+    "old_repo_runtime_import_hits": [],
+    "path_hack_hits": []
+  },
+  "forbidden_evidence_refs": [],
+  "forbidden_surface_dirs": [],
+  "package_id": "public_benchmark_v1_2",
+  "public_packaging_allowed": true,
+  "reasons": [],
+  "required_source_artifacts": [
+    {
+      "exists": true,
+      "name": "current_manifest",
+      "path": "results/current_status/evidence_manifest/current_evidence_manifest.json"
+    },
+    {
+      "exists": true,
+      "name": "twotank_low_coverage",
+      "path": "results/calibrated_two_tank/low_coverage_summary.csv"
+    },
+    {
+      "exists": true,
+      "name": "cstr_low_coverage",
+      "path": "results/calibrated_cstr/low_coverage_summary.csv"
+    },
+    {
+      "exists": true,
+      "name": "benchmark_card",
+      "path": "docs/benchmark_card.md"
+    },
+    {
+      "exists": true,
+      "name": "custom_model_adapter",
+      "path": "docs/custom_model_adapter.md"
+    },
+    {
+      "exists": true,
+      "name": "usability_manifest",
+      "path": "results/benchmark_usability/release/benchmark_usability_manifest.json"
+    },
+    {
+      "exists": true,
+      "name": "readme",
+      "path": "README.md"
+    },
+    {
+      "exists": true,
+      "name": "benchmark_usability_package_check",
+      "path": "reports/benchmark_usability_package_check.md"
+    }
+  ],
+  "scientific_expansion_allowed": false,
+  "source_artifact_hash_manifest": "results/public_benchmark_v1_2/preconditions/source_artifact_hashes.json",
+  "verdict": "READY_FOR_PUBLIC_BENCHMARK_PACKAGING",
+  "working_tree_dirty": false
+}

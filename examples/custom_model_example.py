@@ -87,6 +87,7 @@ def run_example(output: str | Path) -> dict:
         "output": str(out_dir),
     }
     (out_dir / "custom_model_example_summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
+    (out_dir / "custom_model_smoke.json").write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
     report = f"""# Custom Model Example Report
 
 ## Model
@@ -102,6 +103,7 @@ Mean RMSE: {summary["rmse_mean"]:.6f}
 This custom model result is local adapter output only and is not evidence for the current supported claim.
 """
     (out_dir / "custom_model_example_report.md").write_text(report, encoding="utf-8")
+    (out_dir / "custom_model_report.md").write_text(report, encoding="utf-8")
     return summary
 
 

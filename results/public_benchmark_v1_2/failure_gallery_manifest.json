@@ -1,0 +1,134 @@
+{
+  "examples": [
+    {
+      "accepted": true,
+      "bad_rollout": false,
+      "coverage": 0.05,
+      "decision": "accepted",
+      "example_id": "example_1_accepted_good",
+      "false_accept": false,
+      "figure": "docs/figures/failure_gallery/example_1_accepted_good.png",
+      "judge": "calibration_selected_candidate_ranker",
+      "key_signal_values": {
+        "disagreement_score": 0.0714924744252393,
+        "invariant_residual": 0.0001009360441658,
+        "repair_amount": 0.0,
+        "risk_value": 0.1108571428571428,
+        "support_distance": 1.436749728281151,
+        "uncertainty_score": 0.0015769668409409
+      },
+      "model": "mlp_state_space",
+      "rmse": 0.000450660871433,
+      "scenario_id": "judge_test_id_0098",
+      "scenario_type": "normal_policy",
+      "source_artifact": "results/calibrated_two_tank/test_table.csv",
+      "system": "two_tank",
+      "title": "Example 1: Accepted good scenario"
+    },
+    {
+      "accepted": false,
+      "bad_rollout": true,
+      "coverage": 0.05,
+      "decision": "refused",
+      "example_id": "example_2_correctly_rejected_bad",
+      "false_accept": false,
+      "figure": "docs/figures/failure_gallery/example_2_correctly_rejected_bad.png",
+      "judge": "calibration_selected_candidate_ranker",
+      "key_signal_values": {
+        "disagreement_score": 1.1326579090140771,
+        "invariant_residual": 0.0059344241405814,
+        "repair_amount": 0.0,
+        "risk_value": 1.1326579090140771,
+        "support_distance": 15.21936298357149,
+        "uncertainty_score": 0.0
+      },
+      "model": "hold_last",
+      "rmse": 1.3808674410393893,
+      "scenario_id": "judge_test_ood_action_magnitude_0008",
+      "scenario_type": "held_out_action_magnitude",
+      "source_artifact": "results/calibrated_two_tank/test_table.csv",
+      "system": "two_tank",
+      "title": "Example 2: Correctly rejected bad scenario"
+    },
+    {
+      "accepted": true,
+      "bad_rollout": true,
+      "coverage": 0.05,
+      "decision": "accepted",
+      "example_id": "example_3_false_accept_cstr",
+      "false_accept": true,
+      "figure": "docs/figures/failure_gallery/example_3_false_accept_cstr.png",
+      "judge": "support_only",
+      "key_signal_values": {
+        "disagreement_score": 2.5920079912200173,
+        "invariant_residual": 0.35971561141345,
+        "repair_amount": 0.0,
+        "risk_value": 1.766893166038775,
+        "support_distance": 1.766893166038775,
+        "uncertainty_score": 0.0
+      },
+      "model": "hold_last",
+      "rmse": 3.7850521655011913,
+      "scenario_id": "judge_test_id_0009",
+      "scenario_type": "id",
+      "source_artifact": "results/calibrated_cstr/test_table.csv",
+      "system": "cstr",
+      "title": "Example 3: False accept"
+    },
+    {
+      "accepted": false,
+      "bad_rollout": true,
+      "coverage": 0.05,
+      "decision": "refused",
+      "example_id": "example_4_cstr_within_bound_dynamic_failure",
+      "false_accept": false,
+      "figure": "docs/figures/failure_gallery/example_4_cstr_within_bound_dynamic_failure.png",
+      "judge": "rank_normalized_linear",
+      "key_signal_values": {
+        "disagreement_score": 7.285495716443503,
+        "invariant_residual": 0.8106143392905438,
+        "repair_amount": 0.0,
+        "risk_value": 0.9952380952380953,
+        "support_distance": 26.01012539598125,
+        "uncertainty_score": 0.0
+      },
+      "model": "hold_last",
+      "rmse": 12.118251416117529,
+      "scenario_id": "judge_test_unsafe_temperature_event_0072",
+      "scenario_type": "unsafe_temperature_event",
+      "source_artifact": "results/calibrated_cstr/test_table.csv",
+      "system": "cstr",
+      "title": "Example 4: CSTR within-bound dynamic failure"
+    },
+    {
+      "accepted": false,
+      "bad_rollout": true,
+      "coverage": 0.05,
+      "decision": "refused",
+      "example_id": "example_5_invariant_residual_helps",
+      "false_accept": false,
+      "figure": "docs/figures/failure_gallery/example_5_invariant_residual_helps.png",
+      "judge": "rank_normalized_linear",
+      "key_signal_values": {
+        "disagreement_score": 7.303223915229075,
+        "invariant_residual": 0.8504721684867268,
+        "repair_amount": 0.0,
+        "risk_value": 1.0,
+        "support_distance": 25.903390374275105,
+        "uncertainty_score": 0.0
+      },
+      "model": "hold_last",
+      "rmse": 11.96138451643624,
+      "scenario_id": "judge_test_unsafe_temperature_event_0063",
+      "scenario_type": "unsafe_temperature_event",
+      "source_artifact": "results/calibrated_cstr/test_table.csv",
+      "system": "cstr",
+      "title": "Example 5: Invariant residual helps"
+    }
+  ],
+  "source_artifacts": [
+    "results/calibrated_two_tank/test_table.csv",
+    "results/calibrated_cstr/test_table.csv"
+  ],
+  "verdict": "FAILURE_GALLERY_BUILT"
+}

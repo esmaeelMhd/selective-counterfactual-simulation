@@ -1,0 +1,14 @@
+{
+  "coverage_0_05_margin": 0.1733333333333333,
+  "coverage_0_10_margin": 0.1666666666666668,
+  "current_manifest_modified": false,
+  "is_reproduction": true,
+  "outputs": {
+    "plot": "results/reproduce_twotank/twotank_main_result.png",
+    "report": "results/reproduce_twotank/twotank_reproduction_report.md",
+    "summary": "results/reproduce_twotank/twotank_reproduction_summary.json",
+    "table": "results/reproduce_twotank/twotank_main_result.csv"
+  },
+  "source_artifact": "results/calibrated_two_tank/low_coverage_summary.csv",
+  "verdict": "TWOTANK_MAIN_RESULT_REPRODUCED"
+}

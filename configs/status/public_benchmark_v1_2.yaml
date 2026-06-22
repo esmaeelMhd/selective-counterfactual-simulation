@@ -1,0 +1,58 @@
+package_id: public_benchmark_v1_2
+
+source_commit: 45144d9
+source_tag: v1.1-benchmark-usability
+
+allowed_claim:
+  label: WEAK_LOW_COVERAGE_BENCHMARK
+  text: "A weak but positive low-coverage result under the frozen protocol."
+
+expansion_policy:
+  scientific_expansion_allowed: false
+  usability_expansion_allowed: true
+  public_packaging_allowed: true
+
+required_public_hook:
+  text: "A benchmark for testing whether learned dynamical simulators know when to refuse counterfactual predictions."
+
+required_user_value:
+  text: "Plug in a simulator, run OOD/intervention scenarios, and compare false-accept rate versus coverage."
+
+source_artifacts:
+  current_manifest: results/current_status/evidence_manifest/current_evidence_manifest.json
+  twotank_low_coverage: results/calibrated_two_tank/low_coverage_summary.csv
+  cstr_low_coverage: results/calibrated_cstr/low_coverage_summary.csv
+  benchmark_card: docs/benchmark_card.md
+  custom_model_adapter: docs/custom_model_adapter.md
+  usability_manifest: results/benchmark_usability/release/benchmark_usability_manifest.json
+
+forbidden_claims:
+  - strong support
+  - broad simulator reliability
+  - trustworthy counterfactual simulation
+  - safety certification
+  - autonomous control
+  - product readiness
+  - plant-wide digital twin
+  - industrial AI breakthrough
+  - high-coverage reliability
+  - universal simulator
+
+forbidden_research_expansion:
+  - RSSM
+  - heat_exchanger evidence
+  - third-system evidence
+  - new calibrated judge family
+  - new refusal signal
+  - new simulator model as benchmark evidence
+  - protocol mutation
+  - product/API/frontend work
+
+public_outputs:
+  readme: README.md
+  quickstart: docs/quickstart.md
+  benchmark_task: docs/tasks/refusal_benchmark_task.md
+  failure_gallery: docs/failure_gallery.md
+  public_release_note: reports/release_note_v1_2_public_benchmark.md
+  main_readme_figure: docs/figures/readme_low_coverage_result.png
+  public_package_manifest: results/public_benchmark_v1_2/public_package_manifest.json

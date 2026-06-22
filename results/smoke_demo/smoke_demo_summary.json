@@ -1,0 +1,13 @@
+{
+  "is_main_evidence": false,
+  "is_smoke_only": true,
+  "model_id": "linear_narx",
+  "n_train": 24,
+  "outputs": {
+    "plot": "results/smoke_demo/smoke_demo_plot.png",
+    "report": "results/smoke_demo/smoke_demo_report.md",
+    "summary": "results/smoke_demo/smoke_demo_summary.json"
+  },
+  "system_id": "two_tank",
+  "verdict": "SMOKE_DEMO_BUILT"
+}

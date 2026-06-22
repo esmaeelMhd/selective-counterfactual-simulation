@@ -1,0 +1,38 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install package
+        run: pip install -e ".[dev]"
+
+      - name: Run tests
+        run: pytest -q
+
+      - name: Run smoke demo
+        run: python scripts/run_smoke_demo.py --output results/ci_smoke_demo
+
+      - name: Run custom model example
+        run: python examples/custom_model_example.py --output results/ci_custom_model_example
+
+      - name: Run built-in model comparison
+        run: python scripts/compare_models.py --config configs/experiments/calibrated_two_tank.yaml --models hold_last linear_narx --output results/ci_model_comparison
+
+      - name: Check README public landing
+        run: python scripts/update_readme_public_landing.py --config configs/status/public_benchmark_v1_2.yaml --readme README.md --check
+
+      - name: Check claim language
+        run: python scripts/check_claim_language.py --manifest results/current_status/evidence_manifest/current_evidence_manifest.json --paths README.md docs reports
