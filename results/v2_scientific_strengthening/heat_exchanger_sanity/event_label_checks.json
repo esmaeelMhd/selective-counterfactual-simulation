@@ -1,0 +1,24 @@
+{
+  "bad_rmse_labels_non_degenerate": true,
+  "calibration_test_overlap": {
+    "calibration_hash_count": 56,
+    "overlap_count": 0,
+    "overlap_examples": [],
+    "test_hash_count": 70
+  },
+  "event_labels_explicit": true,
+  "event_labels_non_degenerate": true,
+  "finite": true,
+  "id_linear_rmse_mean": 0.0035918903378766394,
+  "nonconstant": true,
+  "ood_differs_from_id": true,
+  "ood_linear_rmse_mean": 0.040376780160595975,
+  "system_id": "heat_exchanger",
+  "thresholds": {
+    "outlet_temperature_high": 101.0,
+    "outlet_temperature_low": 76.0,
+    "target_outlet_temperature": 88.0,
+    "tracking_error_high": 10.0
+  },
+  "verdict": "VALID_HEAT_EXCHANGER_BENCHMARK"
+}

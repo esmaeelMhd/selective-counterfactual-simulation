@@ -1,0 +1,45 @@
+{
+  "by_system": [
+    {
+      "event_labels_non_degenerate": true,
+      "event_positive_rate_max": 0.2,
+      "event_positive_rate_min": 0.0,
+      "system_id": "cstr",
+      "thresholds": {
+        "concentration_high": 1.65,
+        "concentration_low": 0.72,
+        "temperature_high": 365.0
+      }
+    },
+    {
+      "event_labels_non_degenerate": true,
+      "event_positive_rate_max": 1.0,
+      "event_positive_rate_min": 0.6,
+      "system_id": "heat_exchanger",
+      "thresholds": {
+        "outlet_temperature_high": 101.0,
+        "outlet_temperature_low": 76.0,
+        "target_outlet_temperature": 88.0,
+        "tracking_error_high": 10.0
+      }
+    },
+    {
+      "event_labels_non_degenerate": false,
+      "event_positive_rate_max": 0.0,
+      "event_positive_rate_min": 0.0,
+      "system_id": "two_tank",
+      "thresholds": {
+        "level_max": 10.0,
+        "level_min": 0.0
+      }
+    }
+  ],
+  "event_labels_from_trajectories": true,
+  "nondegenerate_system_count": 2,
+  "systems_checked": [
+    "two_tank",
+    "cstr",
+    "heat_exchanger"
+  ],
+  "verdict": "EVENT_TARGETS_VALID"
+}

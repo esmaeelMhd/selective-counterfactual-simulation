@@ -1,0 +1,30 @@
+{
+  "forbidden_dependency_scan": {
+    "old_repo_runtime_import_hits": [],
+    "path_hack_hits": []
+  },
+  "heat_exchanger_exists": true,
+  "heat_exchanger_validated": false,
+  "missing_source_artifacts": [],
+  "oracle_diagnostic_only": true,
+  "product_directories": [],
+  "protocol_hash_if_present": "d05128c44dde09e3a82fbc3ec5a723242eba30057da6f88be1c2577fdff9503a",
+  "reasons": [],
+  "source_artifacts_checked": [
+    "results/current_status/evidence_manifest/current_evidence_manifest.json",
+    "results/calibrated_two_tank/calibrated_risk_coverage.csv",
+    "results/calibrated_cstr/calibrated_risk_coverage.csv",
+    "reports/current_status_decision_gate.md",
+    "reports/practical_utility_decision_gate.md",
+    "reports/repair_signal_role_decision_gate.md",
+    "README.md"
+  ],
+  "source_v1_tag": "v1.1-benchmark-usability",
+  "v1_artifact_hash_count": 7,
+  "v1_tag_exists": true,
+  "v2_id": "v2_scientific_strengthening",
+  "v2_output_directory": "results/v2_scientific_strengthening/preconditions",
+  "v2_output_directory_separate": true,
+  "verdict": "READY_FOR_V2_PROTOCOL_LOCK",
+  "working_tree_status_before_write": ""
+}
