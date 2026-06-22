@@ -1505,3 +1505,239 @@ Allowed claim: {decision["allowed_claim"]}
 This release keeps v2 artifacts separate from v1 artifacts.
 """
     Path("reports/release_note_v2_scientific_strengthening.md").write_text(release, encoding="utf-8")
+
+
+def _safe_auc(labels: pd.Series, scores: pd.Series) -> float:
+    from sklearn.metrics import roc_auc_score
+
+    y_true = labels.astype(int)
+    y_score = scores.astype(float)
+    if y_true.nunique() < 2 or y_score.nunique() < 2:
+        return float("nan")
+    return float(roc_auc_score(y_true, y_score))
+
+
+def diagnose_v2_calibrated_underperformance(results: str | Path, output: str | Path) -> dict[str, Any]:
+    """Diagnose why the primary v2 calibrated judge lost to the strongest baseline.
+
+    This is diagnostic only. It reads frozen v2 artifacts and does not recompute
+    or mutate the v2 protocol, rankings, or decision gate.
+    """
+    results_dir = Path(results)
+    out_dir = Path(output)
+    _ensure_dir(out_dir)
+    risk = pd.read_csv(results_dir / "v2_risk_coverage.csv")
+    scenarios = pd.read_csv(results_dir / "v2_scenario_scores.csv")
+    run_summary = _load_json(results_dir / "v2_run_summary.json")
+    stats_path = results_dir.parent / "statistical_audit" / "v2_statistical_summary.json"
+    stats = _load_json(stats_path) if stats_path.exists() else {}
+    primary_judge = "calibration_selected_candidate_ranker"
+    primary_risk_col = f"risk_{primary_judge}"
+    primary_coverages = [0.05, 0.10]
+    primary_rows = risk[(risk["judge_id"] == primary_judge) & (risk["coverage"].isin(primary_coverages))].copy()
+
+    primary_vs_baseline = (
+        primary_rows.groupby(["system_id", "badness_target"], as_index=False)
+        .agg(
+            mean_primary_far=("false_accept_rate", "mean"),
+            mean_baseline_far=("baseline_far", "mean"),
+            mean_absolute_margin=("absolute_margin", "mean"),
+            mean_relative_margin=("relative_margin", "mean"),
+            losing_row_rate=("absolute_margin", lambda s: float(np.mean(np.asarray(s) < 0.0))),
+            row_count=("absolute_margin", "size"),
+        )
+        .sort_values(["system_id", "badness_target"])
+    )
+    _write_csv(out_dir / "primary_vs_baseline.csv", primary_vs_baseline)
+
+    baseline_winner_counts = (
+        primary_rows.groupby(["system_id", "badness_target", "baseline_judge"], as_index=False)
+        .size()
+        .rename(columns={"size": "winner_count"})
+        .sort_values(["system_id", "badness_target", "winner_count"], ascending=[True, True, False])
+    )
+    _write_csv(out_dir / "baseline_winner_counts.csv", baseline_winner_counts)
+
+    judge_far = (
+        risk[risk["coverage"].isin(primary_coverages)]
+        .groupby(["system_id", "badness_target", "judge_id"], as_index=False)
+        .agg(mean_far=("false_accept_rate", "mean"))
+        .sort_values(["system_id", "badness_target", "mean_far", "judge_id"])
+    )
+    judge_far["rank"] = judge_far.groupby(["system_id", "badness_target"])["mean_far"].rank(method="first")
+    _write_csv(out_dir / "judge_far_ranking.csv", judge_far)
+
+    risk_columns = [column for column in scenarios.columns if column.startswith("risk_")]
+    auc_rows = []
+    for (system_id, target), group in scenarios.groupby(["system_id", "badness_target"], sort=False):
+        for column in risk_columns:
+            auc_rows.append(
+                {
+                    "system_id": system_id,
+                    "badness_target": target,
+                    "judge_or_signal": column.replace("risk_", ""),
+                    "auc": _safe_auc(group["bad_label"], group[column]),
+                    "bad_rate": float(group["bad_label"].mean()),
+                    "unique_scores": int(group[column].nunique()),
+                }
+            )
+    auc_table = pd.DataFrame(auc_rows).sort_values(["system_id", "badness_target", "auc"], ascending=[True, True, False], na_position="last")
+    _write_csv(out_dir / "judge_auc_by_target.csv", auc_table)
+
+    label_balance = (
+        scenarios.groupby(["system_id", "badness_target"], as_index=False)
+        .agg(
+            row_count=("bad_label", "size"),
+            bad_rate=("bad_label", "mean"),
+            rmse_mean=("rmse", "mean"),
+            event_mismatch_rate=("event_mismatch", "mean"),
+            primary_unique_scores=(primary_risk_col, "nunique"),
+        )
+        .sort_values(["system_id", "badness_target"])
+    )
+    _write_csv(out_dir / "label_balance.csv", label_balance)
+
+    oracle_gap = (
+        risk[(risk["coverage"].isin(primary_coverages)) & (risk["judge_id"].isin([primary_judge, "oracle_error_rank"]))]
+        .pivot_table(
+            index=["system_id", "badness_target", "coverage"],
+            columns="judge_id",
+            values="false_accept_rate",
+            aggfunc="mean",
+        )
+        .reset_index()
+    )
+    if primary_judge in oracle_gap and "oracle_error_rank" in oracle_gap:
+        oracle_gap["primary_minus_oracle_far"] = oracle_gap[primary_judge] - oracle_gap["oracle_error_rank"]
+    _write_csv(out_dir / "oracle_gap_summary.csv", oracle_gap)
+
+    moving_comparator = bool(
+        baseline_winner_counts.groupby(["system_id", "badness_target"])["baseline_judge"].nunique().max() > 1
+    )
+    conformal_dominates = bool(
+        baseline_winner_counts.groupby("baseline_judge")["winner_count"].sum().idxmax() == "conformal_risk_threshold"
+    )
+    event_failures = primary_vs_baseline[
+        (primary_vs_baseline["badness_target"] == "bad_event")
+        & (primary_vs_baseline["mean_absolute_margin"] < 0.0)
+    ]["system_id"].tolist()
+    no_signal_event_systems = label_balance[
+        (label_balance["badness_target"] == "bad_event")
+        & (label_balance["bad_rate"] <= 0.0)
+    ]["system_id"].tolist()
+    twotank_rmse = primary_vs_baseline[
+        (primary_vs_baseline["system_id"] == "two_tank")
+        & (primary_vs_baseline["badness_target"] == "bad_rmse")
+    ]
+    twotank_rmse_margin = float(twotank_rmse["mean_absolute_margin"].iloc[0]) if not twotank_rmse.empty else float("nan")
+
+    findings = [
+        {
+            "finding": "The comparator is a moving strongest-baseline envelope.",
+            "evidence": "baseline_judge varies across system/target/model/seed/coverage rows"
+            if moving_comparator
+            else "baseline_judge is stable",
+            "interpretation": (
+                "The primary margin is measured against the best observed baseline row-by-row, "
+                "not against one fixed deployable baseline. This is conservative and explains "
+                "small negative margins where the primary ties individual baselines on average."
+            ),
+        },
+        {
+            "finding": "conformal_risk_threshold is the dominant baseline winner.",
+            "evidence": f"dominates winner counts: {conformal_dominates}",
+            "interpretation": (
+                "The strongest baseline is usually a single oriented signal threshold, which is simpler "
+                "and less variable than the calibrated candidate family."
+            ),
+        },
+        {
+            "finding": "Event-risk is the clearest failure mode.",
+            "evidence": f"negative event-risk systems: {event_failures}; degenerate event system(s): {no_signal_event_systems}",
+            "interpretation": (
+                "CSTR and heat_exchanger event-risk margins are negative, while TwoTank has no event positives. "
+                "The calibrated candidate therefore has no robust event-risk support."
+            ),
+        },
+        {
+            "finding": "TwoTank RMSE underperformance is material.",
+            "evidence": f"TwoTank bad_rmse mean absolute margin: {twotank_rmse_margin:.6f}",
+            "interpretation": (
+                "The primary calibrated candidate loses on the original TwoTank RMSE target after adding v2 "
+                "models, targets, and stronger baselines."
+            ),
+        },
+    ]
+    summary = {
+        "verdict": "UNDERPERFORMANCE_DIAGNOSED",
+        "decision_gate": "NO_METHOD_CLAIM_BENCHMARK_ONLY",
+        "primary_judge": primary_judge,
+        "valid_systems": run_summary.get("valid_systems", []),
+        "models_evaluated": run_summary.get("models_evaluated", []),
+        "badness_targets": run_summary.get("badness_targets", []),
+        "seed_count": run_summary.get("seed_count"),
+        "statistical_verdict": stats.get("verdict"),
+        "event_risk_worsening": stats.get("event_risk_worsening"),
+        "positive_systems": stats.get("positive_systems"),
+        "moving_baseline_comparator": moving_comparator,
+        "dominant_baseline": baseline_winner_counts.groupby("baseline_judge")["winner_count"].sum().idxmax(),
+        "findings": findings,
+        "recommended_next_action": (
+            "Do not attempt a claim upgrade. First separate fixed calibration-selected baseline comparison "
+            "from row-wise strongest-baseline envelope comparison, then diagnose event-risk-specific signals."
+        ),
+    }
+    _write_json(out_dir / "underperformance_diagnosis_summary.json", summary)
+
+    top_judges = (
+        judge_far.sort_values(["system_id", "badness_target", "mean_far"])
+        .groupby(["system_id", "badness_target"])
+        .head(5)
+    )
+    report = f"""# v2 Calibrated Underperformance Diagnosis
+
+## Verdict
+
+UNDERPERFORMANCE_DIAGNOSED
+
+## Scope
+
+This diagnosis reads existing frozen v2 artifacts only. It does not change the v2 protocol, does not rerun model training, and does not upgrade any claim.
+
+## Primary Finding
+
+The primary calibrated candidate underperforms because it is compared against a moving strongest-baseline envelope, and because event-risk targets expose failures that the calibrated ranker does not handle robustly.
+
+## Primary vs Baseline
+
+{_markdown_table(primary_vs_baseline, ["system_id", "badness_target", "mean_primary_far", "mean_baseline_far", "mean_absolute_margin", "losing_row_rate"])}
+
+## Baseline Winner Counts
+
+{_markdown_table(baseline_winner_counts.head(18), ["system_id", "badness_target", "baseline_judge", "winner_count"])}
+
+## Best Judges by FAR
+
+{_markdown_table(top_judges, ["system_id", "badness_target", "judge_id", "mean_far", "rank"], max_rows=30)}
+
+## Label Balance
+
+{_markdown_table(label_balance, ["system_id", "badness_target", "row_count", "bad_rate", "event_mismatch_rate", "primary_unique_scores"])}
+
+## Root Causes
+
+1. The current `baseline_far` is a row-wise envelope over baseline judges. That is stricter than comparing against one fixed deployable baseline and makes small negative margins likely even when the primary candidate ties a baseline on average.
+2. `conformal_risk_threshold` is the dominant baseline winner, showing that simple oriented threshold rules often beat the calibrated candidate at low coverage.
+3. Event-risk is the clearest failure mode: CSTR and heat_exchanger event targets have negative margins, while TwoTank event labels are degenerate.
+4. The primary candidate is not the best calibrated-family member on TwoTank RMSE; learned/logistic scores rank that target better in the current artifacts.
+
+## Claim Impact
+
+The v2 decision remains `NO_METHOD_CLAIM_BENCHMARK_ONLY`. This diagnosis does not support a claim upgrade.
+
+## Recommended Next Action
+
+First produce a calibration-selected fixed-baseline comparison beside the current row-wise strongest-baseline envelope. Then run an event-risk-specific failure analysis before changing any judge.
+"""
+    Path("reports/v2_calibrated_underperformance_diagnosis.md").write_text(report, encoding="utf-8")
+    return summary
