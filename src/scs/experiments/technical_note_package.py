@@ -62,6 +62,8 @@ ALLOWED_CLAIM_CONTEXTS = [
     "limitations",
     "forbidden claims",
     "what it does not claim",
+    "what is not supported",
+    "what this benchmark does not test",
     "important negative findings",
     "negative findings",
     "negative result",
@@ -70,6 +72,8 @@ ALLOWED_CLAIM_CONTEXTS = [
     "honest limitations",
     "what not to do next",
     "claim audit",
+    "claim boundaries",
+    "non-intended use",
 ]
 
 
@@ -942,6 +946,8 @@ def _scan_markdown_claim_file(
         stripped = line.strip()
         if stripped.startswith("#"):
             current_heading = stripped.lstrip("#").strip().lower()
+        elif stripped.startswith("**") and "**" in stripped[2:]:
+            current_heading = stripped.split("**", 2)[1].strip(": ").lower()
         low = line.lower()
         for phrase in phrases:
             if phrase not in low:

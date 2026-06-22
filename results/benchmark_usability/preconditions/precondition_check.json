@@ -1,0 +1,42 @@
+{
+  "allowed_claim": "A weak but positive low-coverage refusal benchmark under a frozen protocol.",
+  "current_status_gate": "CURRENT_STATUS_SYNCED",
+  "dirty_state": [],
+  "forbidden_dependency_scan": {
+    "old_repo_runtime_import_hits": [],
+    "path_hack_hits": []
+  },
+  "forbidden_evidence_refs": [],
+  "forbidden_surface_dirs": [],
+  "package_id": "benchmark_usability_v1_1",
+  "practical_utility_gate": "NARROW_TO_WEAK_LOW_COVERAGE_CLAIM",
+  "reasons": [],
+  "repair_signal_role_gate": "MARK_REPAIR_DIAGNOSTIC_ONLY_FOR_CSTR",
+  "required_artifacts": [
+    {
+      "exists": true,
+      "path": "reports/current_status_decision_gate.md"
+    },
+    {
+      "exists": true,
+      "path": "reports/practical_utility_decision_gate.md"
+    },
+    {
+      "exists": true,
+      "path": "reports/repair_signal_role_decision_gate.md"
+    },
+    {
+      "exists": true,
+      "path": "results/current_status/evidence_manifest/current_evidence_manifest.json"
+    },
+    {
+      "exists": true,
+      "path": "README.md"
+    }
+  ],
+  "scientific_expansion_allowed": false,
+  "source_artifact_hash_manifest": "results/benchmark_usability/preconditions/source_artifact_hashes.json",
+  "usability_expansion_allowed": true,
+  "verdict": "READY_FOR_BENCHMARK_USABILITY_EXPANSION",
+  "working_tree_dirty": false
+}

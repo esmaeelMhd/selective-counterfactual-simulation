@@ -1,0 +1,72 @@
+package_id: benchmark_usability_v1_1
+
+source_commit: e0dbdc2
+source_tag: v1-current-status-sync
+
+controlling_status:
+  current_status_gate: reports/current_status_decision_gate.md
+  practical_utility_gate: reports/practical_utility_decision_gate.md
+  repair_signal_role_gate: reports/repair_signal_role_decision_gate.md
+  current_manifest: results/current_status/evidence_manifest/current_evidence_manifest.json
+
+allowed_claim:
+  label: WEAK_LOW_COVERAGE_BENCHMARK
+  text: "A weak but positive low-coverage refusal benchmark under a frozen protocol."
+
+expansion_policy:
+  scientific_expansion_allowed: false
+  usability_expansion_allowed: true
+
+allowed_usability_additions:
+  - quickstart demo
+  - benchmark card
+  - custom model adapter
+  - custom model example
+  - local model comparison script
+  - usability-focused README update
+  - benchmark release note
+
+forbidden_claims:
+  - strong support
+  - broad simulator reliability
+  - trustworthy counterfactual simulation
+  - safety certification
+  - autonomous control
+  - product readiness
+  - plant-wide digital twin
+  - industrial AI breakthrough
+  - high-coverage reliability
+  - universal simulator
+
+forbidden_research_expansion:
+  - RSSM
+  - heat_exchanger evidence
+  - third system evidence
+  - new calibrated judge family
+  - new refusal signal
+  - new simulator model as benchmark evidence
+  - protocol mutation
+  - product/API/frontend work
+
+demo:
+  output_dir: results/demo
+  report: results/demo/demo_report.md
+  max_runtime_seconds_soft: 300
+  systems:
+    - two_tank
+  required_outputs:
+    - results/demo/main_result_table.csv
+    - results/demo/risk_coverage.png
+    - results/demo/demo_report.md
+    - results/demo/demo_summary.json
+
+custom_model:
+  example_path: examples/custom_model_example.py
+  output_dir: results/custom_model_example
+
+model_comparison:
+  output_dir: results/model_comparison
+  allowed_builtin_models:
+    - hold_last
+    - linear_narx
+    - mlp_state_space

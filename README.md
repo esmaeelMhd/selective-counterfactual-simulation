@@ -27,6 +27,64 @@
 - RSSM or third-system evidence
 <!-- SCS_CURRENT_STATUS_END -->
 
+<!-- SCS_USABILITY_START -->
+## Quickstart
+
+```bash
+pip install -e ".[dev]"
+pytest -q
+python scripts/run_current_status_demo.py
+```
+
+## Run the Current Status Demo
+
+```bash
+python scripts/run_current_status_demo.py --config configs/status/benchmark_usability_v1_1.yaml --output results/demo
+```
+
+The demo is a quick local run, not the full evidence chain.
+
+## What This Benchmark Tests
+
+It tests refusal/ranking behavior for counterfactual simulator rollouts under intervention shift.
+
+## What This Benchmark Does Not Test
+
+It does not test simulator safety, product readiness, plant-wide deployment, RSSM evidence, third-system evidence, autonomous control, or high-coverage reliability.
+
+## Add Your Own Model
+
+Implement the adapter in `src/scs/models/user_model.py`, inspect `examples/custom_model_example.py`, and run:
+
+```bash
+python examples/custom_model_example.py --output results/custom_model_example
+```
+
+## Local Model Comparison
+
+```bash
+python scripts/compare_models.py --config configs/experiments/calibrated_two_tank.yaml --models hold_last linear_narx mlp_state_space --output results/model_comparison
+```
+
+Custom model example:
+
+```bash
+python scripts/compare_models.py --config configs/experiments/calibrated_two_tank.yaml --models linear_narx mlp_state_space --custom-model examples/custom_model_example.py:DampedLinearUserModel --output results/model_comparison_custom
+```
+
+## Current Evidence Status
+
+A weak but positive low-coverage refusal benchmark under a frozen protocol. TwoTank is stronger than CSTR. repair_amount is diagnostic-only for CSTR; invariant_residual is informative for CSTR.
+
+## Reproducibility
+
+Run the install, test, demo, and comparison commands above from the repository root.
+
+## Claim Boundaries
+
+This usability release does not change the scientific claim. It does not add RSSM, third-system evidence, new benchmark systems, product API, frontend, or deployment work.
+<!-- SCS_USABILITY_END -->
+
 
 This repository tests one research question:
 

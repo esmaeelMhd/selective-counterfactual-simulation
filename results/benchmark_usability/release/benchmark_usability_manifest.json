@@ -1,0 +1,38 @@
+{
+  "allowed_claim": "A weak but positive low-coverage refusal benchmark under a frozen protocol.",
+  "custom_model_interface": "src/scs/models/user_model.py",
+  "demo_commands": [
+    "python scripts/run_current_status_demo.py --config configs/status/benchmark_usability_v1_1.yaml --output results/demo"
+  ],
+  "forbidden_claims": [
+    "strong support",
+    "broad simulator reliability",
+    "trustworthy counterfactual simulation",
+    "safety certification",
+    "autonomous control",
+    "product readiness",
+    "plant-wide digital twin",
+    "industrial AI breakthrough",
+    "high-coverage reliability",
+    "universal simulator"
+  ],
+  "known_limitations": [
+    "Scientific claim unchanged.",
+    "Current evidence remains weak-positive and low-coverage only.",
+    "Expansion remains blocked.",
+    "Custom model outputs are local-only and not benchmark evidence."
+  ],
+  "model_comparison_script": "scripts/compare_models.py",
+  "new_user_features": [
+    "quickstart demo",
+    "benchmark card",
+    "custom model adapter",
+    "custom model example",
+    "local model comparison script",
+    "usability-focused README update",
+    "benchmark release note"
+  ],
+  "release_name": "v1.1-benchmark-usability",
+  "release_type": "usability_only",
+  "scientific_claim_changed": false
+}

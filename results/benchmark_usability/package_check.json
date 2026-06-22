@@ -1,0 +1,13 @@
+{
+  "claim_language_violations": [],
+  "custom_model_comparison_check": "MODEL_COMPARISON_BUILT",
+  "custom_model_example_returncode": 0,
+  "demo_check": "DEMO_BUILT",
+  "missing": [],
+  "model_comparison_check": "MODEL_COMPARISON_BUILT",
+  "prior_artifact_mutation_detected": false,
+  "readme_check": "README_USABILITY_SYNCED",
+  "reasons": [],
+  "source_hash_mismatches": [],
+  "verdict": "BENCHMARK_USABILITY_PACKAGE_ACCEPTED"
+}

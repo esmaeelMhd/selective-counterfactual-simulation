@@ -1,0 +1,3 @@
+system_id,coverage,baseline_judge,calibrated_judge,baseline_far,calibrated_far,absolute_margin,claim_scope,is_demo
+two_tank,0.05,support_only_demo,combined_linear_demo,0.0,0.0,0.0,demo_only_not_full_evidence,True
+two_tank,0.1,support_only_demo,combined_linear_demo,0.0,0.0,0.0,demo_only_not_full_evidence,True

@@ -1,0 +1,19 @@
+{
+  "current_claim_modified": false,
+  "custom_model": null,
+  "is_local_comparison_only": true,
+  "models": [
+    "hold_last",
+    "linear_narx",
+    "mlp_state_space"
+  ],
+  "outputs": {
+    "model_comparison": "results/model_comparison/model_comparison.csv",
+    "plot": "results/model_comparison/risk_coverage_by_model.png",
+    "report": "results/model_comparison/model_comparison_report.md",
+    "risk_coverage_by_model": "results/model_comparison/risk_coverage_by_model.csv",
+    "summary": "results/model_comparison/model_comparison_summary.json"
+  },
+  "system_id": "two_tank",
+  "verdict": "MODEL_COMPARISON_BUILT"
+}

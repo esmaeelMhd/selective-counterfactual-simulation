@@ -1,0 +1,13 @@
+{
+  "allowed_claim": "A weak but positive low-coverage refusal benchmark under a frozen protocol.",
+  "best_demo_model_by_id_rmse": "mlp_state_space",
+  "current_manifest_status": "current_evidence_status_v1",
+  "is_demo": true,
+  "outputs": {
+    "demo_report": "results/demo/demo_report.md",
+    "demo_summary": "results/demo/demo_summary.json",
+    "main_result_table": "results/demo/main_result_table.csv",
+    "risk_coverage": "results/demo/risk_coverage.png"
+  },
+  "verdict": "DEMO_BUILT"
+}

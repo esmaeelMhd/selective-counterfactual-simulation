@@ -1,0 +1,19 @@
+{
+  "current_claim_modified": false,
+  "custom_model": "examples/custom_model_example.py:DampedLinearUserModel",
+  "is_local_comparison_only": true,
+  "models": [
+    "linear_narx",
+    "mlp_state_space",
+    "damped_linear_user"
+  ],
+  "outputs": {
+    "model_comparison": "results/model_comparison_custom/model_comparison.csv",
+    "plot": "results/model_comparison_custom/risk_coverage_by_model.png",
+    "report": "results/model_comparison_custom/model_comparison_report.md",
+    "risk_coverage_by_model": "results/model_comparison_custom/risk_coverage_by_model.csv",
+    "summary": "results/model_comparison_custom/model_comparison_summary.json"
+  },
+  "system_id": "two_tank",
+  "verdict": "MODEL_COMPARISON_BUILT"
+}

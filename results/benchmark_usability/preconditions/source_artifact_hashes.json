@@ -1,0 +1,20 @@
+{
+  "artifacts": {
+    "reports/current_status_decision_gate.md": {
+      "bytes": 869,
+      "sha256": "48f838917ce6f7fd62d9ade0a8f99d3893b9278ab144e5d31a79624a7a0ae158"
+    },
+    "reports/practical_utility_decision_gate.md": {
+      "bytes": 921,
+      "sha256": "f8f0d0972f4c4dd32a33fb2736d7716d012ca2c41899c0fb86b373af317003ef"
+    },
+    "reports/repair_signal_role_decision_gate.md": {
+      "bytes": 820,
+      "sha256": "85137212bb273ad0b3055c723778246d242b1251d8e6e69aee26a98677bfde99"
+    },
+    "results/current_status/evidence_manifest/current_evidence_manifest.json": {
+      "bytes": 3440,
+      "sha256": "72da4ab0c23f5beae00b2cb91e535085fea364c95a254ff84d3d4840dae3e431"
+    }
+  }
+}
