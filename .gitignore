@@ -34,5 +34,6 @@ results/ci_custom_model_example/
 results/ci_model_comparison/
 results/smoke_cstr/
 results/seed_sweep_cstr/
+results/v2_comparator_fairness/rerun_source/
 reports/smoke_report.md
 reports/full_v0_report.md

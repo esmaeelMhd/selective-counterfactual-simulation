@@ -1,0 +1,71 @@
+audit_id: v2_comparator_fairness
+source_branch: v2-scientific-strengthening
+source_commit: f936fd8
+
+source_artifacts:
+  protocol_lock: docs/v2/v2_scientific_protocol_lock.md
+  frozen_risk_coverage: results/v2_scientific_strengthening/frozen_protocol/v2_risk_coverage.csv
+  frozen_scenario_scores: results/v2_scientific_strengthening/frozen_protocol/v2_scenario_scores.csv
+  frozen_run_summary: results/v2_scientific_strengthening/frozen_protocol/v2_run_summary.json
+  statistical_summary: results/v2_scientific_strengthening/statistical_audit/v2_statistical_summary.json
+  scientific_gate: reports/v2_scientific_decision_gate.md
+  underperformance_diagnosis: reports/v2_calibrated_underperformance_diagnosis.md
+
+v2_config: configs/v2/v2_scientific_strengthening.yaml
+v2_event_config: configs/v2/v2_event_targets.yaml
+
+primary_calibrated_judge: calibration_selected_candidate_ranker
+
+baseline_judges:
+  - support_only
+  - uncertainty_only
+  - disagreement_only
+  - invariant_only
+  - repair_only
+  - random_baseline
+  - conformal_risk_threshold
+  - ensemble_disagreement_threshold
+  - learned_error_classifier
+
+calibrated_family_judges:
+  - best_single_signal_selected_on_calibration
+  - calibration_selected_candidate_ranker
+  - rank_normalized_linear
+  - logistic_calibrated_judge
+  - isotonic_calibrated_judge
+  - quantile_rule_judge
+  - conservative_low_coverage_judge
+
+diagnostic_only:
+  - oracle_error_rank
+  - row_wise_strongest_baseline_envelope
+
+primary_coverages:
+  - 0.05
+  - 0.10
+
+badness_targets:
+  - bad_rmse
+  - bad_event
+  - bad_rmse_or_event
+
+selection_modes:
+  - global_calibration_selected_baseline
+  - per_system_calibration_selected_baseline
+  - per_system_target_calibration_selected_baseline
+  - row_wise_strongest_baseline_envelope
+
+statistical_rules:
+  min_absolute_margin_for_meaningful_effect: 0.05
+  min_seed_win_rate_for_robust_effect: 0.70
+  confidence_level: 0.95
+  bootstrap_iterations: 1000
+
+forbidden:
+  new_systems: false
+  new_models: false
+  new_judges: false
+  new_signals: false
+  oracle_as_real_method: false
+  test_labels_for_deployable_baselines: false
+  overwrite_v2_source_artifacts: false

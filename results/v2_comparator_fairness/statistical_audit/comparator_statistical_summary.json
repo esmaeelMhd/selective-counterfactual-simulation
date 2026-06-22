@@ -1,0 +1,23 @@
+{
+  "bootstrap_iterations": 1000,
+  "confidence_level": 0.95,
+  "event_risk_worsening_count": 1,
+  "event_target_result": {
+    "event_risk_worsening_count": 1,
+    "mean_margin": -0.0035714285714285713
+  },
+  "fair_mean_margin": -0.0011485890652557322,
+  "fair_mode": "per_system_target_calibration_selected_baseline",
+  "positive_system_count": 1,
+  "positive_systems": [
+    "cstr"
+  ],
+  "practical_threshold_pass_count": 0,
+  "rmse_target_result": {
+    "mean_margin": 0.00026455026455026435,
+    "positive_system_count": 2
+  },
+  "row_wise_mean_margin": -0.022863315696649025,
+  "row_wise_mode": "row_wise_strongest_baseline_envelope",
+  "verdict": "CALIBRATED_TARGET_DEPENDENT"
+}

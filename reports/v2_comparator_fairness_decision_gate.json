@@ -1,0 +1,11 @@
+{
+  "allowed_claim": "Calibrated refusal is target-dependent and not reliable for event-risk.",
+  "decision": "CALIBRATED_TARGET_DEPENDENT",
+  "deployable_baseline_selection_uses_test_labels": false,
+  "evaluation_verdict": "FAIR_BASELINE_ANALYSIS_COMPLETE",
+  "row_wise_envelope_deployable": false,
+  "scientific_claim_upgraded": false,
+  "selection_verdict": "COMPARATOR_SELECTION_VALID",
+  "starting_v2_decision": "NO_METHOD_CLAIM_BENCHMARK_ONLY",
+  "statistical_verdict": "CALIBRATED_TARGET_DEPENDENT"
+}

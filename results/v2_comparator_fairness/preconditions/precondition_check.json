@@ -1,0 +1,28 @@
+{
+  "audit_id": "v2_comparator_fairness",
+  "diagnostic_only_ok": true,
+  "forbidden_dependency_scan": {
+    "old_repo_runtime_import_hits": [],
+    "path_hack_hits": []
+  },
+  "missing_source_artifacts": [],
+  "reasons": [],
+  "risk_columns_ok": true,
+  "scenario_csv_non_empty": true,
+  "source_artifact_modified": false,
+  "source_artifacts": {
+    "frozen_risk_coverage": "results/v2_scientific_strengthening/frozen_protocol/v2_risk_coverage.csv",
+    "frozen_run_summary": "results/v2_scientific_strengthening/frozen_protocol/v2_run_summary.json",
+    "frozen_scenario_scores": "results/v2_scientific_strengthening/frozen_protocol/v2_scenario_scores.csv",
+    "protocol_lock": "docs/v2/v2_scientific_protocol_lock.md",
+    "scientific_gate": "reports/v2_scientific_decision_gate.md",
+    "statistical_summary": "results/v2_scientific_strengthening/statistical_audit/v2_statistical_summary.json",
+    "underperformance_diagnosis": "reports/v2_calibrated_underperformance_diagnosis.md"
+  },
+  "source_branch": "v2-scientific-strengthening",
+  "source_commit": "f936fd8",
+  "underperformance_diagnosis_exists": true,
+  "v2_decision_ok": true,
+  "verdict": "READY_FOR_COMPARATOR_FAIRNESS_AUDIT",
+  "working_tree_status": "M .gitignore\n M reports/calibrated_cstr_seed_sweep_report.md\n M reports/calibrated_seed_sweep_report.md\n M reports/failure_table_report.md\n M reports/seed_sweep_report.md\n M reports/two_tank_severity_report.md\n M tests/conftest.py\n?? configs/v2/v2_comparator_fairness.yaml\n?? docs/v2/v2_comparator_claim_audit.md\n?? docs/v2/v2_comparator_fairness_summary.md\n?? docs/v2/v2_comparator_taxonomy.md\n?? reports/release_note_v2_comparator_fairness.md\n?? reports/v2_comparator_fairness_decision_gate.json\n?? reports/v2_comparator_fairness_decision_gate.md\n?? reports/v2_comparator_fairness_evaluation.md\n?? reports/v2_comparator_fairness_preconditions.md\n?? reports/v2_comparator_fairness_statistical_audit.md\n?? reports/v2_comparator_selection.md\n?? results/v2_comparator_fairness/\n?? scripts/v2_build_comparator_selection_tables.py\n?? scripts/v2_comparator_fairness_statistical_audit.py\n?? scripts/v2_evaluate_comparator_fairness.py\n?? scripts/v2_make_comparator_fairness_decision_gate.py\n?? scripts/v2_verify_comparator_fairness_preconditions.py\n?? src/scs/experiments/v2_comparator.py\n?? tests/test_v2_comparator_decision_gate.py\n?? tests/test_v2_comparator_evaluation.py\n?? tests/test_v2_comparator_no_claim_inflation.py\n?? tests/test_v2_comparator_no_leakage.py\n?? tests/test_v2_comparator_preconditions.py\n?? tests/test_v2_comparator_reports_not_hardcoded.py\n?? tests/test_v2_comparator_selection.py\n?? tests/test_v2_comparator_statistics.py\n?? tests/test_v2_comparator_taxonomy.py"
+}
