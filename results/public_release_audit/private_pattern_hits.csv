@@ -1,0 +1,31 @@
+path,line,pattern,status,allowlist_reason,text
+scripts/make_freeze_report.py,32,\btoken\b,allowlisted,"generic source-code variable or scanner term, not a credential",for token in tokens:
+scripts/make_freeze_report.py,33,\btoken\b,allowlisted,"generic source-code variable or scanner term, not a credential",if token in text:
+scripts/make_freeze_report.py,34,\btoken\b,allowlisted,"generic source-code variable or scanner term, not a credential","findings.append({""path"": str(path), ""token"": token})"
+src/scs/experiments/current_status.py,689,\btoken\b,allowlisted,"generic source-code variable or scanner term, not a credential",allowed_heading = any(token in normalized_heading for token in ALLOWED_CONTEXT_HEADINGS)
+src/scs/experiments/current_status.py,690,\btoken\b,allowlisted,"generic source-code variable or scanner term, not a credential","negated = any(token in line for token in [""not "", ""no "", ""forbidden"", ""blocked"", ""non-"", ""does not"", ""do not"", ""remains out of scope""])"
+src/scs/experiments/public_benchmark.py,135,\btoken\b,allowlisted,"generic source-code variable or scanner term, not a credential","for token in [""rssm"", ""heat_exchanger"", ""third-system"", ""product/api/frontend""]:"
+src/scs/experiments/public_benchmark.py,136,\btoken\b,allowlisted,"generic source-code variable or scanner term, not a credential",if token not in forbidden:
+src/scs/experiments/public_benchmark.py,137,\btoken\b,allowlisted,"generic source-code variable or scanner term, not a credential","raise ValueError(f""forbidden research expansion must include {token}"")"
+src/scs/experiments/public_release.py,91,/home/ismayil,allowlisted,release checker contains required scan patterns,"r""/home/ismayil"","
+src/scs/experiments/public_release.py,91,/home/,allowlisted,release checker contains required scan patterns,"r""/home/ismayil"","
+src/scs/experiments/public_release.py,92,/home/,allowlisted,release checker contains required scan patterns,"r""/home/"","
+src/scs/experiments/public_release.py,94,Agtrup,allowlisted,release checker contains required scan patterns,"r""Agtrup"","
+src/scs/experiments/public_release.py,95,Kolding,allowlisted,release checker contains required scan patterns,"r""Kolding"","
+src/scs/experiments/public_release.py,104,OPENAI_API_KEY,allowlisted,release checker contains required scan patterns,"r""OPENAI_API_KEY"","
+src/scs/experiments/public_release.py,105,AWS_SECRET,allowlisted,release checker contains required scan patterns,"r""AWS_SECRET"","
+src/scs/experiments/public_release.py,106,DATABASE_URL,allowlisted,release checker contains required scan patterns,"r""DATABASE_URL"","
+src/scs/experiments/public_release.py,334,\bprivate\b,allowlisted,release checker contains required scan patterns,"if any(token in lower for token in [""private data"", ""private/local"", ""secret-like"", ""no secrets""]):"
+src/scs/experiments/public_release.py,334,\bsecret\b,allowlisted,release checker contains required scan patterns,"if any(token in lower for token in [""private data"", ""private/local"", ""secret-like"", ""no secrets""]):"
+src/scs/experiments/public_release.py,334,\btoken\b,allowlisted,release checker contains required scan patterns,"if any(token in lower for token in [""private data"", ""private/local"", ""secret-like"", ""no secrets""]):"
+src/scs/experiments/public_release.py,457,\bprivate\b,allowlisted,release checker contains required scan patterns,"reasons.append(f""unresolved private/local pattern hits: {len(unresolved_private)}"")"
+src/scs/experiments/public_release.py,522,\bprivate\b,allowlisted,release checker contains required scan patterns,"""## Private/local pattern scan"","
+src/scs/experiments/public_release.py,723,\bprivate\b,allowlisted,release checker contains required scan patterns,"f""- unresolved private/local hits: {result['private_pattern_unresolved']}"","
+src/scs/experiments/technical_note_package.py,996,\btoken\b,allowlisted,"generic source-code variable or scanner term, not a credential",allowed_heading = any(token in normalized for token in ALLOWED_CLAIM_CONTEXTS)
+src/scs/experiments/technical_note_package.py,997,\btoken\b,allowlisted,"generic source-code variable or scanner term, not a credential","negated = any(token in line for token in [""not "", ""no "", ""forbidden"", ""blocked"", ""does not"", ""do not"", ""unsupported"", ""false"", ""diagnostic-only""])"
+src/scs/experiments/v2_public_hardening.py,196,\btoken\b,allowlisted,"generic source-code variable or scanner term, not a credential",if any(token in lower for token in context_markers):
+src/scs/experiments/v2_public_hardening.py,201,\btoken\b,allowlisted,"generic source-code variable or scanner term, not a credential","if marker_line.endswith("":"") and any(token in marker_line for token in context_markers):"
+src/scs/experiments/v2_public_hardening.py,206,\btoken\b,allowlisted,"generic source-code variable or scanner term, not a credential",if any(token in lower for token in negated_line_markers):
+reports/public_release_exposure_decision.md,40,\bprivate\b,allowlisted,release audit output discusses release risks,## Private data risk
+reports/public_release_package_check.md,11,\bprivate\b,allowlisted,release audit output discusses release risks,- unresolved private/local hits: 0
+reports/public_release_readiness_audit.md,17,\bprivate\b,allowlisted,release audit output discusses release risks,## Private/local pattern scan

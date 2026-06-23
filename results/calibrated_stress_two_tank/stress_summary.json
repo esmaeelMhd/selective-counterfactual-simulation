@@ -1,0 +1,105 @@
+{
+  "command": "python scripts/run_calibrated_stress.py --config configs/experiments/calibrated_two_tank.yaml --thresholds 0.05 0.1 0.15 0.2 0.3 0.5 --coverages 0.05 0.1 0.2 0.4 0.6 0.8 1.0 --seeds 0 1 2 3 4 --output results/calibrated_stress_two_tank",
+  "coverages": [
+    0.05,
+    0.1,
+    0.2,
+    0.4,
+    0.6,
+    0.8,
+    1.0
+  ],
+  "leakage_detected": false,
+  "result_by_coverage": [
+    {
+      "coverage": 0.05,
+      "mean_margin": 0.1088888888888889,
+      "win_rate": 0.8666666666666667
+    },
+    {
+      "coverage": 0.1,
+      "mean_margin": 0.09400000000000001,
+      "win_rate": 0.8666666666666667
+    },
+    {
+      "coverage": 0.2,
+      "mean_margin": 0.068,
+      "win_rate": 0.8666666666666667
+    },
+    {
+      "coverage": 0.4,
+      "mean_margin": 0.03916666666666667,
+      "win_rate": 0.9
+    },
+    {
+      "coverage": 0.6,
+      "mean_margin": 0.0201851851851852,
+      "win_rate": 0.8666666666666667
+    },
+    {
+      "coverage": 0.8,
+      "mean_margin": 0.007749999999999988,
+      "win_rate": 0.8333333333333334
+    },
+    {
+      "coverage": 1.0,
+      "mean_margin": -1.295260195396016e-17,
+      "win_rate": 0.0
+    }
+  ],
+  "result_by_threshold": [
+    {
+      "low_coverage_win_rate": 0.2,
+      "threshold": 0.05,
+      "verdict": "FAILS"
+    },
+    {
+      "low_coverage_win_rate": 1.0,
+      "threshold": 0.1,
+      "verdict": "WORKS"
+    },
+    {
+      "low_coverage_win_rate": 1.0,
+      "threshold": 0.15,
+      "verdict": "WORKS"
+    },
+    {
+      "low_coverage_win_rate": 1.0,
+      "threshold": 0.2,
+      "verdict": "WORKS"
+    },
+    {
+      "low_coverage_win_rate": 1.0,
+      "threshold": 0.3,
+      "verdict": "WORKS"
+    },
+    {
+      "low_coverage_win_rate": 1.0,
+      "threshold": 0.5,
+      "verdict": "WORKS"
+    }
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "thresholds": [
+    0.05,
+    0.1,
+    0.15,
+    0.2,
+    0.3,
+    0.5
+  ],
+  "verdict": "ROBUST_LOW_COVERAGE_ONLY",
+  "working_thresholds": [
+    0.1,
+    0.15,
+    0.2,
+    0.3,
+    0.5
+  ]
+}

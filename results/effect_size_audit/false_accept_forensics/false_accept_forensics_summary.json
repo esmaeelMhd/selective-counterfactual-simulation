@@ -1,0 +1,278 @@
+{
+  "false_accept_count": 306,
+  "system_summary": [
+    {
+      "accepted_bad_count": 35,
+      "accepted_bad_rate": 0.4666666666666667,
+      "accepted_count": 75,
+      "coverage": 0.05,
+      "judge_id": "best_calibrated_family_per_model_scenario",
+      "system_id": "two_tank"
+    },
+    {
+      "accepted_bad_count": 73,
+      "accepted_bad_rate": 0.4866666666666667,
+      "accepted_count": 150,
+      "coverage": 0.1,
+      "judge_id": "best_calibrated_family_per_model_scenario",
+      "system_id": "two_tank"
+    },
+    {
+      "accepted_bad_count": 66,
+      "accepted_bad_rate": 0.6285714285714286,
+      "accepted_count": 105,
+      "coverage": 0.05,
+      "judge_id": "best_calibrated_family_per_model_scenario",
+      "system_id": "cstr"
+    },
+    {
+      "accepted_bad_count": 132,
+      "accepted_bad_rate": 0.6285714285714286,
+      "accepted_count": 210,
+      "coverage": 0.1,
+      "judge_id": "best_calibrated_family_per_model_scenario",
+      "system_id": "cstr"
+    }
+  ],
+  "top_tags": [
+    {
+      "count": 306,
+      "tag": "LOW_REPAIR_BUT_BAD"
+    },
+    {
+      "count": 171,
+      "tag": "SEVERE_MISCLASSIFICATION"
+    },
+    {
+      "count": 150,
+      "tag": "MODEL_SPECIFIC_FAILURE"
+    },
+    {
+      "count": 126,
+      "tag": "LOW_DISAGREEMENT_BUT_BAD"
+    },
+    {
+      "count": 119,
+      "tag": "LOW_UNCERTAINTY_BUT_BAD"
+    },
+    {
+      "count": 45,
+      "tag": "LOW_INVARIANT_RESIDUAL_BUT_BAD"
+    },
+    {
+      "count": 45,
+      "tag": "SPLIT_SPECIFIC_FAILURE"
+    },
+    {
+      "count": 36,
+      "tag": "LOW_SUPPORT_RISK_BUT_BAD"
+    },
+    {
+      "count": 18,
+      "tag": "NEAR_THRESHOLD_FAILURE"
+    }
+  ],
+  "verdict": "INCONCLUSIVE",
+  "worst_false_accepts": [
+    {
+      "coverage": 0.1,
+      "disagreement_score": 6.116558628139864,
+      "final_state_error": 28.66430930908488,
+      "invariant_residual": 0.5791266067770799,
+      "judge_id": "calibration_selected_candidate_ranker",
+      "mae": 5.945991223177994,
+      "max_abs_error": 28.66427980734585,
+      "model_id": "hold_last",
+      "rank_within_accepted": 5,
+      "repair_amount": 0.0,
+      "risk_score": 0.9542857142857144,
+      "rmse": 10.727370523221468,
+      "scenario_id": "judge_test_unsafe_temperature_event_0010",
+      "scenario_type": "unsafe_temperature_event",
+      "support_distance": 26.014867763978863,
+      "system_id": "cstr",
+      "tags": "LOW_UNCERTAINTY_BUT_BAD;LOW_REPAIR_BUT_BAD;MODEL_SPECIFIC_FAILURE;SEVERE_MISCLASSIFICATION",
+      "uncertainty_score": 0.0
+    },
+    {
+      "coverage": 0.05,
+      "disagreement_score": 6.116558628139864,
+      "final_state_error": 28.66430930908488,
+      "invariant_residual": 0.5791266067770799,
+      "judge_id": "calibration_selected_candidate_ranker",
+      "mae": 5.945991223177994,
+      "max_abs_error": 28.66427980734585,
+      "model_id": "hold_last",
+      "rank_within_accepted": 5,
+      "repair_amount": 0.0,
+      "risk_score": 0.9542857142857144,
+      "rmse": 10.727370523221468,
+      "scenario_id": "judge_test_unsafe_temperature_event_0010",
+      "scenario_type": "unsafe_temperature_event",
+      "support_distance": 26.014867763978863,
+      "system_id": "cstr",
+      "tags": "LOW_UNCERTAINTY_BUT_BAD;LOW_REPAIR_BUT_BAD;MODEL_SPECIFIC_FAILURE;SEVERE_MISCLASSIFICATION",
+      "uncertainty_score": 0.0
+    },
+    {
+      "coverage": 0.1,
+      "disagreement_score": 6.100100650222291,
+      "final_state_error": 28.408067318905484,
+      "invariant_residual": 0.5792251338870948,
+      "judge_id": "calibration_selected_candidate_ranker",
+      "mae": 5.909354670240925,
+      "max_abs_error": 28.408015290430058,
+      "model_id": "hold_last",
+      "rank_within_accepted": 6,
+      "repair_amount": 0.0,
+      "risk_score": 0.9542857142857144,
+      "rmse": 10.659668869274908,
+      "scenario_id": "judge_test_unsafe_temperature_event_0023",
+      "scenario_type": "unsafe_temperature_event",
+      "support_distance": 25.91590520476244,
+      "system_id": "cstr",
+      "tags": "LOW_UNCERTAINTY_BUT_BAD;LOW_REPAIR_BUT_BAD;MODEL_SPECIFIC_FAILURE;SEVERE_MISCLASSIFICATION",
+      "uncertainty_score": 0.0
+    },
+    {
+      "coverage": 0.1,
+      "disagreement_score": 6.250378373313771,
+      "final_state_error": 28.32720154644272,
+      "invariant_residual": 0.6017506386167316,
+      "judge_id": "calibration_selected_candidate_ranker",
+      "mae": 5.941194776522435,
+      "max_abs_error": 28.32695859353163,
+      "model_id": "hold_last",
+      "rank_within_accepted": 10,
+      "repair_amount": 0.0,
+      "risk_score": 0.9571428571428572,
+      "rmse": 10.639951270331126,
+      "scenario_id": "judge_test_unsafe_temperature_event_0031",
+      "scenario_type": "unsafe_temperature_event",
+      "support_distance": 25.879881779008,
+      "system_id": "cstr",
+      "tags": "LOW_UNCERTAINTY_BUT_BAD;LOW_REPAIR_BUT_BAD;MODEL_SPECIFIC_FAILURE;SEVERE_MISCLASSIFICATION",
+      "uncertainty_score": 0.0
+    },
+    {
+      "coverage": 0.1,
+      "disagreement_score": 6.108729679990399,
+      "final_state_error": 28.06053563273976,
+      "invariant_residual": 0.5822038603417709,
+      "judge_id": "calibration_selected_candidate_ranker",
+      "mae": 5.814166302153283,
+      "max_abs_error": 28.060435263043477,
+      "model_id": "hold_last",
+      "rank_within_accepted": 3,
+      "repair_amount": 0.0,
+      "risk_score": 0.9542857142857144,
+      "rmse": 10.485849018603735,
+      "scenario_id": "judge_test_unsafe_temperature_event_0004",
+      "scenario_type": "unsafe_temperature_event",
+      "support_distance": 25.79987776941448,
+      "system_id": "cstr",
+      "tags": "LOW_REPAIR_BUT_BAD;MODEL_SPECIFIC_FAILURE;SEVERE_MISCLASSIFICATION",
+      "uncertainty_score": 2.8477220581635265e-14
+    },
+    {
+      "coverage": 0.05,
+      "disagreement_score": 6.108729679990399,
+      "final_state_error": 28.06053563273976,
+      "invariant_residual": 0.5822038603417709,
+      "judge_id": "calibration_selected_candidate_ranker",
+      "mae": 5.814166302153283,
+      "max_abs_error": 28.060435263043477,
+      "model_id": "hold_last",
+      "rank_within_accepted": 3,
+      "repair_amount": 0.0,
+      "risk_score": 0.9542857142857144,
+      "rmse": 10.485849018603735,
+      "scenario_id": "judge_test_unsafe_temperature_event_0004",
+      "scenario_type": "unsafe_temperature_event",
+      "support_distance": 25.79987776941448,
+      "system_id": "cstr",
+      "tags": "LOW_REPAIR_BUT_BAD;MODEL_SPECIFIC_FAILURE;SEVERE_MISCLASSIFICATION",
+      "uncertainty_score": 2.8477220581635265e-14
+    },
+    {
+      "coverage": 0.1,
+      "disagreement_score": 6.093327852048951,
+      "final_state_error": 27.691548868736152,
+      "invariant_residual": 0.5741234322752284,
+      "judge_id": "calibration_selected_candidate_ranker",
+      "mae": 5.723820682200646,
+      "max_abs_error": 27.6913723760145,
+      "model_id": "hold_last",
+      "rank_within_accepted": 4,
+      "repair_amount": 0.0,
+      "risk_score": 0.9542857142857144,
+      "rmse": 10.337739829937558,
+      "scenario_id": "judge_test_unsafe_temperature_event_0007",
+      "scenario_type": "unsafe_temperature_event",
+      "support_distance": 25.84229467938208,
+      "system_id": "cstr",
+      "tags": "LOW_UNCERTAINTY_BUT_BAD;LOW_REPAIR_BUT_BAD;MODEL_SPECIFIC_FAILURE;SEVERE_MISCLASSIFICATION",
+      "uncertainty_score": 0.0
+    },
+    {
+      "coverage": 0.05,
+      "disagreement_score": 6.093327852048951,
+      "final_state_error": 27.691548868736152,
+      "invariant_residual": 0.5741234322752284,
+      "judge_id": "calibration_selected_candidate_ranker",
+      "mae": 5.723820682200646,
+      "max_abs_error": 27.6913723760145,
+      "model_id": "hold_last",
+      "rank_within_accepted": 4,
+      "repair_amount": 0.0,
+      "risk_score": 0.9542857142857144,
+      "rmse": 10.337739829937558,
+      "scenario_id": "judge_test_unsafe_temperature_event_0007",
+      "scenario_type": "unsafe_temperature_event",
+      "support_distance": 25.84229467938208,
+      "system_id": "cstr",
+      "tags": "LOW_UNCERTAINTY_BUT_BAD;LOW_REPAIR_BUT_BAD;MODEL_SPECIFIC_FAILURE;SEVERE_MISCLASSIFICATION",
+      "uncertainty_score": 0.0
+    },
+    {
+      "coverage": 0.1,
+      "disagreement_score": 6.111022603585966,
+      "final_state_error": 27.53086554055225,
+      "invariant_residual": 0.5760238569519124,
+      "judge_id": "calibration_selected_candidate_ranker",
+      "mae": 5.69401480125455,
+      "max_abs_error": 27.53063463860769,
+      "model_id": "hold_last",
+      "rank_within_accepted": 7,
+      "repair_amount": 0.0,
+      "risk_score": 0.9542857142857144,
+      "rmse": 10.273620683626593,
+      "scenario_id": "judge_test_unsafe_temperature_event_0076",
+      "scenario_type": "unsafe_temperature_event",
+      "support_distance": 25.85118017803805,
+      "system_id": "cstr",
+      "tags": "LOW_UNCERTAINTY_BUT_BAD;LOW_REPAIR_BUT_BAD;MODEL_SPECIFIC_FAILURE;SEVERE_MISCLASSIFICATION",
+      "uncertainty_score": 0.0
+    },
+    {
+      "coverage": 0.05,
+      "disagreement_score": 6.031302368030196,
+      "final_state_error": 27.46051184859,
+      "invariant_residual": 0.5619812715822374,
+      "judge_id": "calibration_selected_candidate_ranker",
+      "mae": 5.640936295558031,
+      "max_abs_error": 27.46041161584816,
+      "model_id": "hold_last",
+      "rank_within_accepted": 1,
+      "repair_amount": 0.0,
+      "risk_score": 0.9523809523809524,
+      "rmse": 10.217831267098632,
+      "scenario_id": "judge_test_unsafe_temperature_event_0046",
+      "scenario_type": "unsafe_temperature_event",
+      "support_distance": 25.85716534210505,
+      "system_id": "cstr",
+      "tags": "LOW_UNCERTAINTY_BUT_BAD;LOW_REPAIR_BUT_BAD;MODEL_SPECIFIC_FAILURE;SEVERE_MISCLASSIFICATION",
+      "uncertainty_score": 0.0
+    }
+  ]
+}

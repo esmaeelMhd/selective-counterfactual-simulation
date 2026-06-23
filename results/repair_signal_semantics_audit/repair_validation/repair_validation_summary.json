@@ -1,0 +1,9 @@
+{
+  "bad_rmse_threshold": 0.15,
+  "cstr_repair_semantic_status": "within-bound CSTR errors are high-RMSE but near-zero repair",
+  "cstr_repair_status": "REPAIR_BOUNDS_ONLY",
+  "epsilon": 1e-09,
+  "failed_cases": [],
+  "two_tank_repair_status": "REPAIR_BOUNDS_ONLY",
+  "verdict": "REPAIR_CORRECT_BUT_CSTR_IRRELEVANT"
+}

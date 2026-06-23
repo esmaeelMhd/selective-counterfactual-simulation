@@ -1,0 +1,41 @@
+{
+  "fraction_accepted_false_accepts_with_low_repair": 1.0,
+  "fraction_severe_false_accepts_with_low_repair": 1.0,
+  "key_finding": "repair_amount AUROC=0.5, low-repair accepted false-accept fraction=1.000000",
+  "low_repair_false_accepts_by_coverage": [
+    {
+      "accepted_false_accept_count": 66,
+      "coverage": 0.05,
+      "fraction": 1.0,
+      "low_repair_false_accept_count": 66
+    },
+    {
+      "accepted_false_accept_count": 132,
+      "coverage": 0.1,
+      "fraction": 1.0,
+      "low_repair_false_accept_count": 132
+    }
+  ],
+  "near_zero_repair_fraction": 1.0,
+  "out_of_bounds_or_repair_events_observed": false,
+  "repair_auprc_for_bad_rmse_label": 0.7664622665468487,
+  "repair_auroc_for_bad_rmse_label": 0.5,
+  "repair_dynamic_range": 0.0,
+  "repair_false_negative_rate_at_low_risk_threshold": 1.0,
+  "repair_low_risk_threshold": 0.0,
+  "repair_only_judge_comparison": [
+    {
+      "calibrated_far": 0.6285714285714286,
+      "coverage": 0.05,
+      "repair_only_far": 0.7047619047619048
+    },
+    {
+      "calibrated_far": 0.6285714285714286,
+      "coverage": 0.1,
+      "repair_only_far": 0.7285714285714285
+    }
+  ],
+  "repair_spearman_with_rmse": 0.0,
+  "verdict": "REPAIR_SIGNAL_BLIND_SPOT",
+  "zero_repair_fraction": 1.0
+}

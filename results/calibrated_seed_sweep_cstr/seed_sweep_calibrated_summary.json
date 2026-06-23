@@ -1,0 +1,126 @@
+{
+  "command": "python scripts/run_calibrated_seed_sweep.py --config configs/experiments/calibrated_cstr.yaml --seeds 0 1 2 3 4 5 6 7 8 9 --output results/calibrated_seed_sweep_cstr",
+  "failures": [],
+  "judge_robustness": [
+    {
+      "judge_id": "best_single_signal_selected_on_calibration",
+      "mean_far": 0.6354761904761904,
+      "std_far": 0.4792630698519108,
+      "win_count": 420
+    },
+    {
+      "judge_id": "calibration_selected_candidate_ranker",
+      "mean_far": 0.6323809523809525,
+      "std_far": 0.4746047697447684,
+      "win_count": 420
+    },
+    {
+      "judge_id": "combined_linear",
+      "mean_far": 0.6900000000000001,
+      "std_far": 0.43101146510840327,
+      "win_count": 420
+    },
+    {
+      "judge_id": "conservative_low_coverage_judge",
+      "mean_far": 0.6533333333333333,
+      "std_far": 0.45274377874963606,
+      "win_count": 420
+    },
+    {
+      "judge_id": "disagreement_only",
+      "mean_far": 0.7185714285714286,
+      "std_far": 0.4277798121442212,
+      "win_count": 420
+    },
+    {
+      "judge_id": "invariant_only",
+      "mean_far": 0.6354761904761904,
+      "std_far": 0.4792630698519108,
+      "win_count": 420
+    },
+    {
+      "judge_id": "isotonic_calibrated_judge",
+      "mean_far": 0.6354761904761904,
+      "std_far": 0.47556373973787375,
+      "win_count": 420
+    },
+    {
+      "judge_id": "logistic_calibrated_judge",
+      "mean_far": 0.6471428571428571,
+      "std_far": 0.4589772053256279,
+      "win_count": 420
+    },
+    {
+      "judge_id": "oracle_error_rank",
+      "mean_far": 0.6142857142857143,
+      "std_far": 0.48734408978455596,
+      "win_count": 420
+    },
+    {
+      "judge_id": "quantile_rule_judge",
+      "mean_far": 0.6354761904761904,
+      "std_far": 0.4792630698519108,
+      "win_count": 420
+    },
+    {
+      "judge_id": "random_baseline",
+      "mean_far": 0.7204761904761905,
+      "std_far": 0.4015599200121376,
+      "win_count": 420
+    },
+    {
+      "judge_id": "rank_normalized_linear",
+      "mean_far": 0.6388095238095238,
+      "std_far": 0.4762557944746245,
+      "win_count": 420
+    },
+    {
+      "judge_id": "repair_only",
+      "mean_far": 0.7271428571428571,
+      "std_far": 0.3953505783248499,
+      "win_count": 420
+    },
+    {
+      "judge_id": "support_only",
+      "mean_far": 0.705952380952381,
+      "std_far": 0.4228416175431849,
+      "win_count": 420
+    },
+    {
+      "judge_id": "uncertainty_only",
+      "mean_far": 0.7135714285714285,
+      "std_far": 0.41875096368540227,
+      "win_count": 420
+    }
+  ],
+  "leakage_detected": false,
+  "low_coverage_aggregate": [
+    {
+      "coverage": 0.05,
+      "mean_margin": 0.016190476190476154,
+      "std_margin": 0.015386185163241415,
+      "win_rate_vs_calibration_selected_single_signal": 0.7
+    },
+    {
+      "coverage": 0.1,
+      "mean_margin": 0.01333333333333333,
+      "std_margin": 0.016049809091764476,
+      "win_rate_vs_calibration_selected_single_signal": 0.6
+    }
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "system_id": "cstr",
+  "verdict": "ROBUST_LOW_COVERAGE",
+  "winning_seed_count": 7
+}

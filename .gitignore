@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.ipynb_checkpoints/
 .mypy_cache/
 .ruff_cache/
 .coverage
@@ -9,9 +10,14 @@ htmlcov/
 *.egg-info/
 build/
 dist/
+.env
+.env.*
+*.log
 results/smoke_two_tank/
 results/smoke/
 results/full_v0/
+results/tmp/
+results/local/
 results/seed_sweep_two_tank/
 results/two_tank_severity_sweep/
 results/failure_analysis/

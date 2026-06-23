@@ -1,0 +1,79 @@
+{
+  "allowed_next_action": "UPDATE_SIGNAL_SEMANTICS_ONLY",
+  "dirty_state": [],
+  "expansion_allowed": false,
+  "forbidden_dependency_scan": {
+    "old_repo_runtime_import_hits": [],
+    "path_hack_hits": []
+  },
+  "forbidden_evidence_refs": [],
+  "practical_utility_decision": "NARROW_TO_WEAK_LOW_COVERAGE_CLAIM",
+  "prior_artifact_hash_manifest": "results/current_status/preconditions/prior_artifact_hashes.json",
+  "reasons": [],
+  "repair_signal_role_decision": "MARK_REPAIR_DIAGNOSTIC_ONLY_FOR_CSTR",
+  "required_artifacts": [
+    {
+      "exists": true,
+      "path": "reports/practical_utility_decision_gate.md"
+    },
+    {
+      "exists": true,
+      "path": "reports/cstr_weakness_diagnosis.md"
+    },
+    {
+      "exists": true,
+      "path": "reports/repair_signal_role_decision_gate.md"
+    },
+    {
+      "exists": true,
+      "path": "results/calibrated_two_tank/calibrated_judge_summary.json"
+    },
+    {
+      "exists": true,
+      "path": "results/calibrated_two_tank/low_coverage_summary.csv"
+    },
+    {
+      "exists": true,
+      "path": "results/calibrated_cstr/calibrated_judge_summary.json"
+    },
+    {
+      "exists": true,
+      "path": "results/calibrated_cstr/low_coverage_summary.csv"
+    },
+    {
+      "exists": true,
+      "path": "results/effect_size_audit/effect_size/effect_size_summary.json"
+    },
+    {
+      "exists": true,
+      "path": "results/cstr_weakness_audit/repair_signal/repair_signal_metrics.json"
+    },
+    {
+      "exists": true,
+      "path": "results/repair_signal_semantics_audit/repair_validation/repair_validation_summary.json"
+    },
+    {
+      "exists": true,
+      "path": "results/repair_signal_semantics_audit/repair_vs_invariant/repair_vs_invariant_summary.json"
+    },
+    {
+      "exists": true,
+      "path": "reports/repair_signal_role_decision_gate.md"
+    },
+    {
+      "exists": true,
+      "path": "README.md"
+    },
+    {
+      "exists": true,
+      "path": "src/scs/validators/signal_semantics.py"
+    },
+    {
+      "exists": true,
+      "path": "docs/signal_semantics_registry.md"
+    }
+  ],
+  "status_id": "current_evidence_status_v1",
+  "verdict": "READY_FOR_STATUS_SYNC",
+  "working_tree_dirty": false
+}

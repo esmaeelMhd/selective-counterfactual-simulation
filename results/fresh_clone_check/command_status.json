@@ -1,0 +1,37 @@
+{
+  "commands": [
+    {
+      "command": "python -m venv .venv",
+      "duration_seconds": 2.218,
+      "returncode": 0
+    },
+    {
+      "command": ".venv/bin/python -m pip install -e .[dev]",
+      "duration_seconds": 22.282,
+      "returncode": 0
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q",
+      "duration_seconds": 161.828,
+      "returncode": 0
+    },
+    {
+      "command": ".venv/bin/python scripts/run_smoke.py",
+      "duration_seconds": 22.181,
+      "returncode": 0
+    },
+    {
+      "command": ".venv/bin/python scripts/run_current_status_demo.py",
+      "duration_seconds": 3.029,
+      "returncode": 0
+    },
+    {
+      "command": ".venv/bin/python examples/custom_model_example.py --output results/custom_model_example",
+      "duration_seconds": 1.206,
+      "returncode": 0
+    }
+  ],
+  "log": "results/fresh_clone_check/command_log.txt",
+  "source_commit": "10830465c26b981ea8db8c7d7457dcda91df75ea",
+  "verdict": "FRESH_CLONE_REPRO_PASSED"
+}

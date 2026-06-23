@@ -1,0 +1,32 @@
+{
+  "artifacts": {
+    "reports/cstr_weakness_diagnosis.md": {
+      "bytes": 1601,
+      "sha256": "504c9c34b8dbae9a256c50b30c3b6532efd663db97ee7f5c4be5f1b7112f3a45"
+    },
+    "reports/practical_utility_decision_gate.md": {
+      "bytes": 921,
+      "sha256": "f8f0d0972f4c4dd32a33fb2736d7716d012ca2c41899c0fb86b373af317003ef"
+    },
+    "reports/repair_signal_role_decision_gate.md": {
+      "bytes": 820,
+      "sha256": "85137212bb273ad0b3055c723778246d242b1251d8e6e69aee26a98677bfde99"
+    },
+    "results/cstr_weakness_audit/repair_signal/repair_signal_metrics.json": {
+      "bytes": 1257,
+      "sha256": "3cd5002aa1ebf2b8e9a379dc26bef88281d9a0f9e148b033b034194cca40de07"
+    },
+    "results/effect_size_audit/effect_size/effect_size_summary.json": {
+      "bytes": 3792,
+      "sha256": "76e1bfd4ea45351e4b340191d243cd4e4f117b8775325612a549e07c3206119f"
+    },
+    "results/repair_signal_semantics_audit/repair_validation/repair_validation_summary.json": {
+      "bytes": 317,
+      "sha256": "fe500d6c8bf78959f32c532ffa0afac5bd3e40e066caa3c8f440364cd88be3ae"
+    },
+    "results/repair_signal_semantics_audit/repair_vs_invariant/repair_vs_invariant_summary.json": {
+      "bytes": 251,
+      "sha256": "a62aef4341275076adced8b088b8939a930bf254744a50334355e8b533832cf3"
+    }
+  }
+}

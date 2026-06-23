@@ -1,0 +1,21 @@
+{
+  "artifacts": {
+    "calibrated_risk_coverage": "results/calibrated_two_tank/calibrated_risk_coverage.csv",
+    "calibrated_risk_coverage_plot": "results/calibrated_two_tank/calibrated_risk_coverage.png",
+    "calibration_selection": "results/calibrated_two_tank/calibration_selection.csv",
+    "calibration_table": "results/calibrated_two_tank/calibration_table.csv",
+    "judge_provenance": "results/calibrated_two_tank/judge_provenance.json",
+    "low_coverage_summary": "results/calibrated_two_tank/low_coverage_summary.csv",
+    "test_comparison": "results/calibrated_two_tank/test_comparison.csv",
+    "test_table": "results/calibrated_two_tank/test_table.csv"
+  },
+  "best_calibrated_judge": "calibration_selected_candidate_ranker",
+  "best_calibration_selected_single_signal": "best_single_signal_selected_on_calibration",
+  "expansion_allowed": false,
+  "leakage_detected": false,
+  "low_coverage_win": true,
+  "low_coverage_win_rate": 0.2,
+  "oracle_is_diagnostic_only": true,
+  "unavailable_judges": [],
+  "verdict": "SUPPORTED_LOW_COVERAGE"
+}

@@ -185,6 +185,7 @@ def scan_public_claim_language(text: str, forbidden_claims: list[str]) -> list[s
         "is not an",
         "is not the",
         "is not ",
+        "not a robust",
         "not a method-success claim",
         "not a product",
     ]

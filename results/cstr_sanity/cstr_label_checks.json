@@ -1,0 +1,115 @@
+{
+  "distribution_passed": true,
+  "invalid_reasons": [],
+  "labels_non_degenerate": true,
+  "materially_harder_ood": true,
+  "model_error_passed": true,
+  "roles": [
+    {
+      "bad_count": 751,
+      "bad_rate": 0.7152380952380952,
+      "non_degenerate": true,
+      "role": "judge_calibration",
+      "row_count": 1050
+    },
+    {
+      "bad_count": 1513,
+      "bad_rate": 0.7204761904761905,
+      "non_degenerate": true,
+      "role": "judge_test",
+      "row_count": 2100
+    }
+  ],
+  "scenario_bad_rates": [
+    {
+      "bad_rate": 0.8866666666666667,
+      "role": "judge_calibration",
+      "row_count": 150,
+      "scenario_type": "combined_feed_and_cooling_shift"
+    },
+    {
+      "bad_rate": 0.68,
+      "role": "judge_calibration",
+      "row_count": 150,
+      "scenario_type": "cooling_step_change"
+    },
+    {
+      "bad_rate": 0.6933333333333334,
+      "role": "judge_calibration",
+      "row_count": 150,
+      "scenario_type": "feed_concentration_spike"
+    },
+    {
+      "bad_rate": 0.6866666666666666,
+      "role": "judge_calibration",
+      "row_count": 150,
+      "scenario_type": "feed_temperature_spike"
+    },
+    {
+      "bad_rate": 0.3466666666666667,
+      "role": "judge_calibration",
+      "row_count": 150,
+      "scenario_type": "id"
+    },
+    {
+      "bad_rate": 0.7133333333333334,
+      "role": "judge_calibration",
+      "row_count": 150,
+      "scenario_type": "reaction_rate_shift"
+    },
+    {
+      "bad_rate": 1.0,
+      "role": "judge_calibration",
+      "row_count": 150,
+      "scenario_type": "unsafe_temperature_event"
+    },
+    {
+      "bad_rate": 0.8866666666666667,
+      "role": "judge_test",
+      "row_count": 300,
+      "scenario_type": "combined_feed_and_cooling_shift"
+    },
+    {
+      "bad_rate": 0.72,
+      "role": "judge_test",
+      "row_count": 300,
+      "scenario_type": "cooling_step_change"
+    },
+    {
+      "bad_rate": 0.7166666666666667,
+      "role": "judge_test",
+      "row_count": 300,
+      "scenario_type": "feed_concentration_spike"
+    },
+    {
+      "bad_rate": 0.6766666666666666,
+      "role": "judge_test",
+      "row_count": 300,
+      "scenario_type": "feed_temperature_spike"
+    },
+    {
+      "bad_rate": 0.3433333333333333,
+      "role": "judge_test",
+      "row_count": 300,
+      "scenario_type": "id"
+    },
+    {
+      "bad_rate": 0.7,
+      "role": "judge_test",
+      "row_count": 300,
+      "scenario_type": "reaction_rate_shift"
+    },
+    {
+      "bad_rate": 1.0,
+      "role": "judge_test",
+      "row_count": 300,
+      "scenario_type": "unsafe_temperature_event"
+    }
+  ],
+  "split_overlap": {
+    "scenario_overlap_count": 0
+  },
+  "threshold": 0.15,
+  "verdict": "VALID_CSTR_BENCHMARK",
+  "weak_reasons": []
+}
