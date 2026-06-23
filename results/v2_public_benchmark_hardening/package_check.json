@@ -1,0 +1,10 @@
+{
+  "builtin_benchmark_executed": true,
+  "claim_language_hits": [],
+  "custom_model_benchmark_executed": true,
+  "event_risk_figure_exists": true,
+  "method_claim_supported": false,
+  "reasons": [],
+  "source_hashes_checked": 12,
+  "verdict": "V2_PUBLIC_BENCHMARK_PACKAGE_ACCEPTED"
+}

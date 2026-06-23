@@ -4,7 +4,7 @@ A benchmark for testing whether learned dynamical simulators know when to refuse
 
 Plug in a simulator, run OOD/intervention scenarios, and compare false-accept rate versus coverage.
 
-**Current evidence:** weak-positive, synthetic, low-coverage only. Meaningful on TwoTank, weak on CSTR. Not a safety tool.
+**Current v2 finding:** calibrated refusal is target-dependent and not reliable for event-risk. This is a benchmark result, not a method-success claim.
 
 <!-- SCS_PUBLIC_LANDING_START -->
 
@@ -17,9 +17,8 @@ Learned simulators can look accurate in-distribution and still fail under counte
 ```bash
 pip install -e ".[dev]"
 pytest -q
-python scripts/run_smoke_demo.py --output results/smoke_demo
-python scripts/reproduce_main_twotank_result.py --output results/reproduce_twotank
-python scripts/compare_models.py --config configs/experiments/calibrated_two_tank.yaml --models hold_last linear_narx mlp_state_space --output results/model_comparison
+python scripts/run_benchmark.py --model examples/custom_model_example.py:DampedLinearUserModel --output results/public_benchmark_run
+python scripts/v2_build_public_event_risk_figure.py --config configs/v2/v2_public_benchmark_hardening.yaml --output docs/v2/figures/event_risk_vs_rmse_public.png
 ```
 
 ## Reproduce the main TwoTank result
@@ -35,8 +34,8 @@ This reads the frozen TwoTank low-coverage artifact and writes a small reproduct
 Start from `examples/my_model_template.py` or the runnable example in `examples/custom_model_example.py`, then compare locally:
 
 ```bash
-python examples/custom_model_example.py --output results/custom_model_example
-python scripts/compare_models.py --config configs/experiments/calibrated_two_tank.yaml --models linear_narx mlp_state_space --custom-model examples/custom_model_example.py:DampedLinearUserModel --output results/model_comparison_custom
+python scripts/run_benchmark.py --model examples/custom_model_example.py:DampedLinearUserModel --output results/public_benchmark_run
+python scripts/run_benchmark.py --models linear_narx mlp_state_space --output results/public_benchmark_builtin
 ```
 
 Custom model outputs are local comparison results only; they are not added to the frozen evidence claim.
@@ -45,9 +44,9 @@ Custom model outputs are local comparison results only; they are not added to th
 
 ![Low-coverage false-accept reduction](docs/figures/readme_low_coverage_result.png)
 
-The effect is meaningful on TwoTank and weak on CSTR; this is low-coverage synthetic benchmark evidence only.
+The current v2 result is target-dependent: RMSE can look near-neutral while event-risk worsens.
 
-Current allowed claim: A weak but positive low-coverage result under the frozen protocol.
+Current allowed claim: The benchmark exposes target-dependent calibrated-refusal failure; v2 does not support a robust method claim.
 
 ## What this does not claim
 

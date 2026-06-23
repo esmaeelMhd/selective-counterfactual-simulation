@@ -35,5 +35,8 @@ results/ci_model_comparison/
 results/smoke_cstr/
 results/seed_sweep_cstr/
 results/v2_comparator_fairness/rerun_source/
+results/public_benchmark_builtin/
+results/ci_public_benchmark/
+results/ci_builtin_benchmark/
 reports/smoke_report.md
 reports/full_v0_report.md

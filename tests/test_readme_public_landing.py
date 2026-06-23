@@ -4,13 +4,20 @@ from pathlib import Path
 
 import pytest
 
-from scs.experiments.public_benchmark import README_OPENING, update_readme_public_landing
+from scs.experiments.public_benchmark import update_readme_public_landing
+from scs.experiments.v2_public_hardening import PUBLIC_HOOK
 
 
 def test_readme_starts_with_public_hook_and_required_sections() -> None:
     text = Path("README.md").read_text(encoding="utf-8")
 
-    assert text.startswith(README_OPENING)
+    expected_opening = (
+        "# Selective Counterfactual Simulation Benchmark\n\n"
+        f"{PUBLIC_HOOK}\n\n"
+        "Plug in a simulator, run OOD/intervention scenarios, and compare false-accept rate versus coverage.\n\n"
+        "**Current v2 finding:** calibrated refusal is target-dependent and not reliable for event-risk."
+    )
+    assert text.startswith(expected_opening)
     for section in [
         "## Why this exists",
         "## Quickstart",
@@ -22,10 +29,11 @@ def test_readme_starts_with_public_hook_and_required_sections() -> None:
     ]:
         assert section in text
     assert "python scripts/reproduce_main_twotank_result.py --output results/reproduce_twotank" in text
-    assert "examples/my_model_template.py" in text
-    assert "docs/figures/readme_low_coverage_result.png" in text
-    assert "weak on CSTR" in text
-    assert "Not a safety tool" in text
+    assert "examples/custom_model_example.py:DampedLinearUserModel" in text
+    assert "python scripts/run_benchmark.py --model" in text
+    assert "docs/v2/figures/event_risk_vs_rmse_public.png" in text
+    assert "target-dependent calibrated-refusal failure" in text
+    assert "does not support a robust method claim" in text
     assert "does not claim simulator safety" in text
 
 

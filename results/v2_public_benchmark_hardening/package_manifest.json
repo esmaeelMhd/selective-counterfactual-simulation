@@ -1,0 +1,46 @@
+{
+  "allowed_claim": "benchmark exposes target-dependent calibrated-refusal failure",
+  "forbidden_claims": [
+    "robust calibrated-refusal method",
+    "trustworthy simulator",
+    "safety certification",
+    "validated digital twin",
+    "product readiness",
+    "high-coverage reliability",
+    "general simulator reliability",
+    "industrial AI breakthrough"
+  ],
+  "included_docs": [
+    "README.md",
+    "docs/v2/benchmark_api_contract.md",
+    "docs/v2/benchmark_task.md",
+    "docs/v2/benchmark_card.md",
+    "docs/v2/event_risk_failure_gallery.md"
+  ],
+  "included_figures": [
+    "docs/v2/figures/event_risk_vs_rmse_public.png"
+  ],
+  "included_scripts": [
+    "scripts/run_benchmark.py",
+    "scripts/v2_build_public_event_risk_figure.py",
+    "scripts/v2_build_public_failure_gallery.py",
+    "scripts/v2_check_public_benchmark_package.py"
+  ],
+  "method_claim_supported": false,
+  "package_id": "v2_public_benchmark_hardening",
+  "release_type": "public_benchmark_prototype",
+  "source_artifact_hashes": {
+    "comparator_fairness": "5e75713624d0ed34e0e284fa61e7174075778b8e3ad827118f1dd082adca7293",
+    "comparator_fairness_gate": "baffa64ea63618c44651fbe81a1af50648f23a02739caa4f818fd72dbfc186c3",
+    "comparator_stats": "a58221b25e841322990e8c2cfbb2785d1473a6f66128bd0ef764777807d43dde",
+    "comparator_summary": "c2353511a4c631781a495ce766654544f18a6953dc93f6e4346b33ee84a13e7e",
+    "comparator_taxonomy": "25ac7b2ae0cf75e83b90bb2e850e8b60751f4cc195c07852d7f62f03fb26023b",
+    "protocol_lock": "d05128c44dde09e3a82fbc3ec5a723242eba30057da6f88be1c2577fdff9503a",
+    "v2_event_metrics": "096acb7938424a69de75f091a3b6f02a4961cd96e121cc2d27d56843358bbdf1",
+    "v2_model_metrics": "b26c6c93353b7ef721132294e7715f5b5554d8a2ea2b2c47f0a6ad171c6bc71f",
+    "v2_risk_coverage": "79e610bdced9a5d155e99589746c277434bee34cf34a465304be2af94db445ac",
+    "v2_run_summary": "4f3235ef1bb400719400e9b2073720590118455c5052878a53b49f6d6e3e3512",
+    "v2_scenario_scores": "7c53c35b60dd6f79fe9032667bf570e9e60f5be1c8093b073e4e521e9001bc54",
+    "v2_scientific_gate": "ed40ee0d56d1ed51034d4abb55ec38cb761bf0b5bdb827c595687151d96edd6a"
+  }
+}

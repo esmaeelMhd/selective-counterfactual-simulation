@@ -22,17 +22,14 @@ jobs:
       - name: Run tests
         run: pytest -q
 
-      - name: Run smoke demo
-        run: python scripts/run_smoke_demo.py --output results/ci_smoke_demo
+      - name: Run public custom-model benchmark
+        run: python scripts/run_benchmark.py --model examples/custom_model_example.py:DampedLinearUserModel --output results/ci_public_benchmark
 
-      - name: Run custom model example
-        run: python examples/custom_model_example.py --output results/ci_custom_model_example
+      - name: Run public built-in benchmark
+        run: python scripts/run_benchmark.py --models linear_narx mlp_state_space --output results/ci_builtin_benchmark
 
-      - name: Run built-in model comparison
-        run: python scripts/compare_models.py --config configs/experiments/calibrated_two_tank.yaml --models hold_last linear_narx --output results/ci_model_comparison
+      - name: Build public event-risk figure
+        run: python scripts/v2_build_public_event_risk_figure.py --config configs/v2/v2_public_benchmark_hardening.yaml --output docs/v2/figures/event_risk_vs_rmse_public.png
 
-      - name: Check README public landing
-        run: python scripts/update_readme_public_landing.py --config configs/status/public_benchmark_v1_2.yaml --readme README.md --check
-
-      - name: Check claim language
-        run: python scripts/check_claim_language.py --manifest results/current_status/evidence_manifest/current_evidence_manifest.json --paths README.md docs reports
+      - name: Check public benchmark package
+        run: python scripts/v2_check_public_benchmark_package.py --config configs/v2/v2_public_benchmark_hardening.yaml --manifest results/v2_public_benchmark_hardening/package_manifest.json

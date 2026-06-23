@@ -1,0 +1,62 @@
+{
+  "comparator_fairness": {
+    "bytes": 3854735,
+    "path": "results/v2_comparator_fairness/evaluation/comparator_fairness_by_row.csv",
+    "sha256": "5e75713624d0ed34e0e284fa61e7174075778b8e3ad827118f1dd082adca7293"
+  },
+  "comparator_fairness_gate": {
+    "bytes": 1337,
+    "path": "reports/v2_comparator_fairness_decision_gate.md",
+    "sha256": "baffa64ea63618c44651fbe81a1af50648f23a02739caa4f818fd72dbfc186c3"
+  },
+  "comparator_stats": {
+    "bytes": 686,
+    "path": "results/v2_comparator_fairness/statistical_audit/comparator_statistical_summary.json",
+    "sha256": "a58221b25e841322990e8c2cfbb2785d1473a6f66128bd0ef764777807d43dde"
+  },
+  "comparator_summary": {
+    "bytes": 7158,
+    "path": "results/v2_comparator_fairness/evaluation/comparator_fairness_summary.json",
+    "sha256": "c2353511a4c631781a495ce766654544f18a6953dc93f6e4346b33ee84a13e7e"
+  },
+  "comparator_taxonomy": {
+    "bytes": 3762,
+    "path": "docs/v2/v2_comparator_taxonomy.md",
+    "sha256": "25ac7b2ae0cf75e83b90bb2e850e8b60751f4cc195c07852d7f62f03fb26023b"
+  },
+  "protocol_lock": {
+    "bytes": 4770,
+    "path": "docs/v2/v2_scientific_protocol_lock.md",
+    "sha256": "d05128c44dde09e3a82fbc3ec5a723242eba30057da6f88be1c2577fdff9503a"
+  },
+  "v2_event_metrics": {
+    "bytes": 68764,
+    "path": "results/v2_scientific_strengthening/frozen_protocol/v2_event_metrics.csv",
+    "sha256": "096acb7938424a69de75f091a3b6f02a4961cd96e121cc2d27d56843358bbdf1"
+  },
+  "v2_model_metrics": {
+    "bytes": 130659,
+    "path": "results/v2_scientific_strengthening/frozen_protocol/v2_model_metrics.csv",
+    "sha256": "b26c6c93353b7ef721132294e7715f5b5554d8a2ea2b2c47f0a6ad171c6bc71f"
+  },
+  "v2_risk_coverage": {
+    "bytes": 43239510,
+    "path": "results/v2_scientific_strengthening/frozen_protocol/v2_risk_coverage.csv",
+    "sha256": "79e610bdced9a5d155e99589746c277434bee34cf34a465304be2af94db445ac"
+  },
+  "v2_run_summary": {
+    "bytes": 6470,
+    "path": "results/v2_scientific_strengthening/frozen_protocol/v2_run_summary.json",
+    "sha256": "4f3235ef1bb400719400e9b2073720590118455c5052878a53b49f6d6e3e3512"
+  },
+  "v2_scenario_scores": {
+    "bytes": 69302650,
+    "path": "results/v2_scientific_strengthening/frozen_protocol/v2_scenario_scores.csv",
+    "sha256": "7c53c35b60dd6f79fe9032667bf570e9e60f5be1c8093b073e4e521e9001bc54"
+  },
+  "v2_scientific_gate": {
+    "bytes": 1137,
+    "path": "reports/v2_scientific_decision_gate.md",
+    "sha256": "ed40ee0d56d1ed51034d4abb55ec38cb761bf0b5bdb827c595687151d96edd6a"
+  }
+}

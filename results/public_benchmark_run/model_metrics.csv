@@ -1,0 +1,3 @@
+system_id,model_id,is_custom_model,is_builtin_model,rmse_mean,mae_mean,max_abs_error_mean,n_scenarios
+cstr,damped_linear_user,True,False,0.21205699840979345,0.1260684289663895,0.5096504161955198,70
+heat_exchanger,damped_linear_user,True,False,0.4193797529646137,0.27900072503146894,0.8944522922343489,70

@@ -1,0 +1,8 @@
+{
+  "caption": "v2 calibrated refusal is target-dependent; this is benchmark evidence, not a method-success claim.",
+  "event_target_mean_margin": -0.0035714285714285713,
+  "output": "/tmp/pytest-of-ismayil/pytest-191/test_public_event_risk_figure_0/event.png",
+  "rmse_target_mean_margin": 0.00026455026455026435,
+  "source": "results/v2_comparator_fairness/statistical_audit/comparator_statistical_summary.json",
+  "verdict": "PUBLIC_EVENT_RISK_FIGURE_BUILT"
+}

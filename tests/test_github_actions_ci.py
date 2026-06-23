@@ -8,9 +8,8 @@ def test_github_actions_ci_runs_public_reproducibility_paths() -> None:
 
     assert "pip install -e \".[dev]\"" in text
     assert "pytest -q" in text
-    assert "python scripts/run_smoke_demo.py --output results/ci_smoke_demo" in text
-    assert "python examples/custom_model_example.py --output results/ci_custom_model_example" in text
-    assert "python scripts/compare_models.py" in text
-    assert "python scripts/update_readme_public_landing.py" in text
-    assert "python scripts/check_claim_language.py" in text
+    assert "python scripts/run_benchmark.py --model examples/custom_model_example.py:DampedLinearUserModel --output results/ci_public_benchmark" in text
+    assert "python scripts/run_benchmark.py --models linear_narx mlp_state_space --output results/ci_builtin_benchmark" in text
+    assert "python scripts/v2_build_public_event_risk_figure.py" in text
+    assert "python scripts/v2_check_public_benchmark_package.py" in text
     assert "secrets." not in text

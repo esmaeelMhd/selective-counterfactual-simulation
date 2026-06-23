@@ -1,0 +1,30 @@
+{
+  "comparator_fairness_gate_ok": true,
+  "forbidden_dependency_scan": {
+    "old_repo_runtime_import_hits": [],
+    "path_hack_hits": []
+  },
+  "missing_source_artifacts": [],
+  "package_id": "v2_public_benchmark_hardening",
+  "product_dirs": [],
+  "reasons": [],
+  "row_wise_envelope_diagnostic_only": true,
+  "source_artifact_modified": false,
+  "source_artifacts": {
+    "comparator_fairness": "results/v2_comparator_fairness/evaluation/comparator_fairness_by_row.csv",
+    "comparator_fairness_gate": "reports/v2_comparator_fairness_decision_gate.md",
+    "comparator_stats": "results/v2_comparator_fairness/statistical_audit/comparator_statistical_summary.json",
+    "comparator_summary": "results/v2_comparator_fairness/evaluation/comparator_fairness_summary.json",
+    "comparator_taxonomy": "docs/v2/v2_comparator_taxonomy.md",
+    "protocol_lock": "docs/v2/v2_scientific_protocol_lock.md",
+    "v2_event_metrics": "results/v2_scientific_strengthening/frozen_protocol/v2_event_metrics.csv",
+    "v2_model_metrics": "results/v2_scientific_strengthening/frozen_protocol/v2_model_metrics.csv",
+    "v2_risk_coverage": "results/v2_scientific_strengthening/frozen_protocol/v2_risk_coverage.csv",
+    "v2_run_summary": "results/v2_scientific_strengthening/frozen_protocol/v2_run_summary.json",
+    "v2_scenario_scores": "results/v2_scientific_strengthening/frozen_protocol/v2_scenario_scores.csv",
+    "v2_scientific_gate": "reports/v2_scientific_decision_gate.md"
+  },
+  "v2_scientific_gate_ok": true,
+  "verdict": "READY_FOR_PUBLIC_BENCHMARK_HARDENING",
+  "working_tree_status": "M .github/workflows/ci.yml\n M .gitignore\n M README.md\n M src/scs/models/user_model.py\n M tests/test_github_actions_ci.py\n M tests/test_readme_public_landing.py\n?? configs/v2/v2_public_benchmark_hardening.yaml\n?? docs/v2/benchmark_api_contract.md\n?? docs/v2/benchmark_card.md\n?? docs/v2/benchmark_task.md\n?? docs/v2/event_risk_failure_gallery.md\n?? docs/v2/figures/\n?? reports/v2_public_benchmark_hardening_preconditions.md\n?? reports/v2_public_benchmark_package_check.md\n?? reports/v2_public_event_risk_figure.md\n?? reports/v2_public_failure_gallery_report.md\n?? results/public_benchmark_run/\n?? results/v2_public_benchmark_hardening/\n?? scripts/run_benchmark.py\n?? scripts/v2_build_public_benchmark_manifest.py\n?? scripts/v2_build_public_event_risk_figure.py\n?? scripts/v2_build_public_failure_gallery.py\n?? scripts/v2_check_public_benchmark_package.py\n?? scripts/v2_verify_public_benchmark_hardening_preconditions.py\n?? src/scs/experiments/v2_public_hardening.py\n?? tests/test_benchmark_api_contract.py\n?? tests/test_public_event_risk_figure.py\n?? tests/test_public_failure_gallery.py\n?? tests/test_run_benchmark_public_api.py\n?? tests/test_v2_public_benchmark_preconditions.py\n?? tests/test_v2_public_claim_language.py\n?? tests/test_v2_public_docs.py\n?? tests/test_v2_public_no_prior_artifact_mutation.py\n?? tests/test_v2_public_package_checker.py\n?? tests/test_v2_public_reports_not_hardcoded.py"
+}
