@@ -1,0 +1,35 @@
+audit_id: v2_event_risk_fix
+source_branch: v2-scientific-strengthening
+source_commit: dce535a58bfa0f7e271aca1b7f82f384babbe9f8
+
+comparator_config: configs/v2/v2_comparator_fairness.yaml
+source_score_cache: results/v2_comparator_fairness/rerun_source
+
+source_artifacts:
+  frozen_risk_coverage: results/v2_scientific_strengthening/frozen_protocol/v2_risk_coverage.csv
+  frozen_scenario_scores: results/v2_scientific_strengthening/frozen_protocol/v2_scenario_scores.csv
+  comparator_by_row: results/v2_comparator_fairness/evaluation/comparator_fairness_by_row.csv
+  comparator_statistics: results/v2_comparator_fairness/statistical_audit/comparator_statistical_summary.json
+  comparator_decision_gate: reports/v2_comparator_fairness_decision_gate.md
+
+primary_calibrated_judge: calibration_selected_candidate_ranker
+event_guard_candidate_id: event_guarded_invariant_disagreement_support
+
+event_guard_inputs:
+  - risk_invariant_only
+  - risk_disagreement_only
+  - risk_support_only
+
+primary_coverages:
+  - 0.05
+  - 0.10
+
+badness_target: bad_event
+
+rules:
+  require_calibration_only_normalization: true
+  forbid_test_label_scoring: true
+  forbid_new_systems: true
+  forbid_new_models: true
+  forbid_new_raw_signals: true
+  forbid_claim_upgrade: true
