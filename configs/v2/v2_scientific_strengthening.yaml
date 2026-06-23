@@ -1,0 +1,131 @@
+v2_id: v2_scientific_strengthening
+
+source_v1_tag: v1.1-benchmark-usability
+current_v1_allowed_claim: A weak but positive low-coverage result under the frozen protocol.
+
+systems:
+  - two_tank
+  - cstr
+  - heat_exchanger
+
+models:
+  - hold_last
+  - linear_narx
+  - mlp_state_space
+  - ensemble_mlp
+  - gradient_boosted_narx
+
+signals:
+  - support_distance
+  - uncertainty_score
+  - disagreement_score
+  - invariant_residual
+  - repair_amount
+
+judges:
+  simple:
+    - support_only
+    - uncertainty_only
+    - disagreement_only
+    - invariant_only
+    - repair_only
+    - random_baseline
+  calibrated:
+    - best_single_signal_selected_on_calibration
+    - calibration_selected_candidate_ranker
+    - rank_normalized_linear
+    - logistic_calibrated_judge
+    - isotonic_calibrated_judge
+    - quantile_rule_judge
+    - conservative_low_coverage_judge
+  stronger_baselines:
+    - learned_error_classifier
+    - conformal_risk_threshold
+    - ensemble_disagreement_threshold
+  diagnostic_only:
+    - oracle_error_rank
+
+primary_calibrated_judge: calibration_selected_candidate_ranker
+
+primary_coverages:
+  - 0.05
+  - 0.10
+
+coverage_grid:
+  - 0.01
+  - 0.02
+  - 0.05
+  - 0.10
+  - 0.20
+  - 0.40
+  - 0.60
+  - 0.80
+  - 1.00
+
+badness_targets:
+  - bad_rmse
+  - bad_event
+  - bad_rmse_or_event
+
+rmse_thresholds:
+  - 0.05
+  - 0.10
+  - 0.15
+  - 0.20
+  - 0.30
+  - 0.50
+
+seeds:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+
+practical_thresholds:
+  minimum_absolute_far_reduction: 0.05
+  minimum_relative_far_reduction: 0.10
+  minimum_seed_win_rate_strong: 0.70
+
+data:
+  horizon: 16
+  dt: 0.1
+  n_model_train: 24
+  n_calibration_id: 8
+  n_calibration_ood: 8
+  n_test_id: 10
+  n_test_ood: 10
+  uncertainty_samples: 2
+
+model_runtime:
+  mlp_max_iter: 45
+  ensemble_members: 2
+  ensemble_mlp_max_iter: 35
+  gradient_boosting_max_iter: 45
+
+heat_exchanger_event_thresholds:
+  outlet_temperature_high: 101.0
+  outlet_temperature_low: 76.0
+  tracking_error_high: 10.0
+  target_outlet_temperature: 88.0
+
+source_artifacts:
+  - results/current_status/evidence_manifest/current_evidence_manifest.json
+  - results/calibrated_two_tank/calibrated_risk_coverage.csv
+  - results/calibrated_cstr/calibrated_risk_coverage.csv
+  - reports/current_status_decision_gate.md
+  - reports/practical_utility_decision_gate.md
+  - reports/repair_signal_role_decision_gate.md
+  - README.md
+
+forbidden:
+  allow_product_features: false
+  allow_protocol_mutation_after_results: false
+  allow_test_label_selection: false
+  allow_oracle_as_real_method: false
+  allow_v1_artifact_overwrite: false

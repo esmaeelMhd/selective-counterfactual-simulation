@@ -2,11 +2,17 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import sys
 
 import numpy as np
 import pandas as pd
 import pytest
 import yaml
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+PYTHON_SEARCH_PATH = getattr(sys, "path")
+if str(REPO_ROOT) not in PYTHON_SEARCH_PATH:
+    PYTHON_SEARCH_PATH[:0] = [str(REPO_ROOT)]
 
 from scs.reports.failure_analysis import PLOT_JUDGES, build_failure_table
 

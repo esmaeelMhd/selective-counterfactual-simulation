@@ -14,18 +14,23 @@ from scs.systems.base import TrajectoryBatch
 class MLPStateSpaceModel:
     model_id = "mlp_state_space"
 
-    def __init__(self, random_state: int = 0) -> None:
+    def __init__(
+        self,
+        random_state: int = 0,
+        hidden_layer_sizes: tuple[int, ...] = (48, 24),
+        max_iter: int = 300,
+    ) -> None:
         self.random_state = random_state
         self.x_scaler = StandardScaler()
         self.y_scaler = StandardScaler()
         self.regressor = MLPRegressor(
-            hidden_layer_sizes=(48, 24),
+            hidden_layer_sizes=hidden_layer_sizes,
             activation="tanh",
             solver="adam",
             learning_rate_init=0.003,
             alpha=1e-4,
             batch_size=256,
-            max_iter=300,
+            max_iter=max_iter,
             early_stopping=True,
             n_iter_no_change=18,
             random_state=random_state,
@@ -81,4 +86,3 @@ class MLPStateSpaceModel:
                 states[t + 1] = states[t] + self._predict_delta(states[t], actions[t], disturbances[t]) + noise
             samples[sample_idx] = states
         return samples
-

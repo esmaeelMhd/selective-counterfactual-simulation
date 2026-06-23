@@ -1,0 +1,51 @@
+{
+  "badness_targets": [
+    "bad_rmse",
+    "bad_event",
+    "bad_rmse_or_event"
+  ],
+  "decision_gate": "NO_METHOD_CLAIM_BENCHMARK_ONLY",
+  "dominant_baseline": "conformal_risk_threshold",
+  "event_risk_worsening": true,
+  "findings": [
+    {
+      "evidence": "baseline_judge varies across system/target/model/seed/coverage rows",
+      "finding": "The comparator is a moving strongest-baseline envelope.",
+      "interpretation": "The primary margin is measured against the best observed baseline row-by-row, not against one fixed deployable baseline. This is conservative and explains small negative margins where the primary ties individual baselines on average."
+    },
+    {
+      "evidence": "dominates winner counts: True",
+      "finding": "conformal_risk_threshold is the dominant baseline winner.",
+      "interpretation": "The strongest baseline is usually a single oriented signal threshold, which is simpler and less variable than the calibrated candidate family."
+    },
+    {
+      "evidence": "negative event-risk systems: ['cstr', 'heat_exchanger']; degenerate event system(s): ['two_tank']",
+      "finding": "Event-risk is the clearest failure mode.",
+      "interpretation": "CSTR and heat_exchanger event-risk margins are negative, while TwoTank has no event positives. The calibrated candidate therefore has no robust event-risk support."
+    },
+    {
+      "evidence": "TwoTank bad_rmse mean absolute margin: -0.043778",
+      "finding": "TwoTank RMSE underperformance is material.",
+      "interpretation": "The primary calibrated candidate loses on the original TwoTank RMSE target after adding v2 models, targets, and stronger baselines."
+    }
+  ],
+  "models_evaluated": [
+    "hold_last",
+    "linear_narx",
+    "mlp_state_space",
+    "ensemble_mlp",
+    "gradient_boosted_narx"
+  ],
+  "moving_baseline_comparator": true,
+  "positive_systems": [],
+  "primary_judge": "calibration_selected_candidate_ranker",
+  "recommended_next_action": "Do not attempt a claim upgrade. First separate fixed calibration-selected baseline comparison from row-wise strongest-baseline envelope comparison, then diagnose event-risk-specific signals.",
+  "seed_count": 10,
+  "statistical_verdict": "NO_ROBUST_EFFECT",
+  "valid_systems": [
+    "two_tank",
+    "cstr",
+    "heat_exchanger"
+  ],
+  "verdict": "UNDERPERFORMANCE_DIAGNOSED"
+}

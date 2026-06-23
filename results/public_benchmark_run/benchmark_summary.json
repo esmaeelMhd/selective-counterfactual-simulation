@@ -1,0 +1,21 @@
+{
+  "accepted_false_accept_rows": 99,
+  "badness_targets": [
+    "bad_rmse",
+    "bad_event",
+    "bad_rmse_or_event"
+  ],
+  "command": "python scripts/run_benchmark.py --model examples/custom_model_example.py:DampedLinearUserModel --output results/public_benchmark_run",
+  "current_claim_updated": false,
+  "event_risk_present": true,
+  "is_current_scientific_evidence": false,
+  "models": [
+    "damped_linear_user"
+  ],
+  "risk_rows": 144,
+  "systems": [
+    "cstr",
+    "heat_exchanger"
+  ],
+  "verdict": "PUBLIC_BENCHMARK_RUN_COMPLETE"
+}

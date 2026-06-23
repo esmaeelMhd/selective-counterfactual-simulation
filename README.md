@@ -4,69 +4,133 @@ A benchmark for testing whether learned dynamical simulators know when to refuse
 
 Plug in a simulator, run OOD/intervention scenarios, and compare false-accept rate versus coverage.
 
-**Current evidence:** weak-positive, synthetic, low-coverage only. Meaningful on TwoTank, weak on CSTR. Not a safety tool.
+**Current status:** this is a benchmark prototype with narrow synthetic evidence. It is not a safety tool, product-ready digital twin, or claim of general simulator reliability.
 
-<!-- SCS_PUBLIC_LANDING_START -->
+## What this is
 
-## Why this exists
+Selective Counterfactual Simulation is a small Python benchmark for refusal/ranking behavior in learned dynamical simulators. It generates synthetic intervention-shift trajectories, trains or loads simulator models, ranks scenarios by risk, and reports false-accept rate at fixed coverage.
 
-Learned simulators can look accurate in-distribution and still fail under counterfactual intervention shift. This benchmark asks a narrower question: can a simulator or refusal judge rank scenarios by answerability and abstain on risky ones?
+The central question is:
+
+> Can a simulator identify which counterfactual intervention scenarios it can answer reliably and abstain on the rest?
 
 ## Quickstart
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -e ".[dev]"
 pytest -q
-python scripts/run_smoke_demo.py --output results/smoke_demo
-python scripts/reproduce_main_twotank_result.py --output results/reproduce_twotank
-python scripts/compare_models.py --config configs/experiments/calibrated_two_tank.yaml --models hold_last linear_narx mlp_state_space --output results/model_comparison
-```
-
-## Reproduce the main TwoTank result
-
-```bash
-python scripts/reproduce_main_twotank_result.py --output results/reproduce_twotank
-```
-
-This reads the frozen TwoTank low-coverage artifact and writes a small reproduction table and figure with the nonzero margins.
-
-## Plug in your own simulator
-
-Start from `examples/my_model_template.py` or the runnable example in `examples/custom_model_example.py`, then compare locally:
-
-```bash
+python scripts/run_smoke.py
+python scripts/run_current_status_demo.py
 python examples/custom_model_example.py --output results/custom_model_example
-python scripts/compare_models.py --config configs/experiments/calibrated_two_tank.yaml --models linear_narx mlp_state_space --custom-model examples/custom_model_example.py:DampedLinearUserModel --output results/model_comparison_custom
 ```
 
-Custom model outputs are local comparison results only; they are not added to the frozen evidence claim.
+## Run the benchmark/demo
 
-## Main result
+The fastest public demo is:
 
-![Low-coverage false-accept reduction](docs/figures/readme_low_coverage_result.png)
+```bash
+python scripts/run_current_status_demo.py
+```
 
-The effect is meaningful on TwoTank and weak on CSTR; this is low-coverage synthetic benchmark evidence only.
+The original TwoTank smoke benchmark is:
 
-Current allowed claim: A weak but positive low-coverage result under the frozen protocol.
+```bash
+python scripts/run_smoke.py
+```
 
-## What this does not claim
+The public plug-in benchmark command is:
 
-This benchmark does not claim simulator safety, product readiness, broad simulator reliability, high-coverage reliability, plant-wide deployment, autonomous control, RSSM evidence, heat-exchanger evidence, or third-system evidence.
+```bash
+python scripts/run_benchmark.py --model examples/custom_model_example.py:DampedLinearUserModel --output results/public_benchmark_run
+```
 
-## Repository map
+## Plug in your own model
 
-- `src/scs/systems/`: synthetic systems.
-- `src/scs/models/`: benchmark model interface and built-in baselines.
-- `src/scs/validators/`: refusal/risk signals and judges.
-- `src/scs/metrics/`: trajectory, event, and risk-coverage metrics.
-- `src/scs/experiments/`: reproducible experiment and packaging logic.
-- `configs/`: frozen experiment, audit, and status configs.
-- `docs/`: benchmark card, task definition, failure gallery, and reproducibility notes.
-- `reports/` and `results/`: generated evidence artifacts.
+Implement a class with:
 
-<!-- SCS_PUBLIC_LANDING_END -->
+```python
+model_id: str
 
-## Detailed generated status blocks
+def fit(self, train_batch) -> None:
+    ...
+
+def predict_rollout(self, initial_state, actions, disturbances):
+    ...
+```
+
+Then run:
+
+```bash
+python scripts/run_benchmark.py --model path/to/file.py:ClassName --output results/my_benchmark_run
+```
+
+See `examples/custom_model_example.py` and `docs/custom_model_adapter.md`.
+
+## Current evidence
+
+The current evidence supports a benchmark prototype, not a robust calibrated-refusal method claim.
+
+v1.1 shows weak-positive low-coverage behavior under a frozen synthetic protocol.
+
+v2 harder evidence shows target-dependent behavior: RMSE can look near-neutral while event-risk remains a failure mode. In short, calibrated refusal is target-dependent and not reliable for event-risk.
+
+Public benchmark outputs include:
+
+- `results/public_benchmark_run/risk_coverage.csv`
+- `results/public_benchmark_run/risk_coverage.png`
+- `results/public_benchmark_run/benchmark_summary.json`
+- `docs/v2/figures/event_risk_vs_rmse_public.png`
+- `docs/v2/event_risk_failure_gallery.md`
+
+## What is not claimed
+
+This is not safety certification.
+
+This is not a product-ready digital twin.
+
+This is not a claim of general simulator reliability.
+
+This is not an autonomous control system.
+
+This is not evidence that calibrated refusal works generally.
+
+This repository should not be described as a trusted simulator, a validated industrial simulator, or a production-ready industrial AI system.
+
+## Repository structure
+
+- `src/scs/systems/`: synthetic dynamical systems.
+- `src/scs/models/`: simulator model interfaces and lightweight baselines.
+- `src/scs/validators/`: refusal/risk signals.
+- `src/scs/metrics/`: trajectory, event, and selective risk metrics.
+- `src/scs/experiments/`: reproducible experiment and release-check logic.
+- `configs/`: experiment and audit configs.
+- `examples/`: custom model adapter examples.
+- `docs/`: public benchmark cards, adapter docs, and claim boundaries.
+- `reports/` and `results/`: curated evidence artifacts and generated release checks.
+
+## Reproducibility
+
+Run the quickstart commands from a fresh checkout. For a stricter release check:
+
+```bash
+python scripts/check_public_release_ready.py --output results/public_release_audit
+python scripts/check_fresh_clone_repro.py --repo-path . --output results/fresh_clone_check
+python scripts/check_public_release_package.py --output results/public_release_package_check
+```
+
+## Citation
+
+Use the metadata in `CITATION.cff`.
+
+## License
+
+This repository is released under the MIT License. See `LICENSE`.
+
+## Compatibility Status Blocks
+
+The sections below are retained so existing evidence-sync checks can verify the historical benchmark status. They are not stronger public claims.
 
 <!-- SCS_CURRENT_STATUS_START -->
 ## Current Evidence Status
@@ -96,21 +160,11 @@ This benchmark does not claim simulator safety, product readiness, broad simulat
 <!-- SCS_CURRENT_STATUS_END -->
 
 <!-- SCS_USABILITY_START -->
-## Quickstart
-
-```bash
-pip install -e ".[dev]"
-pytest -q
-python scripts/run_current_status_demo.py
-```
-
 ## Run the Current Status Demo
 
 ```bash
 python scripts/run_current_status_demo.py --config configs/status/benchmark_usability_v1_1.yaml --output results/demo
 ```
-
-The demo is a quick local run, not the full evidence chain.
 
 ## What This Benchmark Tests
 
@@ -118,11 +172,11 @@ It tests refusal/ranking behavior for counterfactual simulator rollouts under in
 
 ## What This Benchmark Does Not Test
 
-It does not test simulator safety, product readiness, plant-wide deployment, RSSM evidence, third-system evidence, autonomous control, or high-coverage reliability.
+It does not test simulator safety, plant-wide deployment, RSSM evidence, third-system evidence, autonomous control, or high-coverage reliability.
 
 ## Add Your Own Model
 
-Implement the adapter in `src/scs/models/user_model.py`, inspect `examples/custom_model_example.py`, and run:
+Implement the adapter described in `docs/custom_model_adapter.md`, inspect `examples/custom_model_example.py`, and run:
 
 ```bash
 python examples/custom_model_example.py --output results/custom_model_example
@@ -134,91 +188,11 @@ python examples/custom_model_example.py --output results/custom_model_example
 python scripts/compare_models.py --config configs/experiments/calibrated_two_tank.yaml --models hold_last linear_narx mlp_state_space --output results/model_comparison
 ```
 
-Custom model example:
-
-```bash
-python scripts/compare_models.py --config configs/experiments/calibrated_two_tank.yaml --models linear_narx mlp_state_space --custom-model examples/custom_model_example.py:DampedLinearUserModel --output results/model_comparison_custom
-```
-
 ## Current Evidence Status
 
-A weak but positive low-coverage refusal benchmark under a frozen protocol. TwoTank is stronger than CSTR. repair_amount is diagnostic-only for CSTR; invariant_residual is informative for CSTR.
-
-## Reproducibility
-
-Run the install, test, demo, and comparison commands above from the repository root.
+A weak but positive low-coverage refusal benchmark under a frozen protocol. TwoTank is stronger than CSTR. `repair_amount` is diagnostic-only for CSTR; `invariant_residual` is informative for CSTR.
 
 ## Claim Boundaries
 
-This usability release does not change the scientific claim. It does not add RSSM, third-system evidence, new benchmark systems, product API, frontend, or deployment work.
+This usability release does not change the scientific claim. It does not add RSSM, third-system evidence, product API, frontend, or deployment work.
 <!-- SCS_USABILITY_END -->
-
-This repository tests one research question:
-
-> Can a learned or hybrid simulator identify which counterfactual intervention scenarios it can answer reliably and abstain on the rest?
-
-The first milestone is an end-to-end smoke benchmark on a simulated TwoTank system. It trains three lightweight simulator models, evaluates at least six refusal judges, and produces risk-coverage artifacts:
-
-- `results/smoke_two_tank/risk_coverage.csv`
-- `results/smoke_two_tank/risk_coverage.png`
-- `results/smoke_two_tank/summary.json`
-- `reports/smoke_report.md`
-
-The primary metric is false accept rate at fixed coverage. A false accept occurs when a judge accepts a scenario whose simulator prediction is materially wrong under the configured error threshold.
-
-## Historical Evidence Milestones
-
-The marker block above is the authoritative current status. The milestones below are retained as evidence history, not as permission to expand beyond the current weak low-coverage claim.
-
-The v0 evidence audit downgraded the primary claim. `combined_linear` did not robustly beat the strongest simple judge in the claim audit or seed sweep, so it should be treated as an exploratory baseline until v0 is fixed and re-audited.
-
-The calibrated refusal-judge milestone replaces the failed `combined_linear` claim with a narrower low-coverage claim. Current calibrated evidence status:
-
-- single calibrated TwoTank run: `SUPPORTED_LOW_COVERAGE`
-- calibrated seed sweep: `ROBUST_LOW_COVERAGE`
-- threshold/coverage stress: `ROBUST_LOW_COVERAGE_ONLY`
-- calibrated decision gate: `PROCEED_TO_CSTR`
-- CSTR frozen-protocol sanity: `VALID_CSTR_BENCHMARK`
-- single calibrated CSTR run: `SUPPORTED_LOW_COVERAGE`
-- calibrated CSTR seed sweep: `ROBUST_LOW_COVERAGE`
-- calibrated CSTR threshold/coverage stress: `ROBUST_LOW_COVERAGE_ONLY`
-- multi-system calibrated gate: `TWO_SYSTEM_LOW_COVERAGE_SUPPORTED`
-
-The multi-system gate allows only the bounded claim stated in `reports/multi_system_calibrated_decision_gate.md`. RSSM, product/platform work, and any frontend/API expansion remain out of scope.
-
-## Non-goals
-
-This is not a product, service, plant-wide digital twin, control stack, API, frontend, or safety certification workflow. The v0 scope is a runnable benchmark with explicit failures and measured risk-coverage curves.
-
-## Quickstart
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-pytest -q
-python scripts/run_smoke.py
-```
-
-## Main Commands
-
-```bash
-python scripts/generate_data.py --config configs/experiments/smoke_two_tank.yaml
-python scripts/train_model.py --config configs/experiments/smoke_two_tank.yaml --model linear_narx
-python scripts/evaluate_selective.py --config configs/experiments/smoke_two_tank.yaml
-python scripts/make_report.py --results results/smoke_two_tank
-python scripts/run_smoke.py
-python scripts/audit_claim.py --results results/smoke_two_tank
-python scripts/make_decision_gate.py
-python scripts/verify_calibrated_judge_preconditions.py
-python scripts/run_calibrated_judge.py --config configs/experiments/calibrated_two_tank.yaml --output results/calibrated_two_tank
-python scripts/run_calibrated_seed_sweep.py --config configs/experiments/calibrated_two_tank.yaml --seeds 0 1 2 3 4 5 6 7 8 9 --output results/calibrated_seed_sweep_two_tank
-python scripts/run_calibrated_stress.py --config configs/experiments/calibrated_two_tank.yaml --thresholds 0.05 0.10 0.15 0.20 0.30 0.50 --coverages 0.05 0.10 0.20 0.40 0.60 0.80 1.00 --seeds 0 1 2 3 4 --output results/calibrated_stress_two_tank
-python scripts/make_calibrated_judge_decision_gate.py --single-run results/calibrated_two_tank/calibrated_judge_summary.json --seed-sweep results/calibrated_seed_sweep_two_tank/seed_sweep_calibrated_summary.json --stress results/calibrated_stress_two_tank/stress_summary.json --output reports/calibrated_judge_decision_gate.md
-python scripts/verify_cstr_preconditions.py --protocol docs/calibrated_protocol_lock_v1.md --output results/cstr_preconditions
-python scripts/run_cstr_sanity.py --config configs/experiments/calibrated_cstr.yaml --output results/cstr_sanity
-python scripts/run_calibrated_judge.py --config configs/experiments/calibrated_cstr.yaml --output results/calibrated_cstr
-python scripts/run_calibrated_seed_sweep.py --config configs/experiments/calibrated_cstr.yaml --seeds 0 1 2 3 4 5 6 7 8 9 --output results/calibrated_seed_sweep_cstr
-python scripts/run_calibrated_stress.py --config configs/experiments/calibrated_cstr.yaml --thresholds 0.05 0.10 0.15 0.20 0.30 0.50 --coverages 0.05 0.10 0.20 0.40 0.60 0.80 1.00 --seeds 0 1 2 3 4 --output results/calibrated_stress_cstr
-python scripts/make_multi_system_calibrated_decision_gate.py --twotank-single results/calibrated_two_tank/calibrated_judge_summary.json --twotank-seed results/calibrated_seed_sweep_two_tank/seed_sweep_calibrated_summary.json --twotank-stress results/calibrated_stress_two_tank/stress_summary.json --cstr-sanity results/cstr_sanity/cstr_label_checks.json --cstr-single results/calibrated_cstr/calibrated_judge_summary.json --cstr-seed results/calibrated_seed_sweep_cstr/seed_sweep_calibrated_summary.json --cstr-stress results/calibrated_stress_cstr/stress_summary.json --output reports/multi_system_calibrated_decision_gate.md
-```

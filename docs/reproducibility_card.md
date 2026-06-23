@@ -1,32 +1,46 @@
 # Reproducibility Card
 
-## Repo state
+## Environment
 
-Commit: e0dbdc2
+Use Python 3.11 or newer.
 
-Tag: v1-current-status-sync
-
-## Commands
+## Fresh checkout commands
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 pip install -e ".[dev]"
 pytest -q
 python scripts/run_smoke.py
-python scripts/verify_current_status_preconditions.py --config configs/status/current_evidence_status.yaml --output results/current_status/preconditions
+python scripts/run_current_status_demo.py
+python examples/custom_model_example.py --output results/custom_model_example
+```
+
+## Release checks
+
+```bash
+python scripts/check_public_release_ready.py --output results/public_release_audit
+python scripts/check_fresh_clone_repro.py --repo-path . --output results/fresh_clone_check
+python scripts/check_public_release_package.py --output results/public_release_package_check
+```
+
+## Historical technical-note package check
+
+Older portfolio packaging evidence can still be checked with:
+
+```bash
 python scripts/check_technical_note_package.py --config configs/status/technical_note_package.yaml --manifest results/technical_note_package/package_manifest.json
 ```
 
-## Main artifacts
+## Expected public artifacts
 
-- docs/technical_note_limitations_first.md
-- docs/one_page_project_summary.md
-- docs/portfolio_summary.md
-- reports/current_status_decision_gate.md
-- reports/technical_note_package_check.md
+- `results/public_release_audit/public_release_check.json`
+- `results/fresh_clone_check/command_status.json`
+- `results/public_release_package_check/package_check.json`
+- `reports/public_release_readiness_audit.md`
+- `reports/fresh_clone_reproduction_check.md`
+- `reports/public_release_package_check.md`
 
 ## Known limitations
 
-- Low-coverage only.
-- CSTR effect is positive but weak.
-- repair_amount is diagnostic-only for CSTR.
-- No safety, product, high-coverage, RSSM, or third-system claim.
+The benchmark uses synthetic systems, narrow low-coverage evidence, limited external validation, and v2 event-risk failure evidence. It is not safety certification and not a product-ready digital twin.

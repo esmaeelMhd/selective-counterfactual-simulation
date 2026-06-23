@@ -1,0 +1,460 @@
+{
+  "allowed_negated_or_forbidden_mentions": [
+    {
+      "context_heading": "what this does not claim",
+      "line": 54,
+      "path": "README.md",
+      "phrase": "autonomous control"
+    },
+    {
+      "context_heading": "what this does not claim",
+      "line": 54,
+      "path": "README.md",
+      "phrase": "high-coverage reliability"
+    },
+    {
+      "context_heading": "what is not supported",
+      "line": 89,
+      "path": "README.md",
+      "phrase": "general selective simulation"
+    },
+    {
+      "context_heading": "what is not supported",
+      "line": 90,
+      "path": "README.md",
+      "phrase": "high-coverage reliability"
+    },
+    {
+      "context_heading": "what is not supported",
+      "line": 91,
+      "path": "README.md",
+      "phrase": "safety certification"
+    },
+    {
+      "context_heading": "what is not supported",
+      "line": 93,
+      "path": "README.md",
+      "phrase": "autonomous control"
+    },
+    {
+      "context_heading": "what is not supported",
+      "line": 94,
+      "path": "README.md",
+      "phrase": "plant-wide digital twin"
+    },
+    {
+      "context_heading": "what this benchmark does not test",
+      "line": 121,
+      "path": "README.md",
+      "phrase": "autonomous control"
+    },
+    {
+      "context_heading": "what this benchmark does not test",
+      "line": 121,
+      "path": "README.md",
+      "phrase": "high-coverage reliability"
+    },
+    {
+      "context_heading": "non-goals",
+      "line": 191,
+      "path": "README.md",
+      "phrase": "safety certification"
+    },
+    {
+      "context_heading": "non-goals",
+      "line": 191,
+      "path": "README.md",
+      "phrase": "plant-wide digital twin"
+    },
+    {
+      "context_heading": "non-intended use",
+      "line": 9,
+      "path": "docs/benchmark_card.md",
+      "phrase": "autonomous control"
+    },
+    {
+      "context_heading": "claim boundaries",
+      "line": 63,
+      "path": "docs/benchmark_card.md",
+      "phrase": "strong support"
+    },
+    {
+      "context_heading": "claim boundaries",
+      "line": 63,
+      "path": "docs/benchmark_card.md",
+      "phrase": "safety certification"
+    },
+    {
+      "context_heading": "claim boundaries",
+      "line": 63,
+      "path": "docs/benchmark_card.md",
+      "phrase": "high-coverage reliability"
+    },
+    {
+      "context_heading": "claim audit table",
+      "line": 11,
+      "path": "docs/claim_audit_table.md",
+      "phrase": "product-ready"
+    },
+    {
+      "context_heading": "what it does not claim",
+      "line": 25,
+      "path": "docs/one_page_project_summary.md",
+      "phrase": "safety certification"
+    },
+    {
+      "context_heading": "what it does not claim",
+      "line": 25,
+      "path": "docs/one_page_project_summary.md",
+      "phrase": "autonomous control"
+    },
+    {
+      "context_heading": "what it does not claim",
+      "line": 25,
+      "path": "docs/one_page_project_summary.md",
+      "phrase": "high-coverage reliability"
+    },
+    {
+      "context_heading": "non-goals",
+      "line": 61,
+      "path": "docs/tasks/refusal_benchmark_task.md",
+      "phrase": "safety certification"
+    },
+    {
+      "context_heading": "non-goals",
+      "line": 61,
+      "path": "docs/tasks/refusal_benchmark_task.md",
+      "phrase": "autonomous control"
+    },
+    {
+      "context_heading": "non-goals",
+      "line": 61,
+      "path": "docs/tasks/refusal_benchmark_task.md",
+      "phrase": "high-coverage reliability"
+    },
+    {
+      "context_heading": "non-claims",
+      "line": 13,
+      "path": "docs/technical_note_limitations_first.md",
+      "phrase": "safety certification"
+    },
+    {
+      "context_heading": "non-claims",
+      "line": 14,
+      "path": "docs/technical_note_limitations_first.md",
+      "phrase": "product-ready"
+    },
+    {
+      "context_heading": "non-claims",
+      "line": 16,
+      "path": "docs/technical_note_limitations_first.md",
+      "phrase": "high-coverage reliability"
+    },
+    {
+      "context_heading": "forbidden_claims[1]",
+      "line": null,
+      "path": "reports/cstr_weakness_diagnosis.json",
+      "phrase": "safety certification"
+    },
+    {
+      "context_heading": "forbidden claims",
+      "line": 41,
+      "path": "reports/cstr_weakness_diagnosis.md",
+      "phrase": "safety certification"
+    },
+    {
+      "context_heading": "forbidden claims",
+      "line": 13,
+      "path": "reports/current_evidence_manifest.md",
+      "phrase": "safety certification"
+    },
+    {
+      "context_heading": "forbidden claims",
+      "line": 13,
+      "path": "reports/current_evidence_manifest.md",
+      "phrase": "plant-wide digital twin"
+    },
+    {
+      "context_heading": "forbidden claims",
+      "line": 13,
+      "path": "reports/current_evidence_manifest.md",
+      "phrase": "autonomous control"
+    },
+    {
+      "context_heading": "forbidden claims",
+      "line": 13,
+      "path": "reports/current_evidence_manifest.md",
+      "phrase": "high-coverage reliability"
+    },
+    {
+      "context_heading": "forbidden_claims[3]",
+      "line": null,
+      "path": "reports/current_status_decision_gate.json",
+      "phrase": "safety certification"
+    },
+    {
+      "context_heading": "forbidden_claims[4]",
+      "line": null,
+      "path": "reports/current_status_decision_gate.json",
+      "phrase": "autonomous control"
+    },
+    {
+      "context_heading": "forbidden_claims[6]",
+      "line": null,
+      "path": "reports/current_status_decision_gate.json",
+      "phrase": "plant-wide digital twin"
+    },
+    {
+      "context_heading": "forbidden_claims[8]",
+      "line": null,
+      "path": "reports/current_status_decision_gate.json",
+      "phrase": "high-coverage reliability"
+    },
+    {
+      "context_heading": "forbidden claims",
+      "line": 41,
+      "path": "reports/current_status_decision_gate.md",
+      "phrase": "safety certification"
+    },
+    {
+      "context_heading": "forbidden claims",
+      "line": 41,
+      "path": "reports/current_status_decision_gate.md",
+      "phrase": "plant-wide digital twin"
+    },
+    {
+      "context_heading": "forbidden claims",
+      "line": 41,
+      "path": "reports/current_status_decision_gate.md",
+      "phrase": "autonomous control"
+    },
+    {
+      "context_heading": "forbidden claims",
+      "line": 41,
+      "path": "reports/current_status_decision_gate.md",
+      "phrase": "high-coverage reliability"
+    },
+    {
+      "context_heading": "forbidden_claims[1]",
+      "line": null,
+      "path": "reports/multi_system_calibrated_decision_gate.json",
+      "phrase": "safety certification"
+    },
+    {
+      "context_heading": "forbidden_claims[2]",
+      "line": null,
+      "path": "reports/multi_system_calibrated_decision_gate.json",
+      "phrase": "autonomous control"
+    },
+    {
+      "context_heading": "forbidden claims",
+      "line": 47,
+      "path": "reports/multi_system_calibrated_decision_gate.md",
+      "phrase": "safety certification"
+    },
+    {
+      "context_heading": "forbidden claims",
+      "line": 47,
+      "path": "reports/multi_system_calibrated_decision_gate.md",
+      "phrase": "autonomous control"
+    },
+    {
+      "context_heading": "forbidden_claims[0]",
+      "line": null,
+      "path": "reports/practical_utility_decision_gate.json",
+      "phrase": "safety certification"
+    },
+    {
+      "context_heading": "forbidden_claims[3]",
+      "line": null,
+      "path": "reports/practical_utility_decision_gate.json",
+      "phrase": "autonomous control"
+    },
+    {
+      "context_heading": "forbidden_claims[4]",
+      "line": null,
+      "path": "reports/practical_utility_decision_gate.json",
+      "phrase": "universal simulator"
+    },
+    {
+      "context_heading": "forbidden claims",
+      "line": 33,
+      "path": "reports/practical_utility_decision_gate.md",
+      "phrase": "safety certification"
+    },
+    {
+      "context_heading": "forbidden claims",
+      "line": 33,
+      "path": "reports/practical_utility_decision_gate.md",
+      "phrase": "autonomous control"
+    },
+    {
+      "context_heading": "forbidden claims",
+      "line": 33,
+      "path": "reports/practical_utility_decision_gate.md",
+      "phrase": "universal simulator"
+    },
+    {
+      "context_heading": "claim boundaries",
+      "line": 29,
+      "path": "reports/release_note_v1_1_benchmark_usability.md",
+      "phrase": "strong support"
+    },
+    {
+      "context_heading": "claim boundaries",
+      "line": 29,
+      "path": "reports/release_note_v1_1_benchmark_usability.md",
+      "phrase": "safety certification"
+    },
+    {
+      "context_heading": "claim boundaries",
+      "line": 29,
+      "path": "reports/release_note_v1_1_benchmark_usability.md",
+      "phrase": "high-coverage reliability"
+    },
+    {
+      "context_heading": "what not to do next",
+      "line": 37,
+      "path": "reports/release_note_v1_current_status.md",
+      "phrase": "safety certification"
+    },
+    {
+      "context_heading": "what not to do next",
+      "line": 37,
+      "path": "reports/release_note_v1_current_status.md",
+      "phrase": "high-coverage reliability"
+    },
+    {
+      "context_heading": "forbidden_claims[1]",
+      "line": null,
+      "path": "reports/repair_signal_role_decision_gate.json",
+      "phrase": "safety certification"
+    },
+    {
+      "context_heading": "forbidden claims",
+      "line": 41,
+      "path": "reports/repair_signal_role_decision_gate.md",
+      "phrase": "safety certification"
+    }
+  ],
+  "paths_scanned": [
+    "README.md",
+    "docs/acceptance_report_template.md",
+    "docs/benchmark_card.md",
+    "docs/calibrated_protocol_lock_v1.md",
+    "docs/claim_audit_table.md",
+    "docs/custom_model_adapter.md",
+    "docs/experiment_protocol.md",
+    "docs/failure_gallery.md",
+    "docs/false_accept_forensics_tags.md",
+    "docs/one_page_project_summary.md",
+    "docs/portfolio_summary.md",
+    "docs/quickstart.md",
+    "docs/reproducibility_card.md",
+    "docs/signal_semantics_registry.md",
+    "docs/source_lineage.md",
+    "docs/tasks/refusal_benchmark_task.md",
+    "docs/technical_note_limitations_first.md",
+    "docs/two_tank_intervention_severity.md",
+    "reports/accepted_false_accept_forensics.md",
+    "reports/benchmark_sanity.md",
+    "reports/benchmark_usability_package_check.md",
+    "reports/benchmark_usability_precondition_check.md",
+    "reports/calibrated_cstr_report.md",
+    "reports/calibrated_cstr_seed_sweep_report.md",
+    "reports/calibrated_cstr_threshold_coverage_stress.md",
+    "reports/calibrated_judge_decision_gate.json",
+    "reports/calibrated_judge_decision_gate.md",
+    "reports/calibrated_precondition_check.md",
+    "reports/calibrated_refusal_judge.md",
+    "reports/calibrated_seed_sweep_report.md",
+    "reports/calibrated_threshold_coverage_stress.md",
+    "reports/coverage_sensitivity.md",
+    "reports/cstr_claim_audit.md",
+    "reports/cstr_diagnosis_table_report.md",
+    "reports/cstr_model_scenario_failure.md",
+    "reports/cstr_precondition_check.md",
+    "reports/cstr_repair_signal_audit.md",
+    "reports/cstr_rmse_target_audit.md",
+    "reports/cstr_sanity_report.md",
+    "reports/cstr_seed_sweep_report.md",
+    "reports/cstr_signal_overlap.md",
+    "reports/cstr_smoke_report.md",
+    "reports/cstr_statewise_error.md",
+    "reports/cstr_weakness_diagnosis.json",
+    "reports/cstr_weakness_diagnosis.md",
+    "reports/cstr_weakness_precondition_check.md",
+    "reports/current_evidence_manifest.md",
+    "reports/current_status_decision_gate.json",
+    "reports/current_status_decision_gate.md",
+    "reports/current_status_precondition_check.md",
+    "reports/effect_size_and_uncertainty_audit.md",
+    "reports/effect_size_audit_precondition_check.md",
+    "reports/event_risk_audit.md",
+    "reports/failure_analysis_gate_verification.md",
+    "reports/failure_diagnosis.json",
+    "reports/failure_diagnosis.md",
+    "reports/failure_gallery_report.md",
+    "reports/failure_table_report.md",
+    "reports/full_v0_report.md",
+    "reports/model_diversity_and_oracle_gap.md",
+    "reports/multi_system_calibrated_decision_gate.json",
+    "reports/multi_system_calibrated_decision_gate.md",
+    "reports/multi_system_report.json",
+    "reports/multi_system_report.md",
+    "reports/per_split_failure.md",
+    "reports/portfolio_package_report.md",
+    "reports/practical_utility_decision_gate.json",
+    "reports/practical_utility_decision_gate.md",
+    "reports/public_benchmark_package_check.md",
+    "reports/public_benchmark_precondition_check.md",
+    "reports/readme_current_status_sync.md",
+    "reports/readme_main_figure_report.md",
+    "reports/release_note_v1_1_benchmark_usability.md",
+    "reports/release_note_v1_2_public_benchmark.md",
+    "reports/release_note_v1_current_status.md",
+    "reports/repair_amount_semantics_validation.md",
+    "reports/repair_signal_role_decision_gate.json",
+    "reports/repair_signal_role_decision_gate.md",
+    "reports/repair_signal_semantics_precondition_check.md",
+    "reports/repair_vs_invariant_comparison.md",
+    "reports/score_ablation.md",
+    "reports/seed_sweep_report.md",
+    "reports/signal_error_correlation.md",
+    "reports/signal_semantics_registry.md",
+    "reports/signal_semantics_status_sync.md",
+    "reports/signal_set_ablation_repair.md",
+    "reports/signal_set_ablation_seed_sweep.md",
+    "reports/smoke_report.md",
+    "reports/technical_note_evidence_tables.md",
+    "reports/technical_note_figures.md",
+    "reports/technical_note_package_check.md",
+    "reports/technical_note_precondition_check.md",
+    "reports/threshold_sensitivity.md",
+    "reports/two_tank_severity_report.md",
+    "reports/v0_claim_audit.md",
+    "reports/v0_claim_downgrade.json",
+    "reports/v0_claim_downgrade.md",
+    "reports/v0_decision_gate.json",
+    "reports/v0_decision_gate.md",
+    "reports/v0_freeze_report.json",
+    "reports/v0_freeze_report.md"
+  ],
+  "risk_phrases": [
+    "strong support",
+    "robust general",
+    "general selective simulation",
+    "trustworthy simulator",
+    "safe simulator",
+    "safety certification",
+    "product-ready",
+    "plant-wide digital twin",
+    "autonomous control",
+    "industrial AI breakthrough",
+    "validated digital twin",
+    "high-coverage reliability",
+    "universal simulator"
+  ],
+  "verdict": "CLAIM_LANGUAGE_OK",
+  "violations": []
+}

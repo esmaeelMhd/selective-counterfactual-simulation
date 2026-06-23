@@ -1,0 +1,37 @@
+{
+  "oracle_selected": false,
+  "reasons": [],
+  "selected_judge_counts": {
+    "calibrated_family_selection.csv": {
+      "best_single_signal_selected_on_calibration": 152,
+      "calibration_selected_candidate_ranker": 3,
+      "conservative_low_coverage_judge": 7,
+      "isotonic_calibrated_judge": 1,
+      "logistic_calibrated_judge": 16,
+      "rank_normalized_linear": 1
+    },
+    "global_baseline_selection.csv": {
+      "conformal_risk_threshold": 2,
+      "learned_error_classifier": 18
+    },
+    "per_system_baseline_selection.csv": {
+      "conformal_risk_threshold": 41,
+      "invariant_only": 9,
+      "learned_error_classifier": 10
+    },
+    "per_system_target_baseline_selection.csv": {
+      "conformal_risk_threshold": 141,
+      "invariant_only": 4,
+      "learned_error_classifier": 35
+    }
+  },
+  "selection_rows": {
+    "calibrated_family_selection.csv": 180,
+    "global_baseline_selection.csv": 20,
+    "per_system_baseline_selection.csv": 60,
+    "per_system_target_baseline_selection.csv": 180
+  },
+  "source_scores": "results/v2_comparator_fairness/rerun_source/comparator_source_scores.csv",
+  "uses_test_labels": false,
+  "verdict": "COMPARATOR_SELECTION_VALID"
+}

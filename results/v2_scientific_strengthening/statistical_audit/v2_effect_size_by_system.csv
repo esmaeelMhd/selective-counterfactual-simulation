@@ -1,0 +1,10 @@
+system_id,badness_target,mean_far_margin,relative_far_margin,bootstrap_ci_low,bootstrap_ci_high,seed_win_rate,practical_threshold_pass,ci_excludes_zero,positive_ci_excludes_zero,event_risk_worsening,accepted_catastrophic_failure_count
+cstr,bad_event,-0.04535714285714285,0.0,-0.07199107142857142,-0.023741071428571427,0.0,False,True,False,True,25
+cstr,bad_rmse,-0.0013095238095238095,-0.0011666666666666665,-0.0025312499999999996,-0.000238095238095238,0.0,False,True,False,False,588
+cstr,bad_rmse_or_event,-0.001726190476190476,-0.0011666666666666665,-0.003214285714285714,-0.00041666666666666664,0.0,False,True,False,False,588
+heat_exchanger,bad_event,-0.06321428571428571,-0.08300000000000002,-0.08107142857142857,-0.04516964285714287,0.0,False,True,False,True,121
+heat_exchanger,bad_rmse,-0.001964285714285714,-0.003333333333333333,-0.003511904761904762,-0.0006547619047619047,0.0,False,True,False,False,762
+heat_exchanger,bad_rmse_or_event,-0.004642857142857141,-0.003333333333333333,-0.008840773809523807,-0.0014255952380952406,0.0,False,True,False,False,791
+two_tank,bad_event,0.0,0.0,0.0,0.0,0.0,False,False,False,False,0
+two_tank,bad_rmse,-0.04377777777777777,-0.024305555555555556,-0.05122222222222222,-0.035777777777777776,0.0,False,True,False,False,256
+two_tank,bad_rmse_or_event,-0.04377777777777777,-0.024305555555555556,-0.05222222222222222,-0.03570833333333334,0.0,False,True,False,False,256

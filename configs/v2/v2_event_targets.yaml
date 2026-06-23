@@ -1,0 +1,28 @@
+two_tank:
+  events:
+    - overflow_event
+    - underflow_event
+  thresholds:
+    level_min: 0.0
+    level_max: 10.0
+
+cstr:
+  events:
+    - temperature_above_limit
+    - concentration_out_of_safe_range
+    - unsafe_reactor_state
+  thresholds:
+    temperature_high: 365.0
+    concentration_low: 0.72
+    concentration_high: 1.65
+
+heat_exchanger:
+  events:
+    - outlet_temperature_above_limit
+    - outlet_temperature_below_limit
+    - large_temperature_tracking_error
+  thresholds:
+    outlet_temperature_high: 101.0
+    outlet_temperature_low: 76.0
+    tracking_error_high: 10.0
+    target_outlet_temperature: 88.0

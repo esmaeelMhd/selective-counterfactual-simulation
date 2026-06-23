@@ -1,0 +1,113 @@
+{
+  "comparison_rows": [
+    {
+      "accepted_event_bad_count": 0,
+      "coverage": 0.05,
+      "event_far": 0.0,
+      "judge": "best_single_signal_selected_on_calibration",
+      "rmse_far": 0.64,
+      "rmse_or_event_far": 0.64,
+      "system_id": "two_tank"
+    },
+    {
+      "accepted_event_bad_count": 0,
+      "coverage": 0.05,
+      "event_far": 0.0,
+      "judge": "calibration_selected_candidate_ranker",
+      "rmse_far": 0.4666666666666666,
+      "rmse_or_event_far": 0.4666666666666666,
+      "system_id": "two_tank"
+    },
+    {
+      "accepted_event_bad_count": 0,
+      "coverage": 0.1,
+      "event_far": 0.0,
+      "judge": "best_single_signal_selected_on_calibration",
+      "rmse_far": 0.6533333333333333,
+      "rmse_or_event_far": 0.6533333333333333,
+      "system_id": "two_tank"
+    },
+    {
+      "accepted_event_bad_count": 0,
+      "coverage": 0.1,
+      "event_far": 0.0,
+      "judge": "rank_normalized_linear",
+      "rmse_far": 0.5733333333333334,
+      "rmse_or_event_far": 0.5733333333333334,
+      "system_id": "two_tank"
+    },
+    {
+      "accepted_event_bad_count": 0,
+      "coverage": 0.05,
+      "event_far": 0.0,
+      "judge": "best_single_signal_selected_on_calibration",
+      "rmse_far": 0.6666666666666666,
+      "rmse_or_event_far": 0.6666666666666666,
+      "system_id": "cstr"
+    },
+    {
+      "accepted_event_bad_count": 0,
+      "coverage": 0.05,
+      "event_far": 0.0,
+      "judge": "rank_normalized_linear",
+      "rmse_far": 0.6666666666666666,
+      "rmse_or_event_far": 0.6666666666666666,
+      "system_id": "cstr"
+    },
+    {
+      "accepted_event_bad_count": 0,
+      "coverage": 0.1,
+      "event_far": 0.0,
+      "judge": "best_single_signal_selected_on_calibration",
+      "rmse_far": 0.6666666666666666,
+      "rmse_or_event_far": 0.6666666666666666,
+      "system_id": "cstr"
+    },
+    {
+      "accepted_event_bad_count": 0,
+      "coverage": 0.1,
+      "event_far": 0.0,
+      "judge": "rank_normalized_linear",
+      "rmse_far": 0.6666666666666666,
+      "rmse_or_event_far": 0.6666666666666666,
+      "system_id": "cstr"
+    }
+  ],
+  "event_label_availability": [
+    {
+      "event_labels_available": true,
+      "missing_reason": "none",
+      "system": "two_tank"
+    },
+    {
+      "event_labels_available": true,
+      "missing_reason": "none",
+      "system": "cstr"
+    }
+  ],
+  "event_thresholds": {
+    "cstr": {
+      "event_labels": [
+        "temperature_above_limit",
+        "concentration_out_of_safe_range",
+        "unsafe_reactor_state"
+      ],
+      "thresholds": {
+        "concentration_high": 1.8,
+        "concentration_low": 0.25,
+        "temperature_high": 390.0
+      }
+    },
+    "two_tank": {
+      "event_labels": [
+        "overflow_event",
+        "underflow_event"
+      ],
+      "thresholds": {
+        "level_max": 10.0,
+        "level_min": 0.0
+      }
+    }
+  },
+  "verdict": "EVENT_SUPPORTS_CLAIM"
+}

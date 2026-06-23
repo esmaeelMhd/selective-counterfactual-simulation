@@ -1,0 +1,82 @@
+{
+  "allowed_next_action": "UPDATE_SIGNAL_SEMANTICS_ONLY",
+  "controlling_claim_label": "WEAK_LOW_COVERAGE_CLAIM",
+  "controlling_claim_text": "A weak but positive low-coverage result under the frozen protocol.",
+  "cstr_weakness_diagnosis": "REPAIR_SIGNAL_BLIND_SPOT",
+  "effect_size_verdict": "WEAK_TWO_SYSTEM_EFFECT",
+  "event_risk_verdict": "EVENT_SUPPORTS_CLAIM",
+  "expansion_allowed": false,
+  "false_accept_forensics_verdict": "INCONCLUSIVE",
+  "forbidden_claims": [
+    "strong two-system support",
+    "broad simulator reliability",
+    "trustworthy counterfactual simulation",
+    "safety certification",
+    "autonomous control",
+    "product readiness",
+    "plant-wide digital twin",
+    "industrial AI breakthrough",
+    "high-coverage reliability"
+  ],
+  "forbidden_directions": [
+    "RSSM",
+    "heat_exchanger evidence",
+    "third system evidence",
+    "new judge family",
+    "new simulator model",
+    "protocol mutation",
+    "product/API/frontend work"
+  ],
+  "practical_utility_decision": "NARROW_TO_WEAK_LOW_COVERAGE_CLAIM",
+  "repair_signal_role_decision": "MARK_REPAIR_DIAGNOSTIC_ONLY_FOR_CSTR",
+  "repair_validation_verdict": "REPAIR_CORRECT_BUT_CSTR_IRRELEVANT",
+  "repair_vs_invariant_verdict": "INVARIANT_DOMINATES_REPAIR",
+  "signal_roles": {
+    "invariant_residual": {
+      "cstr_invariant_auroc": 0.9540608311161304,
+      "cstr_role": "informative_refusal_signal",
+      "reason": "Dominates repair_amount on CSTR accepted-region separation.",
+      "universal_refusal_signal": false
+    },
+    "repair_amount": {
+      "cstr_repair_auroc": 0.5,
+      "cstr_role": "diagnostic_only",
+      "reason": "Correct as a bounds/projection signal but irrelevant for within-bound CSTR dynamic errors.",
+      "twotank_role": "diagnostic_constraint_signal",
+      "universal_refusal_signal": false
+    }
+  },
+  "signal_set_ablation_verdict": "NO_REPAIR_NO_BENEFIT",
+  "source_artifacts": {
+    "cstr_calibrated_summary": "results/calibrated_cstr/calibrated_judge_summary.json",
+    "cstr_low_coverage": "results/calibrated_cstr/low_coverage_summary.csv",
+    "cstr_weakness_summary": "results/cstr_weakness_audit/repair_signal/repair_signal_metrics.json",
+    "effect_size_summary": "results/effect_size_audit/effect_size/effect_size_summary.json",
+    "repair_role_summary": "results/repair_signal_semantics_audit/repair_validation/repair_validation_summary.json",
+    "repair_signal_decision": "reports/repair_signal_role_decision_gate.md",
+    "repair_vs_invariant_summary": "results/repair_signal_semantics_audit/repair_vs_invariant/repair_vs_invariant_summary.json",
+    "twotank_calibrated_summary": "results/calibrated_two_tank/calibrated_judge_summary.json",
+    "twotank_low_coverage": "results/calibrated_two_tank/low_coverage_summary.csv"
+  },
+  "source_commit": "7ba9cdecff1b7fa32bd028c3c4d835ee0b7eb98c",
+  "source_tag": "v1-repair-signal-semantics",
+  "status_id": "current_evidence_status_v1",
+  "systems": {
+    "cstr": {
+      "coverage_0_05_margin": 0.038095238095238,
+      "coverage_0_10_margin": 0.038095238095238,
+      "effect_strength": "positive_but_weak",
+      "low_coverage_verdicts": [
+        "POSITIVE_BUT_WEAK"
+      ]
+    },
+    "two_tank": {
+      "coverage_0_05_margin": 0.1733333333333333,
+      "coverage_0_10_margin": 0.1666666666666668,
+      "effect_strength": "practically_meaningful",
+      "low_coverage_verdicts": [
+        "PRACTICALLY_MEANINGFUL"
+      ]
+    }
+  }
+}

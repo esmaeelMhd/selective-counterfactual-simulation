@@ -1,0 +1,171 @@
+Fresh clone reproduction check
+source_commit=10830465c26b981ea8db8c7d7457dcda91df75ea
+
+$ python -m venv .venv
+
+[exit 0 after 2.22s]
+
+$ .venv/bin/python -m pip install -e .[dev]
+Obtaining file:///tmp/scs_fresh_clone_zhzl6lc1/selective-counterfactual-simulation
+  Installing build dependencies: started
+  Installing build dependencies: finished with status 'done'
+  Checking if build backend supports build_editable: started
+  Checking if build backend supports build_editable: finished with status 'done'
+  Getting requirements to build editable: started
+  Getting requirements to build editable: finished with status 'done'
+  Preparing editable metadata (pyproject.toml): started
+  Preparing editable metadata (pyproject.toml): finished with status 'done'
+Collecting numpy (from selective-counterfactual-simulation==0.1.0)
+  Using cached numpy-2.5.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (6.6 kB)
+Collecting pandas (from selective-counterfactual-simulation==0.1.0)
+  Using cached pandas-3.0.3-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl.metadata (79 kB)
+Collecting scipy (from selective-counterfactual-simulation==0.1.0)
+  Using cached scipy-1.18.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (62 kB)
+Collecting scikit-learn (from selective-counterfactual-simulation==0.1.0)
+  Using cached scikit_learn-1.9.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (11 kB)
+Collecting matplotlib (from selective-counterfactual-simulation==0.1.0)
+  Using cached matplotlib-3.11.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (80 kB)
+Collecting pydantic (from selective-counterfactual-simulation==0.1.0)
+  Using cached pydantic-2.13.4-py3-none-any.whl.metadata (109 kB)
+Collecting pyyaml (from selective-counterfactual-simulation==0.1.0)
+  Using cached pyyaml-6.0.3-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl.metadata (2.4 kB)
+Collecting typer (from selective-counterfactual-simulation==0.1.0)
+  Using cached typer-0.26.7-py3-none-any.whl.metadata (16 kB)
+Collecting pytest (from selective-counterfactual-simulation==0.1.0)
+  Using cached pytest-9.1.1-py3-none-any.whl.metadata (7.6 kB)
+Collecting tqdm (from selective-counterfactual-simulation==0.1.0)
+  Using cached tqdm-4.68.3-py3-none-any.whl.metadata (57 kB)
+Collecting joblib (from selective-counterfactual-simulation==0.1.0)
+  Using cached joblib-1.5.3-py3-none-any.whl.metadata (5.5 kB)
+Collecting contourpy>=1.0.1 (from matplotlib->selective-counterfactual-simulation==0.1.0)
+  Using cached contourpy-1.3.3-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (5.5 kB)
+Collecting cycler>=0.10 (from matplotlib->selective-counterfactual-simulation==0.1.0)
+  Using cached cycler-0.12.1-py3-none-any.whl.metadata (3.8 kB)
+Collecting fonttools>=4.22.0 (from matplotlib->selective-counterfactual-simulation==0.1.0)
+  Using cached fonttools-4.63.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (118 kB)
+Collecting kiwisolver>=1.3.1 (from matplotlib->selective-counterfactual-simulation==0.1.0)
+  Using cached kiwisolver-1.5.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (5.1 kB)
+Collecting packaging>=20.0 (from matplotlib->selective-counterfactual-simulation==0.1.0)
+  Using cached packaging-26.2-py3-none-any.whl.metadata (3.5 kB)
+Collecting pillow>=9 (from matplotlib->selective-counterfactual-simulation==0.1.0)
+  Using cached pillow-12.2.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl.metadata (8.8 kB)
+Collecting pyparsing>=3 (from matplotlib->selective-counterfactual-simulation==0.1.0)
+  Using cached pyparsing-3.3.2-py3-none-any.whl.metadata (5.8 kB)
+Collecting python-dateutil>=2.7 (from matplotlib->selective-counterfactual-simulation==0.1.0)
+  Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl.metadata (8.4 kB)
+Collecting six>=1.5 (from python-dateutil>=2.7->matplotlib->selective-counterfactual-simulation==0.1.0)
+  Using cached six-1.17.0-py2.py3-none-any.whl.metadata (1.7 kB)
+Collecting annotated-types>=0.6.0 (from pydantic->selective-counterfactual-simulation==0.1.0)
+  Using cached annotated_types-0.7.0-py3-none-any.whl.metadata (15 kB)
+Collecting pydantic-core==2.46.4 (from pydantic->selective-counterfactual-simulation==0.1.0)
+  Using cached pydantic_core-2.46.4-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.6 kB)
+Collecting typing-extensions>=4.14.1 (from pydantic->selective-counterfactual-simulation==0.1.0)
+  Using cached typing_extensions-4.15.0-py3-none-any.whl.metadata (3.3 kB)
+Collecting typing-inspection>=0.4.2 (from pydantic->selective-counterfactual-simulation==0.1.0)
+  Using cached typing_inspection-0.4.2-py3-none-any.whl.metadata (2.6 kB)
+Collecting iniconfig>=1.0.1 (from pytest->selective-counterfactual-simulation==0.1.0)
+  Using cached iniconfig-2.3.0-py3-none-any.whl.metadata (2.5 kB)
+Collecting pluggy<2,>=1.5 (from pytest->selective-counterfactual-simulation==0.1.0)
+  Using cached pluggy-1.6.0-py3-none-any.whl.metadata (4.8 kB)
+Collecting pygments>=2.7.2 (from pytest->selective-counterfactual-simulation==0.1.0)
+  Using cached pygments-2.20.0-py3-none-any.whl.metadata (2.5 kB)
+Collecting narwhals>=2.0.1 (from scikit-learn->selective-counterfactual-simulation==0.1.0)
+  Using cached narwhals-2.22.1-py3-none-any.whl.metadata (15 kB)
+Collecting threadpoolctl>=3.5.0 (from scikit-learn->selective-counterfactual-simulation==0.1.0)
+  Using cached threadpoolctl-3.6.0-py3-none-any.whl.metadata (13 kB)
+Collecting shellingham>=1.3.0 (from typer->selective-counterfactual-simulation==0.1.0)
+  Using cached shellingham-1.5.4-py2.py3-none-any.whl.metadata (3.5 kB)
+Collecting rich>=13.8.0 (from typer->selective-counterfactual-simulation==0.1.0)
+  Using cached rich-15.0.0-py3-none-any.whl.metadata (18 kB)
+Collecting annotated-doc>=0.0.2 (from typer->selective-counterfactual-simulation==0.1.0)
+  Using cached annotated_doc-0.0.4-py3-none-any.whl.metadata (6.6 kB)
+Collecting markdown-it-py>=2.2.0 (from rich>=13.8.0->typer->selective-counterfactual-simulation==0.1.0)
+  Using cached markdown_it_py-4.2.0-py3-none-any.whl.metadata (7.4 kB)
+Collecting mdurl~=0.1 (from markdown-it-py>=2.2.0->rich>=13.8.0->typer->selective-counterfactual-simulation==0.1.0)
+  Using cached mdurl-0.1.2-py3-none-any.whl.metadata (1.6 kB)
+Using cached joblib-1.5.3-py3-none-any.whl (309 kB)
+Using cached matplotlib-3.11.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (10.0 MB)
+Using cached contourpy-1.3.3-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (362 kB)
+Using cached cycler-0.12.1-py3-none-any.whl (8.3 kB)
+Using cached fonttools-4.63.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (5.0 MB)
+Using cached kiwisolver-1.5.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (1.5 MB)
+Using cached numpy-2.5.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (16.6 MB)
+Using cached packaging-26.2-py3-none-any.whl (100 kB)
+Using cached pillow-12.2.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (7.1 MB)
+Using cached pyparsing-3.3.2-py3-none-any.whl (122 kB)
+Using cached python_dateutil-2.9.0.post0-py2.py3-none-any.whl (229 kB)
+Using cached six-1.17.0-py2.py3-none-any.whl (11 kB)
+Using cached pandas-3.0.3-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl (10.9 MB)
+Using cached pydantic-2.13.4-py3-none-any.whl (472 kB)
+Using cached pydantic_core-2.46.4-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.1 MB)
+Using cached annotated_types-0.7.0-py3-none-any.whl (13 kB)
+Using cached typing_extensions-4.15.0-py3-none-any.whl (44 kB)
+Using cached typing_inspection-0.4.2-py3-none-any.whl (14 kB)
+Using cached pytest-9.1.1-py3-none-any.whl (386 kB)
+Using cached pluggy-1.6.0-py3-none-any.whl (20 kB)
+Using cached iniconfig-2.3.0-py3-none-any.whl (7.5 kB)
+Using cached pygments-2.20.0-py3-none-any.whl (1.2 MB)
+Using cached pyyaml-6.0.3-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl (801 kB)
+Using cached scikit_learn-1.9.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (9.1 MB)
+Using cached narwhals-2.22.1-py3-none-any.whl (454 kB)
+Using cached scipy-1.18.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl (35.3 MB)
+Using cached threadpoolctl-3.6.0-py3-none-any.whl (18 kB)
+Using cached tqdm-4.68.3-py3-none-any.whl (78 kB)
+Using cached typer-0.26.7-py3-none-any.whl (122 kB)
+Using cached annotated_doc-0.0.4-py3-none-any.whl (5.3 kB)
+Using cached rich-15.0.0-py3-none-any.whl (310 kB)
+Using cached markdown_it_py-4.2.0-py3-none-any.whl (91 kB)
+Using cached mdurl-0.1.2-py3-none-any.whl (10.0 kB)
+Using cached shellingham-1.5.4-py2.py3-none-any.whl (9.8 kB)
+Building wheels for collected packages: selective-counterfactual-simulation
+  Building editable for selective-counterfactual-simulation (pyproject.toml): started
+  Building editable for selective-counterfactual-simulation (pyproject.toml): finished with status 'done'
+  Created wheel for selective-counterfactual-simulation: filename=selective_counterfactual_simulation-0.1.0-0.editable-py3-none-any.whl size=5086 sha256=3415267e722d5f1763e04e65b7c95ce2480e8e7f9c5f71abc9d19db3b6b880dd
+  Stored in directory: /tmp/pip-ephem-wheel-cache-lgvrvvzv/wheels/71/46/7b/d63078308d22741dba8571f2700d10b5a70854c45da2ec1336
+Successfully built selective-counterfactual-simulation
+Installing collected packages: typing-extensions, tqdm, threadpoolctl, six, shellingham, pyyaml, pyparsing, pygments, pluggy, pillow, packaging, numpy, narwhals, mdurl, kiwisolver, joblib, iniconfig, fonttools, cycler, annotated-types, annotated-doc, typing-inspection, scipy, python-dateutil, pytest, pydantic-core, markdown-it-py, contourpy, scikit-learn, rich, pydantic, pandas, matplotlib, typer, selective-counterfactual-simulation
+
+Successfully installed annotated-doc-0.0.4 annotated-types-0.7.0 contourpy-1.3.3 cycler-0.12.1 fonttools-4.63.0 iniconfig-2.3.0 joblib-1.5.3 kiwisolver-1.5.0 markdown-it-py-4.2.0 matplotlib-3.11.0 mdurl-0.1.2 narwhals-2.22.1 numpy-2.5.0 packaging-26.2 pandas-3.0.3 pillow-12.2.0 pluggy-1.6.0 pydantic-2.13.4 pydantic-core-2.46.4 pygments-2.20.0 pyparsing-3.3.2 pytest-9.1.1 python-dateutil-2.9.0.post0 pyyaml-6.0.3 rich-15.0.0 scikit-learn-1.9.0 scipy-1.18.0 selective-counterfactual-simulation-0.1.0 shellingham-1.5.4 six-1.17.0 threadpoolctl-3.6.0 tqdm-4.68.3 typer-0.26.7 typing-extensions-4.15.0 typing-inspection-0.4.2
+
+[notice] A new release of pip is available: 25.3 -> 26.1.2
+[notice] To update, run: /tmp/scs_fresh_clone_zhzl6lc1/selective-counterfactual-simulation/.venv/bin/python -m pip install --upgrade pip
+
+[exit 0 after 22.28s]
+
+$ .venv/bin/python -m pytest -q
+........................................................................ [ 26%]
+........................................................................ [ 53%]
+........................................................................ [ 80%]
+.....................................................                    [100%]
+=============================== warnings summary ===============================
+tests/test_v2_model_participants.py::test_v2_models_fit_predict_and_sample_on_tiny_twotank
+tests/test_v2_model_participants.py::test_v2_models_fit_predict_and_sample_on_tiny_twotank
+  /tmp/scs_fresh_clone_zhzl6lc1/selective-counterfactual-simulation/.venv/lib/python3.13/site-packages/sklearn/neural_network/_multilayer_perceptron.py:695: UserWarning: Got `batch_size` less than 1 or larger than sample size. It is going to be clipped
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+269 passed, 2 warnings in 159.81s (0:02:39)
+
+[exit 0 after 161.83s]
+
+$ .venv/bin/python scripts/run_smoke.py
+smoke run complete
+data_summary: results/smoke_two_tank/data_summary.json
+model_metrics: results/smoke_two_tank/model_metrics.csv
+scenario_scores: results/smoke_two_tank/scenario_scores.csv
+risk_coverage: results/smoke_two_tank/risk_coverage.csv
+risk_coverage_plot: results/smoke_two_tank/risk_coverage.png
+summary: results/smoke_two_tank/summary.json
+smoke_report: reports/smoke_report.md
+
+[exit 0 after 22.18s]
+
+$ .venv/bin/python scripts/run_current_status_demo.py
+DEMO_BUILT
+
+[exit 0 after 3.03s]
+
+$ .venv/bin/python examples/custom_model_example.py --output results/custom_model_example
+damped_linear_user
+
+[exit 0 after 1.21s]

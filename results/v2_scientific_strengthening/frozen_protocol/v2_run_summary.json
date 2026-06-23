@@ -1,0 +1,308 @@
+{
+  "attempted_systems": [
+    "two_tank",
+    "cstr",
+    "heat_exchanger"
+  ],
+  "badness_targets": [
+    "bad_rmse",
+    "bad_event",
+    "bad_rmse_or_event"
+  ],
+  "coverage_grid": [
+    0.01,
+    0.02,
+    0.05,
+    0.1,
+    0.2,
+    0.4,
+    0.6,
+    0.8,
+    1.0
+  ],
+  "leakage_detected": false,
+  "models_evaluated": [
+    "hold_last",
+    "linear_narx",
+    "mlp_state_space",
+    "ensemble_mlp",
+    "gradient_boosted_narx"
+  ],
+  "protocol_hash": "d05128c44dde09e3a82fbc3ec5a723242eba30057da6f88be1c2577fdff9503a",
+  "rmse_thresholds": [
+    0.05,
+    0.1,
+    0.15,
+    0.2,
+    0.3,
+    0.5
+  ],
+  "row_counts": {
+    "event_metrics": 950,
+    "model_metrics": 950,
+    "oracle_gap": 17550,
+    "risk_coverage": 298350,
+    "scenario_scores": 123500
+  },
+  "seed_count": 10,
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "split_overlap": [
+    {
+      "calibration_hash_count": 40,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 0,
+      "system_id": "two_tank",
+      "test_hash_count": 50
+    },
+    {
+      "calibration_hash_count": 40,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 1,
+      "system_id": "two_tank",
+      "test_hash_count": 50
+    },
+    {
+      "calibration_hash_count": 40,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 2,
+      "system_id": "two_tank",
+      "test_hash_count": 50
+    },
+    {
+      "calibration_hash_count": 40,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 3,
+      "system_id": "two_tank",
+      "test_hash_count": 50
+    },
+    {
+      "calibration_hash_count": 40,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 4,
+      "system_id": "two_tank",
+      "test_hash_count": 50
+    },
+    {
+      "calibration_hash_count": 40,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 5,
+      "system_id": "two_tank",
+      "test_hash_count": 50
+    },
+    {
+      "calibration_hash_count": 40,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 6,
+      "system_id": "two_tank",
+      "test_hash_count": 50
+    },
+    {
+      "calibration_hash_count": 40,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 7,
+      "system_id": "two_tank",
+      "test_hash_count": 50
+    },
+    {
+      "calibration_hash_count": 40,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 8,
+      "system_id": "two_tank",
+      "test_hash_count": 50
+    },
+    {
+      "calibration_hash_count": 40,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 9,
+      "system_id": "two_tank",
+      "test_hash_count": 50
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 0,
+      "system_id": "cstr",
+      "test_hash_count": 70
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 1,
+      "system_id": "cstr",
+      "test_hash_count": 70
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 2,
+      "system_id": "cstr",
+      "test_hash_count": 70
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 3,
+      "system_id": "cstr",
+      "test_hash_count": 70
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 4,
+      "system_id": "cstr",
+      "test_hash_count": 70
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 5,
+      "system_id": "cstr",
+      "test_hash_count": 70
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 6,
+      "system_id": "cstr",
+      "test_hash_count": 70
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 7,
+      "system_id": "cstr",
+      "test_hash_count": 70
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 8,
+      "system_id": "cstr",
+      "test_hash_count": 70
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 9,
+      "system_id": "cstr",
+      "test_hash_count": 70
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 0,
+      "system_id": "heat_exchanger",
+      "test_hash_count": 70
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 1,
+      "system_id": "heat_exchanger",
+      "test_hash_count": 70
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 2,
+      "system_id": "heat_exchanger",
+      "test_hash_count": 70
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 3,
+      "system_id": "heat_exchanger",
+      "test_hash_count": 70
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 4,
+      "system_id": "heat_exchanger",
+      "test_hash_count": 70
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 5,
+      "system_id": "heat_exchanger",
+      "test_hash_count": 70
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 6,
+      "system_id": "heat_exchanger",
+      "test_hash_count": 70
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 7,
+      "system_id": "heat_exchanger",
+      "test_hash_count": 70
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 8,
+      "system_id": "heat_exchanger",
+      "test_hash_count": 70
+    },
+    {
+      "calibration_hash_count": 56,
+      "overlap_count": 0,
+      "overlap_examples": [],
+      "seed": 9,
+      "system_id": "heat_exchanger",
+      "test_hash_count": 70
+    }
+  ],
+  "valid_systems": [
+    "two_tank",
+    "cstr",
+    "heat_exchanger"
+  ],
+  "verdict": "V2_FROZEN_PROTOCOL_COMPLETE"
+}

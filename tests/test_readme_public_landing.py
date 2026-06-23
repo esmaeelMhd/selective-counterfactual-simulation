@@ -4,29 +4,39 @@ from pathlib import Path
 
 import pytest
 
-from scs.experiments.public_benchmark import README_OPENING, update_readme_public_landing
-
+from scs.experiments.public_benchmark import update_readme_public_landing
 
 def test_readme_starts_with_public_hook_and_required_sections() -> None:
     text = Path("README.md").read_text(encoding="utf-8")
 
-    assert text.startswith(README_OPENING)
+    expected_opening = (
+        "# Selective Counterfactual Simulation Benchmark\n\n"
+        "A benchmark for testing whether learned dynamical simulators know when to refuse counterfactual predictions.\n\n"
+        "Plug in a simulator, run OOD/intervention scenarios, and compare false-accept rate versus coverage.\n\n"
+        "**Current status:** this is a benchmark prototype with narrow synthetic evidence."
+    )
+    assert text.startswith(expected_opening)
     for section in [
-        "## Why this exists",
+        "## What this is",
         "## Quickstart",
-        "## Reproduce the main TwoTank result",
-        "## Plug in your own simulator",
-        "## Main result",
-        "## What this does not claim",
-        "## Repository map",
+        "## Run the benchmark/demo",
+        "## Plug in your own model",
+        "## Current evidence",
+        "## What is not claimed",
+        "## Repository structure",
+        "## Reproducibility",
+        "## Citation",
+        "## License",
     ]:
         assert section in text
-    assert "python scripts/reproduce_main_twotank_result.py --output results/reproduce_twotank" in text
-    assert "examples/my_model_template.py" in text
-    assert "docs/figures/readme_low_coverage_result.png" in text
-    assert "weak on CSTR" in text
-    assert "Not a safety tool" in text
-    assert "does not claim simulator safety" in text
+    assert "python scripts/run_smoke.py" in text
+    assert "python scripts/run_current_status_demo.py" in text
+    assert "examples/custom_model_example.py:DampedLinearUserModel" in text
+    assert "python scripts/run_benchmark.py --model" in text
+    assert "docs/v2/figures/event_risk_vs_rmse_public.png" in text
+    assert "event-risk remains a failure mode" in text
+    assert "not a robust calibrated-refusal method claim" in text
+    assert "This is not safety certification." in text
 
 
 def test_readme_public_landing_check_catches_stale_readme(tmp_path: Path) -> None:

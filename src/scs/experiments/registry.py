@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from scs.models.hold_last import HoldLastModel
+from scs.models.ensemble_mlp import EnsembleMLPModel
+from scs.models.gradient_boosted_narx import GradientBoostedNARXModel
 from scs.models.linear_narx import LinearNARXModel
 from scs.models.mlp_state_space import MLPStateSpaceModel
 from scs.systems.cstr import CSTRSystem
@@ -25,4 +27,8 @@ def make_model(model_id: str, seed: int = 0):
         return LinearNARXModel(random_state=seed)
     if model_id == "mlp_state_space":
         return MLPStateSpaceModel(random_state=seed)
+    if model_id == "ensemble_mlp":
+        return EnsembleMLPModel(random_state=seed)
+    if model_id == "gradient_boosted_narx":
+        return GradientBoostedNARXModel(random_state=seed)
     raise ValueError(f"unknown model_id: {model_id}")

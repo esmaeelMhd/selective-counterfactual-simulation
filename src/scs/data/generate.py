@@ -24,6 +24,12 @@ INTERVENTION_TYPES = {
     "reaction_rate_shift",
     "combined_feed_and_cooling_shift",
     "unsafe_temperature_event",
+    "inlet_temperature_spike",
+    "flow_rate_shift",
+    "cooling_or_heating_change",
+    "heat_transfer_coefficient_shift",
+    "combined_disturbance_shift",
+    "unsafe_outlet_temperature_event",
 }
 
 TWO_TANK_SEVERITY_SETTINGS = {
@@ -512,17 +518,19 @@ def _intervention_heat_exchanger_action(
     horizon: int,
     rng: np.random.Generator,
 ) -> float:
-    if scenario_type == "held_out_action_magnitude":
+    if scenario_type in {"held_out_action_magnitude", "flow_rate_shift"}:
         phase = 2.0 * np.pi * t / max(horizon, 1)
         return float(np.clip(2.65 + 0.55 * np.sin(phase) + rng.normal(0.0, 0.10), 1.85, 3.35))
-    if scenario_type == "action_step_change" and t >= horizon // 2:
+    if scenario_type in {"action_step_change", "cooling_or_heating_change"} and t >= horizon // 2:
         return float(np.clip(base_action + 1.15, 0.2, 3.4))
-    if scenario_type == "valve_or_pump_degradation" and t >= horizon // 2:
+    if scenario_type in {"valve_or_pump_degradation", "heat_transfer_coefficient_shift"} and t >= horizon // 2:
         return float(np.clip(base_action * 0.42, 0.2, 3.4))
-    if scenario_type == "combined_intervention":
+    if scenario_type in {"combined_intervention", "combined_disturbance_shift"}:
         if t >= horizon // 3:
             return float(np.clip(0.55 + rng.normal(0.0, 0.06), 0.25, 0.85))
         return base_action
+    if scenario_type == "unsafe_outlet_temperature_event" and t >= horizon // 4:
+        return float(np.clip(base_action * 0.30, 0.15, 0.70))
     return base_action
 
 
@@ -535,13 +543,20 @@ def _intervention_heat_exchanger_disturbance(
     disturbance = np.array(base_disturbance, dtype=float)
     spike_start = horizon // 3
     spike_end = min(horizon, spike_start + max(4, horizon // 8))
-    if scenario_type == "inflow_spike" and spike_start <= t < spike_end:
+    if scenario_type in {"inflow_spike", "inlet_temperature_spike"} and spike_start <= t < spike_end:
         disturbance[0] += 42.0
-    if scenario_type == "combined_intervention":
+    if scenario_type == "flow_rate_shift" and t >= horizon // 2:
+        disturbance[1] -= 4.0
+    if scenario_type == "heat_transfer_coefficient_shift" and t >= horizon // 2:
+        disturbance[0] += 18.0
+    if scenario_type in {"combined_intervention", "combined_disturbance_shift"}:
         if spike_start <= t < spike_end:
             disturbance[0] += 32.0
         if t >= horizon // 2:
             disturbance[1] += 7.0
+    if scenario_type == "unsafe_outlet_temperature_event" and t >= horizon // 4:
+        disturbance[0] += 58.0
+        disturbance[1] += 9.0
     return disturbance
 
 
@@ -653,6 +668,129 @@ def _generate_heat_exchanger_dataset(
             dt,
             seeds["ood_combined"],
         ),
+    }
+
+
+def generate_calibrated_heat_exchanger_dataset(
+    n_model_train: int,
+    n_calibration_id: int,
+    n_calibration_ood: int,
+    n_test_id: int,
+    n_test_ood: int,
+    horizon: int,
+    dt: float,
+    seed: int,
+) -> dict[str, TrajectoryBatch]:
+    """Generate separated HeatExchanger roles for v2 frozen evaluation."""
+    split_specs = [
+        ("model_train", "normal_policy", "id", n_model_train, seed + 1001),
+        ("judge_calibration_id", "normal_policy", "id", n_calibration_id, seed + 2001),
+        (
+            "judge_calibration_inlet_temperature_spike",
+            "inlet_temperature_spike",
+            "inlet_temperature_spike",
+            n_calibration_ood,
+            seed + 2101,
+        ),
+        (
+            "judge_calibration_flow_rate_shift",
+            "flow_rate_shift",
+            "flow_rate_shift",
+            n_calibration_ood,
+            seed + 2201,
+        ),
+        (
+            "judge_calibration_cooling_or_heating_change",
+            "cooling_or_heating_change",
+            "cooling_or_heating_change",
+            n_calibration_ood,
+            seed + 2301,
+        ),
+        (
+            "judge_calibration_heat_transfer_coefficient_shift",
+            "heat_transfer_coefficient_shift",
+            "heat_transfer_coefficient_shift",
+            n_calibration_ood,
+            seed + 2401,
+        ),
+        (
+            "judge_calibration_combined_disturbance_shift",
+            "combined_disturbance_shift",
+            "combined_disturbance_shift",
+            n_calibration_ood,
+            seed + 2501,
+        ),
+        (
+            "judge_calibration_unsafe_outlet_temperature_event",
+            "unsafe_outlet_temperature_event",
+            "unsafe_outlet_temperature_event",
+            n_calibration_ood,
+            seed + 2601,
+        ),
+        ("judge_test_id", "normal_policy", "id", n_test_id, seed + 3001),
+        (
+            "judge_test_inlet_temperature_spike",
+            "inlet_temperature_spike",
+            "inlet_temperature_spike",
+            n_test_ood,
+            seed + 3101,
+        ),
+        (
+            "judge_test_flow_rate_shift",
+            "flow_rate_shift",
+            "flow_rate_shift",
+            n_test_ood,
+            seed + 3201,
+        ),
+        (
+            "judge_test_cooling_or_heating_change",
+            "cooling_or_heating_change",
+            "cooling_or_heating_change",
+            n_test_ood,
+            seed + 3301,
+        ),
+        (
+            "judge_test_heat_transfer_coefficient_shift",
+            "heat_transfer_coefficient_shift",
+            "heat_transfer_coefficient_shift",
+            n_test_ood,
+            seed + 3401,
+        ),
+        (
+            "judge_test_combined_disturbance_shift",
+            "combined_disturbance_shift",
+            "combined_disturbance_shift",
+            n_test_ood,
+            seed + 3501,
+        ),
+        (
+            "judge_test_unsafe_outlet_temperature_event",
+            "unsafe_outlet_temperature_event",
+            "unsafe_outlet_temperature_event",
+            n_test_ood,
+            seed + 3601,
+        ),
+    ]
+    return {
+        split: TrajectoryBatch(
+            states=batch.states,
+            actions=batch.actions,
+            disturbances=batch.disturbances,
+            scenario_type=[reported_scenario_type] * batch.n_trajectories,
+            split=split,
+            system_id=batch.system_id,
+        )
+        for split, simulator_scenario_type, reported_scenario_type, n_trajectories, split_seed in split_specs
+        for batch in [
+            _simulate_heat_exchanger_batch(
+                split=split,
+                scenario_type=simulator_scenario_type,
+                n_trajectories=n_trajectories,
+                horizon=horizon,
+                dt=dt,
+                seed=split_seed,
+            )
+        ]
     }
 
 

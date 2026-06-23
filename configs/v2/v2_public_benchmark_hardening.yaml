@@ -1,0 +1,59 @@
+package_id: v2_public_benchmark_hardening
+
+source_branch: v2-scientific-strengthening
+source_commit: dce535a
+
+controlling_reports:
+  v2_scientific_gate: reports/v2_scientific_decision_gate.md
+  comparator_fairness_gate: reports/v2_comparator_fairness_decision_gate.md
+  comparator_taxonomy: docs/v2/v2_comparator_taxonomy.md
+  protocol_lock: docs/v2/v2_scientific_protocol_lock.md
+
+source_artifacts:
+  v2_risk_coverage: results/v2_scientific_strengthening/frozen_protocol/v2_risk_coverage.csv
+  v2_scenario_scores: results/v2_scientific_strengthening/frozen_protocol/v2_scenario_scores.csv
+  v2_model_metrics: results/v2_scientific_strengthening/frozen_protocol/v2_model_metrics.csv
+  v2_event_metrics: results/v2_scientific_strengthening/frozen_protocol/v2_event_metrics.csv
+  v2_run_summary: results/v2_scientific_strengthening/frozen_protocol/v2_run_summary.json
+  comparator_fairness: results/v2_comparator_fairness/evaluation/comparator_fairness_by_row.csv
+  comparator_summary: results/v2_comparator_fairness/evaluation/comparator_fairness_summary.json
+  comparator_stats: results/v2_comparator_fairness/statistical_audit/comparator_statistical_summary.json
+
+public_claim:
+  label: BENCHMARK_EXPOSES_TARGET_DEPENDENT_FAILURE
+  text: "The benchmark exposes target-dependent calibrated-refusal failure; v2 does not support a robust method claim."
+
+public_hook:
+  text: "A benchmark for testing whether learned dynamical simulators know when to refuse counterfactual predictions."
+
+forbidden_claims:
+  - robust calibrated-refusal method
+  - trustworthy simulator
+  - safety certification
+  - validated digital twin
+  - product readiness
+  - high-coverage reliability
+  - general simulator reliability
+  - industrial AI breakthrough
+
+benchmark_api:
+  command: "python scripts/run_benchmark.py --model examples/custom_model_example.py:DampedLinearUserModel --output results/public_benchmark_run"
+  output_dir: results/public_benchmark_run
+
+public_outputs:
+  benchmark_task: docs/v2/benchmark_task.md
+  benchmark_card: docs/v2/benchmark_card.md
+  public_report: docs/v2/public_benchmark_report.md
+  event_risk_figure: docs/v2/figures/event_risk_vs_rmse_public.png
+  failure_gallery: docs/v2/event_risk_failure_gallery.md
+  api_contract: docs/v2/benchmark_api_contract.md
+  public_package_manifest: results/v2_public_benchmark_hardening/package_manifest.json
+
+forbidden:
+  allow_new_experiments: false
+  allow_new_systems: false
+  allow_new_models: false
+  allow_new_judges: false
+  allow_new_signals: false
+  allow_protocol_mutation: false
+  allow_prior_artifact_overwrite: false

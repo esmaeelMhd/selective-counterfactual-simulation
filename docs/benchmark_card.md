@@ -1,67 +1,52 @@
-# Benchmark Card: Selective Counterfactual Simulation
+# Benchmark Card
 
 ## Intended use
 
-Use this benchmark to test refusal/ranking behavior for counterfactual simulator rollouts under intervention shift.
+Use this benchmark to test whether a learned dynamical simulator can rank synthetic counterfactual intervention scenarios by answerability and reduce false accepts at fixed coverage.
 
 ## Non-intended use
 
-This benchmark tests refusal/ranking behavior, not simulator safety. It is not intended for product use, certification, autonomous control, or plant-wide deployment claims.
+Do not use this benchmark for safety certification, product validation, plant-wide deployment evidence, autonomous control, or claims of broad simulator reliability.
 
-## Core question
+## Task
 
-Can a simulator identify which counterfactual intervention scenarios it can answer reliably and abstain on the rest?
+Given a simulator model and synthetic OOD/intervention scenarios, produce rollout predictions and rank scenarios from lowest risk to highest risk.
 
-## Systems included
+## Inputs
 
-The current evidence package includes TwoTank and CSTR. TwoTank is stronger than CSTR. Expansion to RSSM, third systems, or product use is not currently supported.
+- synthetic train/calibration/test trajectory batches;
+- states, actions, disturbances, and scenario labels;
+- a built-in or custom simulator model implementing the adapter contract.
 
-## Models included
+## Outputs
 
-Built-in local models are `hold_last`, `linear_narx`, and `mlp_state_space`.
+- risk-coverage tables;
+- model and event metrics;
+- accepted false-accept examples;
+- benchmark summaries and plots.
 
-## Refusal signals included
+## Metrics
 
-Support distance, uncertainty, disagreement, invariant residual, and repair amount are available. repair_amount is diagnostic-only for CSTR. invariant_residual is informative for CSTR.
+The main metric is false accept rate at fixed coverage. Coverage is the accepted fraction after sorting scenarios by risk score.
 
-## Primary metric
+## Systems
 
-False accept rate at fixed coverage.
+The public prototype includes synthetic TwoTank, CSTR, and heat-exchanger-oriented evidence paths. These are benchmark systems, not validated industrial simulators.
 
-## What counts as a false accept
+## Badness targets
 
-A false accept occurs when a judge accepts a scenario whose simulator prediction is materially wrong under the configured error threshold.
+- RMSE above threshold;
+- event mismatch;
+- RMSE-or-event failure.
 
-## Current evidence status
+## Current evidence
 
-A weak but positive low-coverage refusal benchmark under a frozen protocol. Current evidence is weak-positive and low-coverage only. TwoTank margin at coverage 0.05 is 0.173333; CSTR margin at coverage 0.05 is 0.038095.
+The current evidence supports a benchmark prototype, not a robust calibrated-refusal method claim. v1.1 is weak-positive at low coverage. v2 shows target-dependent behavior where event-risk remains a failure mode.
 
-## Known weaknesses
+## Known limitations
 
-CSTR is positive but weak. repair_amount misses within-bound CSTR dynamic errors, while invariant_residual is more informative.
-
-## How to run the quickstart demo
-
-```bash
-python scripts/run_current_status_demo.py --config configs/status/benchmark_usability_v1_1.yaml --output results/demo
-```
-
-## How to add a custom model
-
-Implement `fit(train_batch)` and `predict_rollout(initial_state, actions, disturbances)` using `src/scs/models/user_model.py`, then run `python examples/custom_model_example.py --output results/custom_model_example`.
-
-## How to compare models fairly
-
-Use the local comparison script and report results as local-only:
-
-```bash
-python scripts/compare_models.py --config configs/experiments/calibrated_two_tank.yaml --models hold_last linear_narx mlp_state_space --output results/model_comparison
-```
+The systems are synthetic, evidence is narrow, external validation is limited, and event-risk remains difficult. Large v2 CSV artifacts are retained only as frozen diagnostic evidence.
 
 ## Claim boundaries
 
-Do not claim strong support, broad simulator reliability, safety certification, product readiness, high-coverage reliability, RSSM evidence, or third-system evidence.
-
-## Reproducibility
-
-Run `pip install -e ".[dev]"`, `pytest -q`, and the quickstart demo command above.
+This is not safety certification. This is not a product-ready digital twin. This is not a claim of general simulator reliability. This is not evidence that calibrated refusal works generally.

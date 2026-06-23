@@ -1,0 +1,64 @@
+{
+  "beats_row_wise_envelope_systems": [],
+  "by_system": [
+    {
+      "event_guard_far": 0.010714285714285714,
+      "fair_baseline_far": 0.04642857142857142,
+      "false_accept_count": 6,
+      "improvement_vs_primary": 0.034642857142857135,
+      "margin_vs_fair_baseline": 0.035714285714285705,
+      "margin_vs_row_wise_envelope": -0.010714285714285714,
+      "primary_far": 0.045357142857142846,
+      "row_wise_envelope_far": 0.0,
+      "system_id": "cstr"
+    },
+    {
+      "event_guard_far": 0.2,
+      "fair_baseline_far": 0.20821428571428569,
+      "false_accept_count": 110,
+      "improvement_vs_primary": 0.019999999999999997,
+      "margin_vs_fair_baseline": 0.008214285714285712,
+      "margin_vs_row_wise_envelope": -0.04321428571428571,
+      "primary_far": 0.22,
+      "row_wise_envelope_far": 0.15678571428571428,
+      "system_id": "heat_exchanger"
+    },
+    {
+      "event_guard_far": 0.0,
+      "fair_baseline_far": 0.0,
+      "false_accept_count": 0,
+      "improvement_vs_primary": 0.0,
+      "margin_vs_fair_baseline": 0.0,
+      "margin_vs_row_wise_envelope": 0.0,
+      "primary_far": 0.0,
+      "row_wise_envelope_far": 0.0,
+      "system_id": "two_tank"
+    }
+  ],
+  "candidate_id": "event_guarded_invariant_disagreement_support",
+  "comparator_config_audit_id": "v2_comparator_fairness",
+  "event_target": "bad_event",
+  "improved_vs_primary_systems": [
+    "cstr",
+    "heat_exchanger"
+  ],
+  "mean_improvement_vs_primary": 0.01821428571428571,
+  "mean_margin_vs_fair_baseline": 0.014642857142857138,
+  "mean_margin_vs_row_wise_envelope": -0.017976190476190475,
+  "nondegenerate_event_systems": [
+    "cstr",
+    "heat_exchanger"
+  ],
+  "nonworse_vs_fair_baseline_systems": [
+    "cstr",
+    "heat_exchanger"
+  ],
+  "scientific_claim_upgraded": false,
+  "signal_diagnosis_rows": 2550,
+  "source_scores_path": "results/v2_comparator_fairness/rerun_source/comparator_source_scores.csv",
+  "uses_new_models": false,
+  "uses_new_raw_signals": false,
+  "uses_new_systems": false,
+  "uses_test_labels_for_scoring": false,
+  "verdict": "EVENT_GUARD_REDUCES_EVENT_FALSE_ACCEPTS_NO_CLAIM_UPGRADE"
+}

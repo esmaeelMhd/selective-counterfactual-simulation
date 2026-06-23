@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+title: "Selective Counterfactual Simulation Benchmark"
+message: "If you use this benchmark, please cite this repository."
+type: software
+authors:
+  - name: "Selective Counterfactual Simulation contributors"
+repository-code: "https://github.com/esmaeelMhd/selective-counterfactual-simulation"
+abstract: "A benchmark prototype for testing whether learned dynamical simulators know when to refuse counterfactual predictions."
+license: MIT
+version: "v1.1-public-benchmark"
+date-released: "2026-06-23"

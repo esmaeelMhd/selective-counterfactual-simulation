@@ -1,0 +1,9 @@
+{
+  "README.md": "a88f6a5109e6cf1c3fdbd67582e3cd0d177c9a39b9c81d5a3fcec3b4ab4b0d05",
+  "reports/current_status_decision_gate.md": "48f838917ce6f7fd62d9ade0a8f99d3893b9278ab144e5d31a79624a7a0ae158",
+  "reports/practical_utility_decision_gate.md": "f8f0d0972f4c4dd32a33fb2736d7716d012ca2c41899c0fb86b373af317003ef",
+  "reports/repair_signal_role_decision_gate.md": "85137212bb273ad0b3055c723778246d242b1251d8e6e69aee26a98677bfde99",
+  "results/calibrated_cstr/calibrated_risk_coverage.csv": "253d941c93c8d5d219dc21de9636416c26e96a4a716f09de5671331a1ea03b5e",
+  "results/calibrated_two_tank/calibrated_risk_coverage.csv": "0143a5864ce8b7360fc754d034d62538cc29da865ae13e4e8eab508a5ef3b29a",
+  "results/current_status/evidence_manifest/current_evidence_manifest.json": "72da4ab0c23f5beae00b2cb91e535085fea364c95a254ff84d3d4840dae3e431"
+}

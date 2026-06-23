@@ -1,0 +1,13 @@
+{
+  "artifacts": {
+    "docs": "docs/signal_semantics_registry.md",
+    "registry_json": "results/repair_signal_semantics_audit/signal_semantics/signal_semantics_registry.json",
+    "report": "reports/signal_semantics_registry.md"
+  },
+  "historical_artifact_policy": "historical calibrated/effect/weakness outputs were not rewritten",
+  "invariant_residual_cstr_role": "informative_refusal_signal",
+  "reasons": [],
+  "repair_amount_cstr_role": "diagnostic_only",
+  "source_manifest": "results/current_status/evidence_manifest/current_evidence_manifest.json",
+  "verdict": "SIGNAL_SEMANTICS_SYNCED"
+}

@@ -1,0 +1,9 @@
+{
+  "check_mode": true,
+  "controlling_claim": "A weak but positive low-coverage result under the frozen protocol.",
+  "expansion_allowed": false,
+  "manifest_status_id": "current_evidence_status_v1",
+  "readme": "README.md",
+  "stale": false,
+  "verdict": "README_SYNCED"
+}

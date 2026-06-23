@@ -1,0 +1,10 @@
+{
+  "claim_language_hits": 0,
+  "fresh_clone_reproduction": "FRESH_CLONE_REPRO_PASSED",
+  "large_files_unresolved": 0,
+  "private_pattern_unresolved": 0,
+  "public_release_audit": "PUBLIC_RELEASE_READY",
+  "readme_errors": [],
+  "reasons": [],
+  "verdict": "PUBLIC_RELEASE_PACKAGE_ACCEPTED"
+}
