@@ -13,6 +13,7 @@ dist/
 .env
 .env.*
 *.log
+RESEARCH_CONSTITUTION.md
 results/smoke_two_tank/
 results/smoke/
 results/full_v0/
