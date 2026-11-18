@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from scs.models.base import validate_rollout_inputs
+from scs.models.base import validate_rollout_batch, validate_rollout_inputs
 from scs.systems.base import TrajectoryBatch
 
 
@@ -23,6 +23,15 @@ class HoldLastModel:
     ) -> np.ndarray:
         initial_state, actions, disturbances = validate_rollout_inputs(initial_state, actions, disturbances)
         return np.repeat(initial_state[None, :], len(actions) + 1, axis=0)
+
+    def predict_rollouts(
+        self,
+        initial_states: np.ndarray,
+        actions: np.ndarray,
+        disturbances: np.ndarray,
+    ) -> np.ndarray:
+        initial_states, actions, _disturbances = validate_rollout_batch(initial_states, actions, disturbances)
+        return np.repeat(initial_states[:, None, :], actions.shape[1] + 1, axis=1)
 
     def predict_rollout_samples(
         self,

@@ -59,3 +59,39 @@ def validate_rollout_inputs(
         raise ValueError("actions and disturbances must have the same horizon")
     return initial_state, actions, disturbances
 
+
+def validate_rollout_batch(
+    initial_states: np.ndarray,
+    actions: np.ndarray,
+    disturbances: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    initial_states = np.asarray(initial_states, dtype=float)
+    actions = np.asarray(actions, dtype=float)
+    disturbances = np.asarray(disturbances, dtype=float)
+    if initial_states.ndim != 2:
+        raise ValueError("initial_states must have shape (batch, state_dim)")
+    if actions.ndim != 3 or disturbances.ndim != 3:
+        raise ValueError("actions and disturbances must have shape (batch, horizon, dim)")
+    if initial_states.shape[0] != actions.shape[0] or actions.shape[:2] != disturbances.shape[:2]:
+        raise ValueError("batch rollout inputs must share batch and horizon")
+    return initial_states, actions, disturbances
+
+
+def rollout_from_delta(
+    delta_batch,
+    initial_states: np.ndarray,
+    actions: np.ndarray,
+    disturbances: np.ndarray,
+    noise: np.ndarray | None = None,
+) -> np.ndarray:
+    """Recursive batch rollout. ``noise`` has shape (batch, horizon, state_dim)."""
+    n_rows, horizon, _ = actions.shape
+    states = np.empty((n_rows, horizon + 1, initial_states.shape[-1]), dtype=float)
+    states[:, 0] = initial_states
+    for step in range(horizon):
+        delta = np.asarray(delta_batch(states[:, step], actions[:, step], disturbances[:, step]), dtype=float)
+        states[:, step + 1] = states[:, step] + delta
+        if noise is not None:
+            states[:, step + 1] = states[:, step + 1] + noise[:, step]
+    return states
+

@@ -1,0 +1,74 @@
+# Exploratory Stage A settings. Not the confirmatory freeze.
+stage: A
+label: exploratory
+event_config: configs/v2/v2_event_targets.yaml
+
+systems:
+  - two_tank
+  - cstr
+  - heat_exchanger
+
+models:
+  - hold_last
+  - linear_narx
+  - mlp_state_space
+  - ensemble_mlp
+  - gradient_boosted_narx
+
+learned_models:
+  - mlp_state_space
+  - ensemble_mlp
+  - gradient_boosted_narx
+
+eligibility_baselines:
+  - hold_last
+  - linear_narx
+
+primary_coverages:
+  - 0.05
+  - 0.10
+
+badness_targets:
+  - bad_rmse
+  - bad_event
+
+# One working threshold for this run. It is not frozen.
+rmse_threshold: 0.05
+
+seeds:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+
+event_guard_inputs:
+  - risk_invariant_only
+  - risk_disagreement_only
+  - risk_support_only
+
+bootstrap_samples: 500
+bootstrap_seed: 2025
+interval_width_limit: 0.10
+min_test_scenarios: 2000
+
+data:
+  horizon: 32
+  dt: 0.1
+  n_model_train: 160
+  n_calibration_id: 80
+  n_calibration_ood: 80
+  n_test_id: 400
+  n_test_ood: 400
+  uncertainty_samples: 2
+
+model_runtime:
+  mlp_max_iter: 400
+  ensemble_members: 5
+  ensemble_mlp_max_iter: 400
+  gradient_boosting_max_iter: 200

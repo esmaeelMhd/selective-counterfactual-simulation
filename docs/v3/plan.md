@@ -1,6 +1,6 @@
 # v3 plan: a powered, pre-registered refusal benchmark on a recognised process model
 
-Status: WP0 drafted. `docs/v3/prior_work.md` and `docs/v3/protocol.md` exist. The protocol is not frozen. Nothing in this plan changes v1 or v2 artifacts or claims.
+Status: WP0 drafted and corrected after a stress test. WP1 is in progress (`configs/v3/stage_a.yaml`, `scripts/v3_run.py`). The protocol is not frozen. Nothing in this plan changes v1 or v2 artifacts or claims.
 
 ## Goal
 
