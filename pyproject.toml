@@ -29,6 +29,9 @@ dev = [
 bsm1 = [
   "bsm2-python",
 ]
+learned = [
+  "torch",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

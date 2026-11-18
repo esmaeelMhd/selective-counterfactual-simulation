@@ -353,6 +353,34 @@ def _make_v2_model(model_id: str, seed: int, config: dict[str, Any]):
             random_state=seed,
             max_iter=int(runtime.get("gradient_boosting_max_iter", 60)),
         )
+    if model_id == "lstm_world":
+        from scs.models.lstm_world import LSTMWorldModel
+
+        return LSTMWorldModel(
+            random_state=seed,
+            hidden_dim=int(runtime.get("lstm_hidden", 64)),
+            num_layers=int(runtime.get("lstm_layers", 2)),
+            epochs=int(runtime.get("lstm_epochs", 30)),
+        )
+    if model_id == "ensemble_lstm":
+        from scs.models.ensemble_lstm import EnsembleLSTMModel
+
+        return EnsembleLSTMModel(
+            random_state=seed,
+            n_members=int(runtime.get("ensemble_members", 5)),
+            hidden_dim=int(runtime.get("lstm_hidden", 64)),
+            num_layers=int(runtime.get("lstm_layers", 2)),
+            epochs=int(runtime.get("lstm_epochs", 30)),
+        )
+    if model_id == "recurrent_world":
+        from scs.models.recurrent_world import RecurrentWorldModel
+
+        return RecurrentWorldModel(
+            random_state=seed,
+            hidden_dim=int(runtime.get("rssm_hidden", 32)),
+            latent_dim=int(runtime.get("rssm_latent", 8)),
+            epochs=int(runtime.get("rssm_epochs", 20)),
+        )
     raise ValueError(f"unknown v2 model_id: {model_id}")
 
 
