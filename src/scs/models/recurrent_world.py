@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import numpy as np
 
-from scs.models.base import validate_rollout_inputs
 from scs.systems.base import TrajectoryBatch
 
 
@@ -48,6 +47,12 @@ class RecurrentWorldModel:
         self.state_dim: int | None = None
         self.action_dim: int | None = None
         self.disturbance_dim: int | None = None
+        self.state_mean: np.ndarray | None = None
+        self.state_std: np.ndarray | None = None
+        self.action_mean: np.ndarray | None = None
+        self.action_std: np.ndarray | None = None
+        self.disturbance_mean: np.ndarray | None = None
+        self.disturbance_std: np.ndarray | None = None
         self.train_losses: list[float] = []
 
     def fit(self, train: TrajectoryBatch) -> None:
@@ -60,6 +65,16 @@ class RecurrentWorldModel:
         self.state_dim = int(states.shape[-1])
         self.action_dim = int(actions.shape[-1])
         self.disturbance_dim = int(disturbances.shape[-1])
+        self.state_mean = states.mean(axis=(0, 1))
+        self.state_std = np.maximum(states.std(axis=(0, 1)), 1e-6)
+        self.action_mean = actions.mean(axis=(0, 1))
+        self.action_std = np.maximum(actions.std(axis=(0, 1)), 1e-6)
+        self.disturbance_mean = disturbances.mean(axis=(0, 1))
+        self.disturbance_std = np.maximum(disturbances.std(axis=(0, 1)), 1e-6)
+        states = (states - self.state_mean) / self.state_std
+        targets = (targets - self.state_mean) / self.state_std
+        actions = (actions - self.action_mean) / self.action_std
+        disturbances = (disturbances - self.disturbance_mean) / self.disturbance_std
         model = factory(
             input_dim=self.action_dim + self.disturbance_dim + self.state_dim,
             output_dim=self.state_dim,
@@ -105,29 +120,46 @@ class RecurrentWorldModel:
         history: np.ndarray | None = None,
     ) -> np.ndarray:
         del history
+        rolled = self.predict_rollouts(initial_state[None, :], actions[None, :, :], disturbances[None, :, :])
+        return rolled[0]
+
+    def predict_rollouts(
+        self,
+        initial_states: np.ndarray,
+        actions: np.ndarray,
+        disturbances: np.ndarray,
+    ) -> np.ndarray:
         torch, _factory = _require_latent()
-        if self.model is None or self.action_dim is None or self.disturbance_dim is None:
+        if self.model is None or self.state_mean is None or self.action_mean is None or self.disturbance_mean is None:
             raise RuntimeError("model must be fit before rollout")
-        initial_state, actions, disturbances = validate_rollout_inputs(initial_state, actions, disturbances)
+        initial_states = np.asarray(initial_states, dtype=float)
+        actions = np.asarray(actions, dtype=float)
+        disturbances = np.asarray(disturbances, dtype=float)
         self.model.eval()
-        horizon = len(actions)
+        batch, horizon, _action_dim = actions.shape
+        scaled_state = ((initial_states - self.state_mean) / self.state_std).astype(np.float32)
+        scaled_actions = ((actions - self.action_mean) / self.action_std).astype(np.float32)
+        scaled_disturbances = ((disturbances - self.disturbance_mean) / self.disturbance_std).astype(np.float32)
         warmup = np.concatenate(
             [
-                np.zeros((1, 1, self.action_dim), dtype=np.float32),
-                np.zeros((1, 1, self.disturbance_dim), dtype=np.float32),
-                initial_state.astype(np.float32)[None, None, :],
+                np.zeros((batch, 1, self.action_dim), dtype=np.float32),
+                np.zeros((batch, 1, self.disturbance_dim), dtype=np.float32),
+                scaled_state[:, None, :],
             ],
             axis=-1,
         )
-        states = np.empty((horizon + 1, initial_state.shape[0]), dtype=float)
-        states[0] = initial_state
+        states = np.empty((batch, horizon + 1, initial_states.shape[-1]), dtype=float)
+        states[:, 0, :] = initial_states
         with torch.no_grad():
             latent = self.model.init_state(torch.tensor(warmup))
+            controls = torch.tensor(scaled_actions)
+            exogenous = torch.tensor(scaled_disturbances)
+            predicted = []
             for time in range(horizon):
-                control = torch.tensor(actions[time].astype(np.float32)[None, :])
-                exogenous = torch.tensor(disturbances[time].astype(np.float32)[None, :])
-                latent, predicted = self.model.step(latent, control, exogenous)
-                states[time + 1] = predicted.numpy()[0]
+                latent, step = self.model.step(latent, controls[:, time], exogenous[:, time])
+                predicted.append(step)
+            restored = torch.stack(predicted, dim=1).numpy() * self.state_std + self.state_mean
+        states[:, 1:, :] = restored
         return states
 
     def predict_rollout_samples(
