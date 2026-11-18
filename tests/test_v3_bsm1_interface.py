@@ -98,6 +98,102 @@ def test_missing_signal_still_scores() -> None:
     assert np.isfinite(results["false_accept_rate"]).all()
 
 
+def test_rain_storm_and_confirmatory_test_are_refused() -> None:
+    from scs.systems.bsm1 import assert_split_allowed
+
+    for split in ("judge_test_id", "judge_test_rain", "judge_test_storm", "judge_test_control", "rain", "storm"):
+        with pytest.raises(RuntimeError):
+            assert_split_allowed(split)
+
+
+def test_pretest_windows_do_not_overlap() -> None:
+    from scs.systems.bsm1 import CONTROL_SCALE, NOMINAL_SCALE, pretest_specs
+
+    horizon, history = 8, 2
+    specs = pretest_specs(n_model_train=2, n_calibration_id=2, n_calibration_control=2, horizon=horizon, history=history, seed=0)
+    starts = sorted(int(spec["start_minute"]) for spec in specs)
+    assert len(starts) == len(set(starts))
+    assert all(right - left >= horizon + history for left, right in zip(starts, starts[1:]))
+    assert {spec["split"] for spec in specs} == {"model_train", "judge_calibration_id", "judge_calibration_control"}
+    nominal = [spec for spec in specs if spec["split"] != "judge_calibration_control"]
+    shifted = [spec for spec in specs if spec["split"] == "judge_calibration_control"]
+    assert all(NOMINAL_SCALE[0] <= float(spec["kla"][2] / 240.0) <= NOMINAL_SCALE[1] for spec in nominal)
+    assert all(float(spec["kla"][2] / 240.0) >= CONTROL_SCALE[0] for spec in shifted)
+
+
+def test_pretest_dataset_round_trip(tmp_path) -> None:
+    pytest.importorskip("bsm2_python")
+    from scs.data.schemas import load_dataset, save_dataset
+    from scs.systems.bsm1 import generate_bsm1_pretest_dataset
+
+    plant_state = _state_after_short_rollout()
+    dataset, manifest = generate_bsm1_pretest_dataset(
+        n_model_train=1,
+        n_calibration_id=1,
+        n_calibration_control=1,
+        horizon=4,
+        history=2,
+        seed=1,
+        steady_state=plant_state,
+    )
+    assert manifest["confirmatory_test_generated"] is False
+    assert "judge_test_id" not in dataset
+    assert manifest["weather"]["rain"] != "ok"
+    assert manifest["weather"]["storm"] == "missing"
+    save_dataset(dataset, tmp_path)
+    loaded = load_dataset(tmp_path)
+    assert loaded["model_train"].measured_history.shape[0] == 1
+    assert loaded["model_train"].measured_history.shape[-1] == 5
+    assert np.isfinite(loaded["judge_calibration_control"].states).all()
+
+
+def _state_after_short_rollout() -> dict:
+    import numpy as np
+    from bsm2_python.bsm1_ol import BSM1OL
+
+    from scs.systems.bsm1 import NOMINAL_KLA, PUBLISHED_CONSTANT_INFLUENT, capture_plant
+
+    times = np.arange(6) / 1440.0
+    influent = np.repeat(PUBLISHED_CONSTANT_INFLUENT[None, :], len(times), axis=0)
+    plant = BSM1OL(data_in=np.column_stack([times, influent]), timestep=1.0 / 1440.0)
+    for index in range(3):
+        plant.step(index, klas=NOMINAL_KLA)
+    return capture_plant(plant)
+
+
+def test_bsm1_effluent_limit_is_one_bit_per_quantity() -> None:
+    import yaml
+
+    from scs.experiments.v2 import trajectory_bad_event, trajectory_event_flags
+    from scs.systems.bsm1 import EFFLUENT_OFFSET, STATE_DIM
+
+    config = yaml.safe_load(open("configs/v3/bsm1_events.yaml", encoding="utf-8"))
+    states = np.zeros((3, STATE_DIM))
+    assert trajectory_bad_event("bsm1", states, config) is False
+    states[1, EFFLUENT_OFFSET + 9] = 4.1
+    flags = trajectory_event_flags("bsm1", states, config)
+    assert flags["s_nh_above_limit"] is True
+    assert flags["total_n_above_limit"] is False
+    assert trajectory_bad_event("bsm1", states, config) is True
+
+
+def test_effluent_measurements_match_the_library() -> None:
+    pytest.importorskip("bsm2_python")
+    from bsm2_python.bsm2.plantperformance import PlantPerformance
+    import bsm2_python.bsm2.init.plantperformanceinit_bsm1 as pp_init
+
+    from scs.systems.bsm1 import EFFLUENT_OFFSET, STATE_DIM, effluent_measurements
+
+    effluent = np.array([30, 2, 5, 40, 10, 1, 1, 0.5, 8, 1.7, 0.7, 1, 7, 12, 18000, 15, 0, 0, 0, 0, 0], dtype=float)
+    states = np.zeros(STATE_DIM)
+    states[EFFLUENT_OFFSET : EFFLUENT_OFFSET + 21] = effluent
+    performance = PlantPerformance(pp_init.PP_PAR)
+    library = np.asarray(performance.advanced_quantities(effluent, ("totalN", "COD", "X_TSS", "BOD5e")), dtype=float).reshape(-1)
+    measured = effluent_measurements(states)
+    assert measured[0] == pytest.approx(effluent[9])
+    assert measured[1:] == pytest.approx(library)
+
+
 def test_bsm1_rollout_has_a_measured_history() -> None:
     pytest.importorskip("bsm2_python")
     from scs.systems.bsm1 import MEASURED_NAMES, STATE_DIM, influent_file_status, rollout_scenario

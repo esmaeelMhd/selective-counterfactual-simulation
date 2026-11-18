@@ -78,7 +78,7 @@ Event-guard candidate, starting definition, taken from `configs/v2/v2_event_risk
 
 **Stage A, exploratory.** TwoTank, CSTR, and heat exchanger. Used to fix model training, choose the event-guard definition, and set every tunable number. The Stage A report is labelled exploratory and does not issue the confirmatory yes or no.
 
-**Stage B, confirmatory.** One new system, BSM1, after the freeze. Train on dry weather with controls in the nominal range. Test on rain, storm, control moves outside the training range, and the combination. Report once. No rerun with changed settings.
+**Stage B, confirmatory.** One new system, BSM1, after the freeze. Train on dry weather with controls in the nominal range. Test on rain, storm, control moves outside the training range, and the combination. Report once. No rerun with changed settings. The packaged dry file parses and is repeated. The packaged rain file does not parse, and the package has no storm file, so those two splits are not generated. Sampled windows do not overlap, and a four-day tail after the last sampled window stays unused until the confirmatory test split is allowed.
 
 Signals that need the full state (`invariant_residual`, `repair_amount`) are marked not available on BSM1. A judge must still return a score when a signal is missing. The v2 event guard uses the invariant signal, so that guard is not the BSM1 guard. Q3 stays unanswered until this file names the guard that runs when invariant and repair are absent.
 
@@ -100,9 +100,11 @@ A row with a Stage A value is a working setting. It is part of the freeze only w
 | Event-guard definition on the fully observed systems | v2 candidate above; Stage A may replace it |
 | Event-guard definition on BSM1 | unset. Q3 cannot be answered until this row is filled |
 | How 5% and 10% combine into one yes | unset. Stage A reports each coverage separately |
-| Horizon, ensemble size, training stop | Stage A config sets a working value; not frozen |
+| Horizon, ensemble size, training stop | Stage A config sets a working value for the three ODE systems; not frozen |
+| BSM1 horizon | working value, not frozen: 15 minutes of measured history and 480 minutes of prediction, one reactor hydraulic time |
+| BSM1 event bit | working definition, not frozen: a trajectory is positive when any measured effluent series exceeds its benchmark limit (ammonia 4, total nitrogen 18, COD 100, suspended solids 30, BOD 10). This is not the BSM1 refusal guard |
 | `bad_rmse` threshold per system | Stage A uses 0.05 for all three systems; not frozen |
 | Eligibility metric | mean RMSE on `judge_test_id`, strict improvement on both baselines |
 | Seed list | Stage A uses seeds 0–9; not frozen |
-| BSM1 measured variables | unset |
+| BSM1 measured variables | working list, not frozen: ammonia, total nitrogen, COD, suspended solids, BOD |
 | Bootstrap draw count | 500 |

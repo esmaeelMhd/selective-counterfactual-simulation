@@ -424,6 +424,10 @@ def trajectory_event_flags(system_id: str, states: np.ndarray, event_config: dic
             "outlet_temperature_below_limit": bool(np.any(hot_out < low)),
             "large_temperature_tracking_error": bool(np.any(np.abs(hot_out - target) > tracking)),
         }
+    if system_id == "bsm1":
+        from scs.systems.bsm1 import effluent_limit_flags
+
+        return effluent_limit_flags(states, thresholds)
     raise ValueError(f"unknown system_id for events: {system_id}")
 
 
