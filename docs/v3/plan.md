@@ -1,6 +1,6 @@
 # v3 plan: a powered, pre-registered refusal benchmark on a recognised process model
 
-Status: draft, not started. Nothing in this plan changes v1 or v2 artifacts or claims.
+Status: WP0 drafted. `docs/v3/prior_work.md` and `docs/v3/protocol.md` exist. The protocol is not frozen. Nothing in this plan changes v1 or v2 artifacts or claims.
 
 ## Goal
 
