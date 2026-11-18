@@ -1,7 +1,7 @@
-"""Adapter around ``LSTMWorldModel`` from time-series-simulator.
+"""Adapter around ``timesim.models.lstm.LSTMWorldModel``.
 
 The network is that class. This module only standardizes a trajectory batch
-and calls it. PyTorch and time-series-simulator are optional.
+and calls it. PyTorch and timesim are optional.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ def _require_lstm():
         import torch
         from timesim.models.lstm import LSTMWorldModel as TimesimLSTM
     except ImportError as exc:
-        raise ImportError("LSTM world model needs torch and time-series-simulator") from exc
+        raise ImportError("LSTM world model needs torch and timesim") from exc
     return torch, TimesimLSTM
 
 

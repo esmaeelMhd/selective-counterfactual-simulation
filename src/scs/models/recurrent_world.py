@@ -1,8 +1,8 @@
-"""Adapter for the recurrent state-space world model in time-series-simulator.
+"""Adapter for ``timesim.models.latent_ssm.LatentSSMWorldModel``.
 
-The class is ``LatentSSMWorldModel``. Training uses its posterior filter and
-a one-step prior prediction of the next state. PyTorch and that package are
-optional. The confirmatory BSM1 test split is not used here.
+Training uses its posterior filter and a one-step prior prediction of the
+next state. PyTorch and timesim are optional. The confirmatory BSM1 test
+split is not used here.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ def _require_latent():
         from timesim.models.latent_ssm import LatentSSMWorldModel
     except ImportError as exc:
         raise ImportError(
-            "recurrent world model needs torch and time-series-simulator"
+            "recurrent world model needs torch and timesim"
         ) from exc
     return torch, LatentSSMWorldModel
 
