@@ -20,8 +20,13 @@ class SimulatorModel(Protocol):
         initial_state: np.ndarray,
         actions: np.ndarray,
         disturbances: np.ndarray,
+        history: np.ndarray | None = None,
     ) -> np.ndarray:
-        """Return predicted states with shape ``(horizon + 1, state_dim)``."""
+        """Return predicted states with shape ``(horizon + 1, state_dim)``.
+
+        ``history`` is an optional window of measured variables. Existing
+        models ignore it, so the three-argument call is unchanged.
+        """
 
     def predict_rollout_samples(
         self,

@@ -1,6 +1,6 @@
 # v3 plan: a powered, pre-registered refusal benchmark on a recognised process model
 
-Status: WP0 drafted and corrected after a stress test. WP1 is in progress (`configs/v3/stage_a.yaml`, `scripts/v3_run.py`). The protocol is not frozen. Nothing in this plan changes v1 or v2 artifacts or claims.
+Status: WP0 drafted. WP1 Stage A has been run and is exploratory. WP2 has a checked BSM1 port and the measured-history API; rain and storm splits are not generated. The protocol is not frozen. Nothing in this plan changes v1 or v2 artifacts or claims.
 
 ## Goal
 
@@ -137,7 +137,7 @@ Hours assume 6 to 8 a week.
 ## Optional: real-plant section
 
 Real plant data has no "what if" ground truth, so it cannot be a main result. One section
-could test refusal on unusual historical periods of the Agtrup dataset.
+could test refusal on unusual historical periods of one wastewater plant dataset that stays outside this repository.
 
 - Only with written permission from the data owner to publish aggregate numbers.
 - No rows, plots of raw series or derived datasets enter this repo.

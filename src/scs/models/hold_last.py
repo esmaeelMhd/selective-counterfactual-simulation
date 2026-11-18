@@ -20,6 +20,7 @@ class HoldLastModel:
         initial_state: np.ndarray,
         actions: np.ndarray,
         disturbances: np.ndarray,
+        history: np.ndarray | None = None,
     ) -> np.ndarray:
         initial_state, actions, disturbances = validate_rollout_inputs(initial_state, actions, disturbances)
         return np.repeat(initial_state[None, :], len(actions) + 1, axis=0)

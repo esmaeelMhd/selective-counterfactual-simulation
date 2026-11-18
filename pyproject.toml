@@ -26,6 +26,9 @@ dependencies = [
 dev = [
   "pytest",
 ]
+bsm1 = [
+  "bsm2-python",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

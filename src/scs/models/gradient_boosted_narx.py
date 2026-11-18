@@ -65,6 +65,7 @@ class GradientBoostedNARXModel:
         initial_state: np.ndarray,
         actions: np.ndarray,
         disturbances: np.ndarray,
+        history: np.ndarray | None = None,
     ) -> np.ndarray:
         initial_state, actions, disturbances = validate_rollout_inputs(initial_state, actions, disturbances)
         states = np.empty((len(actions) + 1, initial_state.shape[0]), dtype=float)

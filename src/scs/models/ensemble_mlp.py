@@ -37,10 +37,11 @@ class EnsembleMLPModel:
         initial_state: np.ndarray,
         actions: np.ndarray,
         disturbances: np.ndarray,
+        history: np.ndarray | None = None,
     ) -> np.ndarray:
         initial_state, actions, disturbances = validate_rollout_inputs(initial_state, actions, disturbances)
         predictions = [
-            member.predict_rollout(initial_state, actions, disturbances)
+            member.predict_rollout(initial_state, actions, disturbances, history=history)
             for member in self.members
         ]
         return np.mean(np.stack(predictions, axis=0), axis=0)

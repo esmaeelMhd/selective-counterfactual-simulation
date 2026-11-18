@@ -14,7 +14,7 @@ def predict_rollout(self, initial_state, actions, disturbances):
     ...
 ```
 
-`predict_rollout` must return a finite array with shape `(horizon + 1, state_dim)`.
+`predict_rollout` must return a finite array with shape `(horizon + 1, state_dim)`. An optional fourth argument, `history`, is a window of measured variables. Omitting it keeps the previous call working.
 
 ## Example
 

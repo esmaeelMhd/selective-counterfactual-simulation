@@ -30,6 +30,7 @@ from scs.experiments.v2 import (
     trajectory_bad_event,
 )
 from scs.experiments.v2_event_risk import event_guarded_score
+from scs.signals import available_signals
 from scs.validators.invariants import invariant_residual_score
 from scs.validators.repair import repair_amount_score
 from scs.validators.support import SupportDistance
@@ -154,6 +155,7 @@ def _score_batch(
             pred = predicted[index]
             pred_event = trajectory_bad_event(system_id, pred, event_config)
             diff = pred - true_states
+            signals_here = available_signals(system_id)
             rows.append(
                 {
                     "system_id": system_id,
@@ -170,10 +172,14 @@ def _score_batch(
                     "support_distance": float(support_scores[index]),
                     "uncertainty_score": float(uncertainty[model_id][index]),
                     "disagreement_score": float(disagreement[index]),
-                    "invariant_residual": invariant_residual_score(
-                        system, pred, batch.actions[index], batch.disturbances[index], dt
+                    "invariant_residual": (
+                        invariant_residual_score(system, pred, batch.actions[index], batch.disturbances[index], dt)
+                        if "invariant_residual" in signals_here
+                        else float("nan")
                     ),
-                    "repair_amount": repair_amount_score(system, pred),
+                    "repair_amount": (
+                        repair_amount_score(system, pred) if "repair_amount" in signals_here else float("nan")
+                    ),
                 }
             )
     return rows
@@ -240,11 +246,44 @@ def _relative_margin(absolute: float, baseline_far: float) -> float:
     return float("nan")
 
 
+def _finite_signal_names(frame: pd.DataFrame) -> list[str]:
+    names = []
+    for name, column in SIMPLE_RISK_COLUMN.items():
+        values = frame[column].to_numpy(dtype=float)
+        if np.isfinite(values).all():
+            names.append(name)
+    return names
+
+
+def _rank_mean_available(calibration: pd.DataFrame, test: pd.DataFrame) -> np.ndarray:
+    """Calibration-percentile mean over the signals that are actually present."""
+    labels = calibration["bad_label"].to_numpy(dtype=bool)
+    parts = []
+    for column in SIGNAL_COLUMNS:
+        cal_values = calibration[column].to_numpy(dtype=float)
+        test_values = test[column].to_numpy(dtype=float)
+        if not np.isfinite(cal_values).all() or not np.isfinite(test_values).all():
+            continue
+        orientation = 1
+        if 0 < int(labels.sum()) < len(labels):
+            orientation = 1 if float(cal_values[labels].mean()) >= float(cal_values[~labels].mean()) else -1
+        reference = np.sort(orientation * cal_values)
+        score = orientation * test_values
+        parts.append(np.searchsorted(reference, score, side="right") / max(len(reference), 1))
+    if not parts:
+        raise RuntimeError("no finite refusal signal")
+    return np.mean(np.vstack(parts), axis=0)
+
+
 def _best_simple_baseline(calibration: pd.DataFrame, coverages: list[float]) -> str:
     labels = calibration["bad_label"].to_numpy(dtype=bool)
     best_name = ""
     best_key: tuple[float, str] | None = None
-    for name, column in SIMPLE_RISK_COLUMN.items():
+    finite_names = _finite_signal_names(calibration)
+    if not finite_names:
+        raise RuntimeError("no finite simple baseline")
+    for name in finite_names:
+        column = SIMPLE_RISK_COLUMN[name]
         far = _low_coverage_far(labels, calibration[column].to_numpy(dtype=float), coverages)
         key = (far, name)
         if best_key is None or key < best_key:
@@ -285,22 +324,29 @@ def result_rows_for_frame(frame: pd.DataFrame, config: dict[str, Any], eligibili
             calibration = labelled[labelled["role"] == "judge_calibration"].copy()
             test = labelled[labelled["role"] == "judge_test"].copy()
             test["risk_random_baseline"] = _assign_random(test, int(seed))
-            calibrated = _fit_v2_calibrated_scores(calibration, test, coverages)
-            test["risk_calibration_selected_candidate_ranker"] = calibrated[PRIMARY_JUDGE]
+            if all(np.isfinite(labelled[column].to_numpy(dtype=float)).all() for column in SIGNAL_COLUMNS):
+                calibrated = _fit_v2_calibrated_scores(calibration, test, coverages)
+                primary_scores = calibrated[PRIMARY_JUDGE]
+            else:
+                primary_scores = _rank_mean_available(calibration, test)
+            test["risk_calibration_selected_candidate_ranker"] = primary_scores
             for model_id, model_test in test.groupby("model_id", sort=True):
                 model_calibration = calibration[calibration["model_id"] == model_id]
                 simple_name = _best_simple_baseline(model_calibration, coverages)
-                guard = event_guarded_score(
-                    model_calibration,
-                    model_test,
-                    list(config["event_guard_inputs"]),
-                )
+                guard_inputs = [
+                    column
+                    for column in config["event_guard_inputs"]
+                    if np.isfinite(model_calibration[column].to_numpy(dtype=float)).all()
+                    and np.isfinite(model_test[column].to_numpy(dtype=float)).all()
+                ]
                 judge_scores = {
-                    **{name: model_test[f"risk_{name}"].to_numpy(dtype=float) for name in SIMPLE_RISK_COLUMN},
-                    RANDOM_JUDGE: model_test["risk_random_baseline"].to_numpy(dtype=float),
-                    PRIMARY_JUDGE: model_test["risk_calibration_selected_candidate_ranker"].to_numpy(dtype=float),
-                    "event_guard": guard,
+                    name: model_test[f"risk_{name}"].to_numpy(dtype=float)
+                    for name in _finite_signal_names(model_test)
                 }
+                judge_scores[RANDOM_JUDGE] = model_test["risk_random_baseline"].to_numpy(dtype=float)
+                judge_scores[PRIMARY_JUDGE] = model_test["risk_calibration_selected_candidate_ranker"].to_numpy(dtype=float)
+                if guard_inputs:
+                    judge_scores["event_guard"] = event_guarded_score(model_calibration, model_test, guard_inputs)
                 labels = model_test["bad_label"].to_numpy(dtype=bool)
                 random_curve = _risk_curve_from_labels(labels, judge_scores[RANDOM_JUDGE], coverages)
                 primary_curve = _risk_curve_from_labels(labels, judge_scores[PRIMARY_JUDGE], coverages)
