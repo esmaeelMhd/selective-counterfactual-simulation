@@ -27,6 +27,7 @@ def _linear_batch() -> TrajectoryBatch:
 
 def test_lstm_world_learns_a_linear_step() -> None:
     pytest.importorskip("torch")
+    pytest.importorskip("timesim")
     from scs.models.lstm_world import LSTMWorldModel
 
     train = _linear_batch()
@@ -41,6 +42,7 @@ def test_lstm_world_learns_a_linear_step() -> None:
 
 def test_ensemble_lstm_matches_member_shape() -> None:
     pytest.importorskip("torch")
+    pytest.importorskip("timesim")
     from scs.models.ensemble_lstm import EnsembleLSTMModel
 
     train = _linear_batch()
