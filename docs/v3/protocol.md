@@ -78,7 +78,7 @@ Event-guard candidate, starting definition, taken from `configs/v2/v2_event_risk
 
 **Stage A, exploratory.** TwoTank, CSTR, and heat exchanger. Used to fix model training, choose the event-guard definition, and set every tunable number. The Stage A report is labelled exploratory and does not issue the confirmatory yes or no.
 
-**Stage B, confirmatory.** One new system, BSM1, after the freeze. Train on dry weather with controls in the nominal range. Test on rain, storm, control moves outside the training range, and the combination. Report once. No rerun with changed settings. The packaged dry file parses and is repeated. The packaged rain file does not parse, and the package has no storm file, so those two splits are not generated. Sampled windows do not overlap, and a four-day tail after the last sampled window stays unused until the confirmatory test split is allowed.
+**Stage B, confirmatory.** One new system, BSM1, after the freeze. Train on dry weather with controls in the nominal range. Test on rain, storm, control moves outside the training range, and the combination. Report once. No rerun with changed settings. The packaged dry file parses and covers 14 days. The packaged rain file does not parse, and the package has no storm file, so those two splits are not generated. Each pretest split reads its own block of the dry file: days 0–7 for `model_train`, 7–8.5 for `judge_calibration_id`, and 8.5–10 for `judge_calibration_control`. No two splits share an influent minute, and the file is not wrapped. Windows inside one split may overlap. Days 10–14 are not read until the confirmatory test split is allowed. Every window starts from the plant state at its own minute of one continuous dry run at nominal aeration, after one 14-day warm-up.
 
 Signals that need the full state (`invariant_residual`, `repair_amount`) are marked not available on BSM1. A judge must still return a score when a signal is missing. The v2 event guard uses the invariant signal, so that guard is not the BSM1 guard. Q3 stays unanswered until this file names the guard that runs when invariant and repair are absent.
 
@@ -102,6 +102,7 @@ A row with a Stage A value is a working setting. It is part of the freeze only w
 | How 5% and 10% combine into one yes | unset. Stage A reports each coverage separately |
 | Horizon, ensemble size, training stop | Stage A config sets a working value for the three ODE systems; not frozen |
 | BSM1 horizon | working value, not frozen: 15 minutes of measured history and 480 minutes of prediction, one reactor hydraulic time |
+| BSM1 dry-file blocks | working value, not frozen: train days 0–7, calibration ID 7–8.5, calibration control 8.5–10, reserved 10–14 |
 | BSM1 event bit | working definition, not frozen: a trajectory is positive when any measured effluent series exceeds its benchmark limit (ammonia 4, total nitrogen 18, COD 100, suspended solids 30, BOD 10). This is not the BSM1 refusal guard |
 | `bad_rmse` threshold per system | Stage A uses 0.05 for all three systems; not frozen |
 | Eligibility metric | mean RMSE on `judge_calibration_id`, strict improvement on both baselines; never a judge-test split |

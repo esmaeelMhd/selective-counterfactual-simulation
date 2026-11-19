@@ -6,6 +6,10 @@ aeration reached the published reactor-5 steady state (SS 0.889, SO 0.491,
 SNO 10.4, SNH 1.73, SND 0.688) to within 0.2 percent. One such run took 77
 seconds. The packaged rain file does not parse, and the package has no storm
 file, so those weather splits are not generated.
+
+Splits read disjoint blocks of the 14-day dry file (``SPLIT_DAYS``), the last
+four days are reserved for the confirmatory test, and every window starts from
+the plant state at its own minute of one continuous dry run.
 """
 
 from __future__ import annotations
@@ -46,7 +50,23 @@ HISTORY_MINUTES = 15
 # Five reactor volumes sum to 5999 m3. At the constant influent flow of 18446 m3/d
 # that is 7.8 hours. The working horizon is 8 hours, one hydraulic residence time.
 HORIZON_MINUTES = 480
+# The dry file is 14 days at 15-minute samples. Each split owns its own block of
+# those days, so no two splits share an influent minute. The last four days are
+# kept for the confirmatory test and are not read before the freeze. Windows in
+# one split may overlap each other; windows in different splits never do.
+DRY_DAYS = 14
+DRY_MINUTES = DRY_DAYS * 1440
 RESERVED_TEST_DAYS = 4
+SPLIT_DAYS = {
+    "model_train": (0.0, 7.0),
+    "judge_calibration_id": (7.0, 8.5),
+    "judge_calibration_control": (8.5, 10.0),
+}
+RESERVED_DAYS = (float(DRY_DAYS - RESERVED_TEST_DAYS), float(DRY_DAYS))
+# Initial states come from one continuous dry run at nominal aeration: one full
+# dry cycle of warm-up after the constant-influent steady state, then a second
+# pass in which the plant state is read at each window start.
+WARMUP_MINUTES = DRY_MINUTES
 PRETEST_COUNTS = {
     "model_train": 160,
     "judge_calibration_id": 80,
@@ -253,7 +273,7 @@ def pretest_specs(
     history: int = HISTORY_MINUTES,
     seed: int = 0,
 ) -> list[dict[str, object]]:
-    """Non-overlapping dry-weather windows. The dry file repeats. A tail stays unused."""
+    """Dry-weather windows inside each split's own block of days. The reserved tail is not used."""
     for split in PRETEST_COUNTS:
         assert_split_allowed(split)
     if min(n_model_train, n_calibration_id, n_calibration_control, horizon, history) < 1:
@@ -264,22 +284,65 @@ def pretest_specs(
         ("judge_calibration_id", "dry_nominal", n_calibration_id, NOMINAL_SCALE),
         ("judge_calibration_control", "dry_control_shift", n_calibration_control, CONTROL_SCALE),
     ]
-    slots = list(range(0, sum(count for _, _, count, _ in counts) * span, span))
     rng = np.random.default_rng(seed)
     specs = []
-    cursor = 0
     for split, label, count, scale in counts:
-        for start in slots[cursor : cursor + count]:
+        first, end = split_minutes(split)
+        last = end - span
+        if last < first:
+            raise ValueError(f"{split} block is shorter than one window of {span} minutes")
+        for start in np.linspace(first, last, count).round().astype(int):
             specs.append(
                 {
                     "split": split,
                     "scenario_type": label,
-                    "start_minute": start,
+                    "start_minute": int(start),
                     "kla": _scaled_kla(rng, scale),
                 }
             )
-        cursor += count
     return specs
+
+
+def split_minutes(split: str) -> tuple[int, int]:
+    """Half-open range of dry-file minutes that a pretest split may read."""
+    first, end = SPLIT_DAYS[split]
+    return round(first * 1440), round(end * 1440)
+
+
+def reserved_minutes() -> tuple[int, int]:
+    """Half-open range of dry-file minutes kept for the confirmatory test."""
+    return round(RESERVED_DAYS[0] * 1440), round(RESERVED_DAYS[1] * 1440)
+
+
+def dry_start_states(
+    dry: np.ndarray,
+    start_minutes: list[int],
+    steady_state: dict[str, np.ndarray],
+    warmup_minutes: int = WARMUP_MINUTES,
+) -> dict[int, dict[str, np.ndarray]]:
+    """Plant state at each start minute of one continuous dry run at nominal aeration.
+
+    The run starts from ``steady_state``, warms up for ``warmup_minutes``, and
+    then reads the plant just before the step at each requested dry-file minute.
+    """
+    wanted = sorted({int(minute) for minute in start_minutes})
+    if not wanted:
+        return {}
+    if wanted[0] < 0 or wanted[-1] >= DRY_MINUTES:
+        raise ValueError("start minutes must lie inside one dry cycle")
+    if warmup_minutes % DRY_MINUTES:
+        raise ValueError("warm-up must be a whole number of dry cycles so minutes stay aligned")
+    n_steps = warmup_minutes + wanted[-1]
+    plant = _new_plant(_dry_series(dry, 0, n_steps), NOMINAL_KLA)
+    apply_plant(plant, steady_state)
+    captured: dict[int, dict[str, np.ndarray]] = {}
+    targets = {warmup_minutes + minute: minute for minute in wanted}
+    for index in range(n_steps + 1):
+        if index in targets:
+            captured[targets[index]] = capture_plant(plant)
+        if index < n_steps:
+            plant.step(index, klas=NOMINAL_KLA)
+    return captured
 
 
 def _scaled_kla(rng: np.random.Generator, scale: tuple[float, float]) -> np.ndarray:
@@ -334,8 +397,13 @@ def generate_bsm1_pretest_dataset(
     history: int = HISTORY_MINUTES,
     seed: int = 0,
     steady_state: dict[str, np.ndarray] | None = None,
+    start_states: dict[int, dict[str, np.ndarray]] | None = None,
 ) -> tuple[dict[str, TrajectoryBatch], dict[str, object]]:
-    """Train and calibration splits on dry weather. No rain, storm, or judge-test rows."""
+    """Train and calibration splits on dry weather. No rain, storm, or judge-test rows.
+
+    Each window starts from the plant state at that dry-file minute of one
+    continuous nominal run. ``start_states`` skips that run, for tests.
+    """
     specs = pretest_specs(
         n_model_train=n_model_train,
         n_calibration_id=n_calibration_id,
@@ -345,7 +413,19 @@ def generate_bsm1_pretest_dataset(
         seed=seed,
     )
     dry = load_dry_influent()
-    state = open_loop_steady_state() if steady_state is None else steady_state
+    if len(dry) * 15 != DRY_MINUTES:
+        raise RuntimeError(f"dry influent covers {len(dry) * 15} minutes, expected {DRY_MINUTES}")
+    reserved_first, _reserved_end = reserved_minutes()
+    for spec in specs:
+        if int(spec["start_minute"]) + history + horizon > reserved_first:
+            raise RuntimeError("a pretest window reaches the reserved confirmatory days")
+    starts = [int(spec["start_minute"]) for spec in specs]
+    if start_states is None:
+        state = open_loop_steady_state() if steady_state is None else steady_state
+        start_states = dry_start_states(dry, starts, state)
+    missing = sorted(set(starts) - set(start_states))
+    if missing:
+        raise ValueError(f"no plant state for start minutes {missing[:5]}")
     grouped: dict[str, list[TrajectoryBatch]] = {}
     for spec in specs:
         batch = _rollout_from_state(
@@ -354,7 +434,7 @@ def generate_bsm1_pretest_dataset(
             history=history,
             horizon=horizon,
             kla=np.asarray(spec["kla"], dtype=float),
-            steady_state=state,
+            initial_state=start_states[int(spec["start_minute"])],
             split=str(spec["split"]),
             scenario_type=str(spec["scenario_type"]),
         )
@@ -370,8 +450,11 @@ def generate_bsm1_pretest_dataset(
         "seed": seed,
         "nominal_scale": list(NOMINAL_SCALE),
         "control_scale": list(CONTROL_SCALE),
+        "dry_minutes": DRY_MINUTES,
+        "split_minutes": {split: list(split_minutes(split)) for split in dataset},
         "reserved_test_days": RESERVED_TEST_DAYS,
-        "reserved_start_minute": int(max(int(spec["start_minute"]) for spec in specs) + history + horizon),
+        "reserved_minutes": list(reserved_minutes()),
+        "initial_state": f"continuous nominal dry run after {WARMUP_MINUTES} minutes of warm-up",
         "start_minutes": {split: [int(spec["start_minute"]) for spec in specs if spec["split"] == split] for split in dataset},
     }
     return dataset, manifest
@@ -407,14 +490,14 @@ def _rollout_from_state(
     history: int,
     horizon: int,
     kla: np.ndarray,
-    steady_state: dict[str, np.ndarray],
+    initial_state: dict[str, np.ndarray],
     split: str,
     scenario_type: str,
 ) -> TrajectoryBatch:
     assert_split_allowed(split)
     total = history + horizon
     plant = _new_plant(_dry_series(dry, start_minute, total), kla)
-    apply_plant(plant, steady_state)
+    apply_plant(plant, initial_state)
     measured = np.empty((total, len(MEASURED_NAMES)), dtype=float)
     states = np.empty((total + 1, STATE_DIM), dtype=float)
     states[0] = _pack_state(plant)
