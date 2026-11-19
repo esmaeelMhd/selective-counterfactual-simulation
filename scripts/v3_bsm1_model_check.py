@@ -15,6 +15,7 @@ from scs.metrics.trajectory import rmse
 from scs.models.hold_last import HoldLastModel
 from scs.models.linear_narx import LinearNARXModel
 from scs.models.lstm_world import LSTMWorldModel
+from scs.models.mlp_state_space import MLPStateSpaceModel
 from scs.models.recurrent_world import RecurrentWorldModel
 from scs.systems.base import TrajectoryBatch
 from scs.systems.bsm1 import effluent_measurements
@@ -48,6 +49,7 @@ def main() -> None:
         LinearNARXModel(),
         LSTMWorldModel(random_state=0, epochs=15),
         RecurrentWorldModel(random_state=0, epochs=15),
+        MLPStateSpaceModel(random_state=0, max_iter=80),
     ]
     lines = [
         "# Exploratory BSM1 model check",
