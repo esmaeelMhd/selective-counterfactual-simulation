@@ -166,8 +166,8 @@ def test_pretest_splits_use_disjoint_dry_minutes_and_skip_the_reserved_tail() ->
     specs = pretest_specs(seed=0)
     assert {spec["split"] for spec in specs} == {"model_train", "judge_calibration_id", "judge_calibration_control"}
     reserved_first, reserved_end = reserved_minutes()
-    assert reserved_end == DRY_MINUTES
-    assert reserved_end - reserved_first == 4 * 1440
+    assert reserved_end == DRY_MINUTES == 7 * 1440
+    assert reserved_end - reserved_first == int(1.5 * 1440)
     used: dict[str, set[int]] = {}
     for spec in specs:
         first, end = split_minutes(str(spec["split"]))
@@ -211,10 +211,12 @@ def test_pretest_dataset_round_trip(tmp_path) -> None:
         start_states={start: plant_state for start in starts},
         **counts,
     )
-    assert manifest["reserved_minutes"] == [10 * 1440, 14 * 1440]
+    assert manifest["reserved_minutes"] == [int(5.5 * 1440), 7 * 1440]
+    assert manifest["unique_dry_days"] == 7
+    assert [repair["raw"] for repair in manifest["rain_repairs"]] == ["30.044.50", "27.446.67", "26.880.33"]
     assert manifest["confirmatory_test_generated"] is False
     assert "judge_test_id" not in dataset
-    assert manifest["weather"]["rain"] != "ok"
+    assert manifest["weather"]["rain"] == "repaired"
     assert manifest["weather"]["storm"] == "missing"
     save_dataset(dataset, tmp_path)
     loaded = load_dataset(tmp_path)
@@ -276,7 +278,7 @@ def test_bsm1_rollout_has_a_measured_history() -> None:
 
     status = influent_file_status()
     assert status["dry"] == "ok"
-    assert status["rain"] != "ok"
+    assert status["rain"] == "repaired"
     assert status["storm"] == "missing"
     scenario = rollout_scenario(history=2, horizon=3)
     assert scenario.system_id == "bsm1"
@@ -284,3 +286,43 @@ def test_bsm1_rollout_has_a_measured_history() -> None:
     assert scenario.measured_history is not None
     assert scenario.measured_history.shape == (1, 2, len(MEASURED_NAMES))
     assert np.isfinite(scenario.measured_history).all()
+
+
+def test_dry_file_has_seven_unique_days() -> None:
+    pytest.importorskip("bsm2_python")
+    from scs.systems.bsm1 import DRY_MINUTES, load_dry_influent
+
+    dry = load_dry_influent()
+    assert dry.shape[0] * 15 == DRY_MINUTES
+    # Every window must stay inside the 7 unique days. The packaged file repeats them,
+    # so a window read from days 7 to 13 would be a copy of one from days 0 to 6.
+    assert DRY_MINUTES == 7 * 1440
+
+
+def test_rain_file_is_repaired_and_matches_the_dry_units() -> None:
+    pytest.importorskip("bsm2_python")
+    from scs.systems.bsm1 import RAIN_FLOW_COLUMN, load_dry_influent, load_rain_influent
+
+    rain, repairs = load_rain_influent()
+    assert [repair["row"] for repair in repairs] == [997, 999, 1000]
+    flow = rain[:, RAIN_FLOW_COLUMN]
+    # The repaired cells follow the straight line from 28013 to 26314 m3/d.
+    assert flow[998:1002] == pytest.approx([28013.0, 27446.67, 26880.33, 26314.0], abs=0.01)
+    assert float(np.median(flow)) > 1000.0
+    # Days 0 to 7 of the rain file carry the dry flows, so the units agree.
+    assert flow[:96].mean() == pytest.approx(load_dry_influent()[:96, RAIN_FLOW_COLUMN].mean(), rel=1e-3)
+    # The one rain event is on days 8 to 10.
+    daily = flow.reshape(14, 96).mean(axis=1)
+    assert daily[8:11].min() > 1.3 * daily[:8].max()
+
+
+def test_a_corrupted_rain_cell_outside_the_flow_column_is_refused(tmp_path, monkeypatch) -> None:
+    pytest.importorskip("bsm2_python")
+    from scs.systems import bsm1
+
+    rows = ["0," + ",".join(["1.0"] * 21) for _ in range(5)]
+    rows[2] = rows[2].replace("1.0", "1.0.5", 1)
+    (tmp_path / "raininfluent.csv").write_text("\n".join(rows) + "\n", encoding="utf-8")
+    monkeypatch.setattr(bsm1, "_package_data_dir", lambda: tmp_path)
+    with pytest.raises(RuntimeError, match="unexpected malformed"):
+        bsm1.load_rain_influent()
