@@ -18,7 +18,7 @@ from scs.models.lstm_world import LSTMWorldModel
 from scs.models.mlp_state_space import MLPStateSpaceModel
 from scs.models.recurrent_world import RecurrentWorldModel
 from scs.systems.base import TrajectoryBatch
-from scs.systems.bsm1 import REACTOR_WIDTH, effluent_measurements
+from scs.systems.bsm1 import REACTOR_WIDTH, effluent_measurements, rollout_with_known_hydraulics
 
 _FLOW = [14 + REACTOR_WIDTH * block for block in range(6)]
 _TEMPERATURE = [15 + REACTOR_WIDTH * block for block in range(6)]
@@ -28,7 +28,7 @@ _CONCENTRATIONS = [index for index in range(6 * REACTOR_WIDTH) if index not in s
 
 def _score(model, batch: TrajectoryBatch) -> dict[str, float]:
     if hasattr(model, "predict_rollouts"):
-        predicted = model.predict_rollouts(batch.states[:, 0, :], batch.actions, batch.disturbances)
+        predicted = rollout_with_known_hydraulics(model, batch.states[:, 0, :], batch.actions, batch.disturbances)
     else:
         predicted = np.stack(
             [
@@ -65,6 +65,7 @@ def main() -> None:
         "",
         "Scored on `judge_calibration_id` after fitting `model_train`.",
         "This is not the eligibility rule. Eligibility uses `judge_test_id`, and that split is not generated.",
+        "Reactor and effluent flow are set from the influent with the open-loop recycle and waste flows.",
         "",
         "| model | fit seconds | state RMSE | one-step RMSE | flow | temperature | settler | concentration | effluent RMSE | final train loss |",
         "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",

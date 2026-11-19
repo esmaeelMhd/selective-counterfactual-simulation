@@ -31,6 +31,13 @@ PUBLISHED_CONSTANT_INFLUENT = np.array(
 )
 REACTOR_WIDTH = 21
 SETTLER_SOLIDS = 10
+# Open-loop hydraulics from asm1init_bsm1. Internal recycle is three times the
+# nominal influent, return sludge equals that influent, and waste flow is 385 m3/d.
+NOMINAL_INFLUENT_FLOW = 18446.0
+INTERNAL_RECYCLE = 3.0 * NOMINAL_INFLUENT_FLOW
+RETURN_SLUDGE = NOMINAL_INFLUENT_FLOW
+WASTE_FLOW = 385.0
+FLOW_INDEX = 14
 STATE_DIM = 5 * REACTOR_WIDTH + REACTOR_WIDTH + SETTLER_SOLIDS
 # Working ranges, not frozen. Aerated reactors only; the two anoxic reactors stay at zero.
 NOMINAL_SCALE = (0.9, 1.1)
@@ -94,6 +101,35 @@ _FP = 0.08
 _IXB = 0.08
 _IXP = 0.06
 EFFLUENT_OFFSET = 5 * REACTOR_WIDTH
+
+
+def apply_hydraulic_flows(states: np.ndarray, disturbances: np.ndarray) -> np.ndarray:
+    """Set reactor and effluent flow from the influent flow.
+
+    Reactor flow is influent plus the fixed internal recycle and return sludge.
+    Effluent flow is influent minus the fixed waste flow.
+    """
+    updated = np.array(states, dtype=float, copy=True)
+    influent_flow = np.asarray(disturbances, dtype=float)[..., FLOW_INDEX]
+    reactor_flow = influent_flow + INTERNAL_RECYCLE + RETURN_SLUDGE
+    effluent_flow = influent_flow - WASTE_FLOW
+    for block in range(5):
+        updated[..., FLOW_INDEX + REACTOR_WIDTH * block] = reactor_flow
+    updated[..., FLOW_INDEX + REACTOR_WIDTH * 5] = effluent_flow
+    return updated
+
+
+def rollout_with_known_hydraulics(model, initial_states: np.ndarray, actions: np.ndarray, disturbances: np.ndarray) -> np.ndarray:
+    """Roll out one step at a time and replace the flow channels with the hydraulic values."""
+    state = np.asarray(initial_states, dtype=float)
+    horizon = actions.shape[1]
+    predicted = np.empty((state.shape[0], horizon + 1, state.shape[1]), dtype=float)
+    predicted[:, 0] = state
+    for time in range(horizon):
+        step = model.predict_rollouts(state, actions[:, time : time + 1], disturbances[:, time : time + 1])
+        state = apply_hydraulic_flows(step[:, 1], disturbances[:, time])
+        predicted[:, time + 1] = state
+    return predicted
 
 
 def effluent_measurements(states: np.ndarray) -> np.ndarray:

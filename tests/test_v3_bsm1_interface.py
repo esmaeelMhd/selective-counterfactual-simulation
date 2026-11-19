@@ -21,6 +21,48 @@ def _batch() -> TrajectoryBatch:
     )
 
 
+def test_open_loop_flows_follow_the_influent() -> None:
+    from scs.systems.bsm1 import FLOW_INDEX, REACTOR_WIDTH, apply_hydraulic_flows
+
+    disturbances = np.zeros((2, 21))
+    disturbances[:, FLOW_INDEX] = [18000.0, 20000.0]
+    states = np.zeros((2, 136))
+    updated = apply_hydraulic_flows(states, disturbances)
+    reactor = disturbances[:, FLOW_INDEX] + 3.0 * 18446.0 + 18446.0
+    effluent = disturbances[:, FLOW_INDEX] - 385.0
+    for block in range(5):
+        assert np.allclose(updated[:, FLOW_INDEX + REACTOR_WIDTH * block], reactor)
+    assert np.allclose(updated[:, FLOW_INDEX + REACTOR_WIDTH * 5], effluent)
+
+
+def test_saved_dry_flows_match_the_hydraulic_rule() -> None:
+    from pathlib import Path
+
+    from scs.data.schemas import load_batch
+    from scs.systems.bsm1 import apply_hydraulic_flows
+
+    path = Path("results/v3/bsm1_pretest/model_train.npz")
+    if not path.exists():
+        pytest.skip("dry pretest set is not present")
+    batch = load_batch(path)
+    projected = apply_hydraulic_flows(batch.states[:2, 1:], batch.disturbances[:2])
+    assert np.allclose(projected[..., 14::21], batch.states[:2, 1:, 14::21])
+
+
+def test_hydraulic_rollout_replaces_held_flow() -> None:
+    from scs.systems.bsm1 import rollout_with_known_hydraulics
+
+    model = HoldLastModel()
+    model.fit(_batch())
+    initial = np.zeros((1, 136))
+    actions = np.zeros((1, 2, 5))
+    disturbances = np.zeros((1, 2, 21))
+    disturbances[:, :, 14] = 19000.0
+    predicted = rollout_with_known_hydraulics(model, initial, actions, disturbances)
+    assert np.allclose(predicted[0, 1, 14], 19000.0 + 4.0 * 18446.0)
+    assert np.allclose(predicted[0, 2, 119], 19000.0 - 385.0)
+
+
 def test_old_trajectory_batch_still_builds() -> None:
     batch = _batch()
     assert batch.measured_history is None
