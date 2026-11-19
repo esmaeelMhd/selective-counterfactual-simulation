@@ -93,22 +93,38 @@ class RecurrentWorldModel:
             use_symlog=False,
         )
         optimizer = torch.optim.Adam(model.parameters(), lr=self.learning_rate)
-        observed = torch.tensor(states)
-        nxt = torch.tensor(targets)
-        controls = torch.tensor(actions)
-        exogenous = torch.tensor(disturbances)
+        observed = torch.tensor(states.reshape(-1, self.state_dim))
+        nxt = torch.tensor(targets.reshape(-1, self.state_dim))
+        controls = torch.tensor(actions.reshape(-1, self.action_dim))
+        exogenous = torch.tensor(disturbances.reshape(-1, self.disturbance_dim))
+        generator = torch.Generator().manual_seed(self.random_state)
+        batch_size = 256
         self.train_losses = []
         model.train()
         for _ in range(self.epochs):
-            optimizer.zero_grad()
-            filtered = model.observe(controls, exogenous, observed)
-            predicted = _prior_next(model, filtered, controls, exogenous)
-            reconstruction = torch.mean((predicted - nxt) ** 2)
-            divergence = torch.mean(filtered["kl_terms"])
-            loss = reconstruction + self.kl_weight * divergence
-            loss.backward()
-            optimizer.step()
-            self.train_losses.append(float(loss.detach()))
+            order = torch.randperm(observed.shape[0], generator=generator)
+            total = 0.0
+            for start in range(0, observed.shape[0], batch_size):
+                choice = order[start : start + batch_size]
+                optimizer.zero_grad()
+                filtered = model.observe(
+                    controls[choice, None, :],
+                    exogenous[choice, None, :],
+                    observed[choice, None, :],
+                )
+                predicted = _prior_next(
+                    model,
+                    filtered,
+                    controls[choice, None, :],
+                    exogenous[choice, None, :],
+                )
+                reconstruction = torch.mean((predicted[:, 0, :] - nxt[choice]) ** 2)
+                divergence = torch.mean(filtered["kl_terms"])
+                loss = reconstruction + self.kl_weight * divergence
+                loss.backward()
+                optimizer.step()
+                total += float(loss.detach()) * int(choice.shape[0])
+            self.train_losses.append(total / observed.shape[0])
         model.eval()
         self.model = model
 

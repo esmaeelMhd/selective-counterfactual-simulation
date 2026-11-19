@@ -68,24 +68,31 @@ class LSTMWorldModel:
         )
         optimizer = torch.optim.Adam(net.parameters(), lr=self.learning_rate)
         loss_fn = torch.nn.MSELoss()
-        x_tensor = torch.tensor(x_scaled, dtype=torch.float32)
-        y_tensor = torch.tensor(y_scaled, dtype=torch.float32)
+        x_tensor = torch.tensor(x_scaled.reshape(-1, x_scaled.shape[-1]), dtype=torch.float32)
+        y_tensor = torch.tensor(y_scaled.reshape(-1, y_scaled.shape[-1]), dtype=torch.float32)
+        generator = torch.Generator().manual_seed(self.random_state)
+        batch_size = 256
         self.train_losses = []
         net.train()
         for _ in range(self.epochs):
-            optimizer.zero_grad()
-            hidden, _ = net.lstm(x_tensor)
-            predicted = net.fc(hidden)
-            loss = loss_fn(predicted, y_tensor)
-            loss.backward()
-            optimizer.step()
-            self.train_losses.append(float(loss.detach()))
+            order = torch.randperm(x_tensor.shape[0], generator=generator)
+            total = 0.0
+            for start in range(0, x_tensor.shape[0], batch_size):
+                choice = order[start : start + batch_size]
+                optimizer.zero_grad()
+                hidden, _ = net.lstm(x_tensor[choice, None, :])
+                predicted = net.fc(hidden[:, 0])
+                loss = loss_fn(predicted, y_tensor[choice])
+                loss.backward()
+                optimizer.step()
+                total += float(loss.detach()) * int(choice.shape[0])
+            self.train_losses.append(total / x_tensor.shape[0])
         net.eval()
         with torch.no_grad():
-            hidden, _ = net.lstm(x_tensor)
-            predicted = net.fc(hidden).numpy()
+            hidden, _ = net.lstm(x_tensor[:, None, :])
+            predicted = net.fc(hidden[:, 0]).numpy()
         restored = predicted * self.y_std + self.y_mean
-        self.residual_std = np.maximum(np.std(targets - restored, axis=(0, 1)), 1e-5)
+        self.residual_std = np.maximum(np.std(targets.reshape(-1, targets.shape[-1]) - restored, axis=0), 1e-5)
         self.net = net
 
     def predict_rollout(
@@ -125,7 +132,7 @@ class LSTMWorldModel:
         predicted = []
         with torch.no_grad():
             for time in range(horizon):
-                (hidden, cell), step = self.net.step((hidden, cell), controls[:, time], exogenous[:, time], previous)
+                _state, step = self.net.step((hidden, cell), controls[:, time], exogenous[:, time], previous)
                 previous = step
                 predicted.append(step)
             restored = torch.stack(predicted, dim=1).numpy() * self.y_std + self.y_mean

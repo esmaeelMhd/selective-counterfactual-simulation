@@ -20,7 +20,7 @@ from scs.systems.base import TrajectoryBatch
 from scs.systems.bsm1 import effluent_measurements
 
 
-def _score(model, batch: TrajectoryBatch) -> tuple[float, float]:
+def _score(model, batch: TrajectoryBatch) -> tuple[float, float, float]:
     if hasattr(model, "predict_rollouts"):
         predicted = model.predict_rollouts(batch.states[:, 0, :], batch.actions, batch.disturbances)
     else:
@@ -32,7 +32,11 @@ def _score(model, batch: TrajectoryBatch) -> tuple[float, float]:
         )
     measured_pred = np.stack([effluent_measurements(predicted[index]) for index in range(batch.n_trajectories)])
     measured_true = np.stack([effluent_measurements(batch.states[index]) for index in range(batch.n_trajectories)])
-    return rmse(predicted, batch.states), rmse(measured_pred, measured_true)
+    return (
+        rmse(predicted, batch.states),
+        rmse(predicted[:, 1], batch.states[:, 1]),
+        rmse(measured_pred, measured_true),
+    )
 
 
 def main() -> None:
@@ -50,19 +54,18 @@ def main() -> None:
         "",
         "Scored on `judge_calibration_id` after fitting `model_train`.",
         "This is not the eligibility rule. Eligibility uses `judge_test_id`, and that split is not generated.",
-        "The gap is already present in the one-step prediction, before the 8-hour rollout.",
         "",
-        "| model | fit seconds | state RMSE | effluent RMSE | final train loss |",
-        "|---|---:|---:|---:|---:|",
+        "| model | fit seconds | state RMSE | one-step RMSE | effluent RMSE | final train loss |",
+        "|---|---:|---:|---:|---:|---:|",
     ]
     for model in models:
         started = time.perf_counter()
         model.fit(train)
         fit_seconds = time.perf_counter() - started
-        state_error, effluent_error = _score(model, calibration)
+        state_error, one_step_error, effluent_error = _score(model, calibration)
         final_loss = getattr(model, "train_losses", [float("nan")])[-1]
         lines.append(
-            f"| {model.model_id} | {fit_seconds:.1f} | {state_error:.4g} | {effluent_error:.4g} | {final_loss:.4g} |"
+            f"| {model.model_id} | {fit_seconds:.1f} | {state_error:.4g} | {one_step_error:.4g} | {effluent_error:.4g} | {final_loss:.4g} |"
         )
         print(lines[-1], flush=True)
     output = Path("results/v3/bsm1_model_check/report.md")
