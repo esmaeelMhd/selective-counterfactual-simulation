@@ -47,3 +47,5 @@ results/ci_public_benchmark/
 results/ci_builtin_benchmark/
 reports/smoke_report.md
 reports/full_v0_report.md
+# Regenerate with scripts/v3_bsm1_dataset.py; published as a release asset, not tracked.
+results/v3/bsm1_pretest/*.npz

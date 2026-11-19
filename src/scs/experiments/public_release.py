@@ -141,9 +141,6 @@ LARGE_FILE_JUSTIFICATIONS = {
     "results/v2_scientific_strengthening/frozen_protocol/v2_scenario_scores.csv": (
         "kept as frozen v2 diagnostic evidence used by the public failure gallery and package checks"
     ),
-    "results/v3/bsm1_pretest/model_train.npz": "BSM1 dry-weather training trajectories at an 8-hour horizon",
-    "results/v3/bsm1_pretest/judge_calibration_id.npz": "BSM1 dry-weather calibration trajectories at an 8-hour horizon",
-    "results/v3/bsm1_pretest/judge_calibration_control.npz": "BSM1 dry-weather control-shift calibration trajectories at an 8-hour horizon",
 }
 CURATED_IGNORED_RELEASE_GLOBS = [
     "results/current_status/**/*.json",
