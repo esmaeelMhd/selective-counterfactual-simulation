@@ -1,6 +1,6 @@
 # v3 plan: a powered, pre-registered refusal benchmark on a recognised process model
 
-Status: WP0 drafted. WP1 Stage A has been run and is exploratory. WP2 has a checked BSM1 port, the measured-history API, effluent-limit events, and a dry-weather train and calibration dataset at an 8-hour horizon. WP3 adapters call the LSTM and the recurrent state-space model from time-series-simulator. An exploratory calibration check does not beat `linear_narx`, and the gap is already present in the one-step prediction. Eligibility is not decided, because `judge_test` is not generated. Rain and storm are not generated. The protocol is not frozen. Nothing in this plan changes v1 or v2 artifacts or claims.
+Status: WP0 drafted. WP1 Stage A has been run and is exploratory. WP2 has a checked BSM1 port, the measured-history API, effluent-limit events, and a dry-weather train and calibration dataset at an 8-hour horizon. WP3 adapters call the LSTM and the recurrent state-space model from time-series-simulator. An exploratory calibration check does not beat `linear_narx`, and the gap is already present in the one-step prediction. Training the networks on the leftover of that linear step made the calibration rollout diverge, so that change was not kept. Eligibility is not decided, because `judge_test` is not generated. Rain and storm are not generated. The protocol is not frozen. Nothing in this plan changes v1 or v2 artifacts or claims.
 
 ## Goal
 
