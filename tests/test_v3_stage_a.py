@@ -143,3 +143,102 @@ def test_stage_a_margin_is_against_random(tmp_path: Path) -> None:
     assert "exploratory" in report
     random_rows = table[table["judge_id"] == "random_baseline"]
     assert np.allclose(random_rows["absolute_margin"], 0.0)
+
+
+def _margin_rows(system: str, target: str, bad_share: float, margins: list[float]) -> list[dict]:
+    return [
+        {
+            "system_id": system,
+            "badness_target": target,
+            "coverage": 0.05,
+            "seed": seed,
+            "judge_id": "calibration_selected_candidate_ranker",
+            "eligible": True,
+            "absolute_margin": margin,
+            "bad_share": bad_share,
+        }
+        for seed, margin in enumerate(margins)
+    ]
+
+
+def test_rmse_threshold_can_differ_by_system() -> None:
+    from scs.experiments.v3 import rmse_threshold_for
+
+    config = {"rmse_threshold": {"two_tank": 0.02, "cstr": 0.3}}
+    assert rmse_threshold_for(config, "two_tank") == 0.02
+    assert rmse_threshold_for(config, "cstr") == 0.3
+    assert rmse_threshold_for({"rmse_threshold": 0.05}, "cstr") == 0.05
+
+
+def test_config_requires_a_threshold_for_every_system(tmp_path: Path) -> None:
+    path = _tiny_config(tmp_path / "tiny.yaml")
+    config = yaml.safe_load(path.read_text(encoding="utf-8"))
+    config["rmse_threshold"] = {"cstr": 0.1}
+    path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    with pytest.raises(ValueError, match="two_tank"):
+        load_v3_config(path)
+
+
+def test_a_target_with_no_bad_scenarios_is_degenerate_and_not_a_pass() -> None:
+    from scs.experiments.v3 import interval_table, precision_check
+
+    config = {"bootstrap_seed": 1, "bootstrap_samples": 50, "interval_width_limit": 0.10}
+    rows = _margin_rows("two_tank", "bad_event", 0.0, [0.0, 0.0, 0.0]) + _margin_rows(
+        "two_tank", "bad_rmse", 0.4, [0.30, 0.31, 0.29]
+    )
+    table = interval_table(pd.DataFrame(rows), config)
+    flags = dict(zip(table["badness_target"], table["degenerate"]))
+    assert flags == {"bad_event": True, "bad_rmse": False}
+    passed, degenerate = precision_check(table)
+    assert passed and degenerate == 1
+
+
+def test_precision_needs_an_informative_row_on_every_system() -> None:
+    from scs.experiments.v3 import interval_table, precision_check
+
+    config = {"bootstrap_seed": 1, "bootstrap_samples": 50, "interval_width_limit": 0.10}
+    rows = _margin_rows("two_tank", "bad_rmse", 0.4, [0.30, 0.31, 0.29]) + _margin_rows(
+        "cstr", "bad_event", 1.0, [0.0, 0.0, 0.0]
+    )
+    passed, degenerate = precision_check(interval_table(pd.DataFrame(rows), config))
+    assert not passed
+    assert degenerate == 1
+
+
+def test_a_wide_informative_interval_fails_the_check() -> None:
+    from scs.experiments.v3 import interval_table, precision_check
+
+    config = {"bootstrap_seed": 1, "bootstrap_samples": 200, "interval_width_limit": 0.10}
+    rows = _margin_rows("two_tank", "bad_rmse", 0.4, [0.0, 0.9, 0.1, 0.8, 0.2, 0.7])
+    passed, _degenerate = precision_check(interval_table(pd.DataFrame(rows), config))
+    assert not passed
+
+
+def test_guard_table_counts_only_eligible_models_and_names_missing_guards() -> None:
+    from scs.experiments.v3 import _guard_lines
+
+    def row(system, model, judge, eligible, far, primary, simple):
+        return {
+            "system_id": system,
+            "model_id": model,
+            "judge_id": judge,
+            "eligible": eligible,
+            "coverage": 0.05,
+            "badness_target": "bad_event",
+            "false_accept_rate": far,
+            "primary_far": primary,
+            "calibration_simple_far": simple,
+        }
+
+    results = pd.DataFrame(
+        [
+            row("two_tank", "good", "event_guard", True, 0.10, 0.20, 0.30),
+            row("two_tank", "hold_last", "event_guard", False, 1.00, 1.00, 1.00),
+            row("bsm1", "good", "calibration_selected_candidate_ranker", True, 0.2, 0.2, 0.2),
+            row("cstr", "weak", "event_guard", False, 0.5, 0.5, 0.5),
+        ]
+    )
+    text = _guard_lines(results)
+    assert "| two_tank | bad_event | 1 | 0.1000 | 0.2000 | 0.3000 | 0.1000 | 0.2000 |" in text
+    assert "No event guard is defined on: bsm1" in text
+    assert "No eligible model, so no guard row: cstr" in text

@@ -57,9 +57,14 @@ class EnsembleLSTMModel:
         initial_states: np.ndarray,
         actions: np.ndarray,
         disturbances: np.ndarray,
+        history: np.ndarray | None = None,
+        project=None,
     ) -> np.ndarray:
         initial_states, actions, disturbances = validate_rollout_batch(initial_states, actions, disturbances)
-        stacked = [member.predict_rollouts(initial_states, actions, disturbances) for member in self.members]
+        stacked = [
+            member.predict_rollouts(initial_states, actions, disturbances, history=history, project=project)
+            for member in self.members
+        ]
         return np.mean(np.stack(stacked, axis=0), axis=0)
 
     def predict_rollout_samples(

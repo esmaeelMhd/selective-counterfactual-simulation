@@ -101,7 +101,7 @@ def test_bsm1_drops_full_state_signals() -> None:
     assert available_signals("two_tank") >= available_signals("bsm1")
 
 
-def test_missing_signal_still_scores() -> None:
+def test_missing_signal_still_scores_and_the_guard_is_refused() -> None:
     rows = []
     for role, bad in (("judge_calibration", True), ("judge_calibration", False), ("judge_test", True), ("judge_test", False)):
         for index in range(3):
@@ -136,7 +136,9 @@ def test_missing_signal_still_scores() -> None:
     assert "invariant_only" not in judges
     assert "repair_only" not in judges
     assert "calibration_selected_candidate_ranker" in judges
-    assert "event_guard" in judges
+    # The guard needs all three of its inputs. With the invariant signal missing it is not
+    # computed on the two that remain, because that would be a different guard.
+    assert "event_guard" not in judges
     assert np.isfinite(results["false_accept_rate"]).all()
 
 

@@ -82,14 +82,31 @@ def validate_rollout_batch(
     return initial_states, actions, disturbances
 
 
+def validate_history(history: np.ndarray | None, batch_size: int) -> None:
+    """Check an optional measured-history window of shape (batch, window, n_measured)."""
+    if history is None:
+        return
+    history = np.asarray(history, dtype=float)
+    if history.ndim != 3 or history.shape[0] != batch_size or history.shape[1] < 1 or history.shape[2] < 1:
+        raise ValueError("history must have shape (batch, window, n_measured)")
+    if not np.isfinite(history).all():
+        raise ValueError("history contains non-finite values")
+
+
 def rollout_from_delta(
     delta_batch,
     initial_states: np.ndarray,
     actions: np.ndarray,
     disturbances: np.ndarray,
     noise: np.ndarray | None = None,
+    project=None,
 ) -> np.ndarray:
-    """Recursive batch rollout. ``noise`` has shape (batch, horizon, state_dim)."""
+    """Recursive batch rollout.
+
+    ``noise`` has shape (batch, horizon, state_dim). ``project(step, states)``
+    may overwrite channels of each predicted state, such as flows that the
+    plant sets from the influent, before that state is fed back.
+    """
     n_rows, horizon, _ = actions.shape
     states = np.empty((n_rows, horizon + 1, initial_states.shape[-1]), dtype=float)
     states[:, 0] = initial_states
@@ -98,5 +115,7 @@ def rollout_from_delta(
         states[:, step + 1] = states[:, step] + delta
         if noise is not None:
             states[:, step + 1] = states[:, step + 1] + noise[:, step]
+        if project is not None:
+            states[:, step + 1] = project(step, states[:, step + 1])
     return states
 
