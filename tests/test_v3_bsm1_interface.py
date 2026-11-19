@@ -148,19 +148,50 @@ def test_rain_storm_and_confirmatory_test_are_refused() -> None:
             assert_split_allowed(split)
 
 
-def test_pretest_windows_do_not_overlap() -> None:
-    from scs.systems.bsm1 import CONTROL_SCALE, NOMINAL_SCALE, pretest_specs
+def test_pretest_splits_use_disjoint_dry_minutes_and_skip_the_reserved_tail() -> None:
+    from scs.systems.bsm1 import (
+        CONTROL_SCALE,
+        DRY_MINUTES,
+        HISTORY_MINUTES,
+        HORIZON_MINUTES,
+        NOMINAL_SCALE,
+        pretest_specs,
+        reserved_minutes,
+        split_minutes,
+    )
 
-    horizon, history = 8, 2
-    specs = pretest_specs(n_model_train=2, n_calibration_id=2, n_calibration_control=2, horizon=horizon, history=history, seed=0)
-    starts = sorted(int(spec["start_minute"]) for spec in specs)
-    assert len(starts) == len(set(starts))
-    assert all(right - left >= horizon + history for left, right in zip(starts, starts[1:]))
+    span = HISTORY_MINUTES + HORIZON_MINUTES
+    specs = pretest_specs(seed=0)
     assert {spec["split"] for spec in specs} == {"model_train", "judge_calibration_id", "judge_calibration_control"}
+    reserved_first, reserved_end = reserved_minutes()
+    assert reserved_end == DRY_MINUTES
+    assert reserved_end - reserved_first == 4 * 1440
+    used: dict[str, set[int]] = {}
+    for spec in specs:
+        first, end = split_minutes(str(spec["split"]))
+        start = int(spec["start_minute"])
+        assert first <= start and start + span <= end
+        assert start + span <= reserved_first
+        used.setdefault(str(spec["split"]), set()).update(range(start, start + span))
+    names = sorted(used)
+    for left_index, left in enumerate(names):
+        for right in names[left_index + 1 :]:
+            assert not used[left] & used[right], (left, right)
     nominal = [spec for spec in specs if spec["split"] != "judge_calibration_control"]
     shifted = [spec for spec in specs if spec["split"] == "judge_calibration_control"]
     assert all(NOMINAL_SCALE[0] <= float(spec["kla"][2] / 240.0) <= NOMINAL_SCALE[1] for spec in nominal)
     assert all(float(spec["kla"][2] / 240.0) >= CONTROL_SCALE[0] for spec in shifted)
+
+
+def test_start_states_differ_by_minute() -> None:
+    pytest.importorskip("bsm2_python")
+    from scs.systems.bsm1 import dry_start_states, load_dry_influent
+
+    plant_state = _state_after_short_rollout()
+    states = dry_start_states(load_dry_influent(), [0, 30], plant_state, warmup_minutes=0)
+    assert set(states) == {0, 30}
+    assert np.allclose(states[0]["reactor5"], plant_state["reactor5"])
+    assert not np.allclose(states[30]["reactor5"], states[0]["reactor5"])
 
 
 def test_pretest_dataset_round_trip(tmp_path) -> None:
@@ -168,16 +199,17 @@ def test_pretest_dataset_round_trip(tmp_path) -> None:
     from scs.data.schemas import load_dataset, save_dataset
     from scs.systems.bsm1 import generate_bsm1_pretest_dataset
 
+    from scs.systems.bsm1 import pretest_specs
+
     plant_state = _state_after_short_rollout()
+    counts = {"n_model_train": 1, "n_calibration_id": 1, "n_calibration_control": 1, "horizon": 4, "history": 2}
+    starts = [int(spec["start_minute"]) for spec in pretest_specs(seed=1, **counts)]
     dataset, manifest = generate_bsm1_pretest_dataset(
-        n_model_train=1,
-        n_calibration_id=1,
-        n_calibration_control=1,
-        horizon=4,
-        history=2,
         seed=1,
-        steady_state=plant_state,
+        start_states={start: plant_state for start in starts},
+        **counts,
     )
+    assert manifest["reserved_minutes"] == [10 * 1440, 14 * 1440]
     assert manifest["confirmatory_test_generated"] is False
     assert "judge_test_id" not in dataset
     assert manifest["weather"]["rain"] != "ok"

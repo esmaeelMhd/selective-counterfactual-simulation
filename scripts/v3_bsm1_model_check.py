@@ -1,6 +1,7 @@
 """Exploratory BSM1 model check on calibration rows.
 
-This does not score judge_test and does not decide eligibility.
+It scores the eligibility split but does not decide eligibility: RMSE is pooled over
+rows, not averaged per scenario, and flows are set from the influent.
 """
 
 from __future__ import annotations
@@ -64,7 +65,8 @@ def main() -> None:
         "# Exploratory BSM1 model check",
         "",
         "Scored on `judge_calibration_id` after fitting `model_train`.",
-        "This is not the eligibility rule. Eligibility uses `judge_test_id`, and that split is not generated.",
+        "`judge_calibration_id` is the eligibility split, but this is not the eligibility rule: RMSE is pooled over rows rather than averaged per scenario.",
+        "Splits read disjoint blocks of the dry file, and each window starts from its own minute of one continuous dry run.",
         "Reactor and effluent flow are set from the influent with the open-loop recycle and waste flows.",
         "",
         "| model | fit seconds | state RMSE | one-step RMSE | flow | temperature | settler | concentration | effluent RMSE | final train loss |",
