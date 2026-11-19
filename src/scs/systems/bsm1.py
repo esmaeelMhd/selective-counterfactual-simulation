@@ -4,16 +4,24 @@ The dynamics come from ``bsm2-python`` (BSD 3-Clause, FAU-EVT). A 100-day
 open-loop run with the published constant influent and the library's default
 aeration reached the published reactor-5 steady state (SS 0.889, SO 0.491,
 SNO 10.4, SNH 1.73, SND 0.688) to within 0.2 percent. One such run took 77
-seconds. The packaged rain file does not parse, and the package has no storm
-file, so those weather splits are not generated.
+seconds.
 
-Splits read disjoint blocks of the 14-day dry file (``SPLIT_DAYS``), the last
-four days are reserved for the confirmatory test, and every window starts from
+Weather. The packaged dry file lists 14 days, but days 7 to 13 are an exact copy
+of days 0 to 6, so it holds 7 unique days. The loader checks that and returns
+those 7. The packaged rain file has three malformed flow cells and its flow is
+in thousands of m3/d. ``load_rain_influent`` repairs both and says what it
+changed. Its only rain event is on days 8 to 10, which belong to the confirmatory
+test, so no rain split is generated before the freeze. The package has no storm
+file, so there is no storm split.
+
+Splits read disjoint blocks of the 7 unique dry days (``SPLIT_DAYS``), the last
+1.5 days are reserved for the confirmatory test, and every window starts from
 the plant state at its own minute of one continuous dry run.
 """
 
 from __future__ import annotations
 
+import csv
 from pathlib import Path
 
 import numpy as np
@@ -50,23 +58,27 @@ HISTORY_MINUTES = 15
 # Five reactor volumes sum to 5999 m3. At the constant influent flow of 18446 m3/d
 # that is 7.8 hours. The working horizon is 8 hours, one hydraulic residence time.
 HORIZON_MINUTES = 480
-# The dry file is 14 days at 15-minute samples. Each split owns its own block of
-# those days, so no two splits share an influent minute. The last four days are
-# kept for the confirmatory test and are not read before the freeze. Windows in
-# one split may overlap each other; windows in different splits never do.
-DRY_DAYS = 14
+# The dry file lists 14 days at 15-minute samples, and days 7 to 13 repeat days 0 to 6.
+# That leaves 7 unique days. Each split owns its own block of them, so no two splits
+# share an influent minute. The last 1.5 days are kept for the confirmatory test and are
+# not read before the freeze. Windows in one split may overlap each other; windows in
+# different splits never do. Windows inside one split share influent days, so the
+# number of independent influent windows per split is far below the window count.
+DRY_DAYS = 7
 DRY_MINUTES = DRY_DAYS * 1440
-RESERVED_TEST_DAYS = 4
 SPLIT_DAYS = {
-    "model_train": (0.0, 7.0),
-    "judge_calibration_id": (7.0, 8.5),
-    "judge_calibration_control": (8.5, 10.0),
+    "model_train": (0.0, 3.5),
+    "judge_calibration_id": (3.5, 4.5),
+    "judge_calibration_control": (4.5, 5.5),
 }
-RESERVED_DAYS = (float(DRY_DAYS - RESERVED_TEST_DAYS), float(DRY_DAYS))
-# Initial states come from one continuous dry run at nominal aeration: one full
-# dry cycle of warm-up after the constant-influent steady state, then a second
-# pass in which the plant state is read at each window start.
-WARMUP_MINUTES = DRY_MINUTES
+RESERVED_DAYS = (5.5, float(DRY_DAYS))
+RESERVED_TEST_DAYS = RESERVED_DAYS[1] - RESERVED_DAYS[0]
+# Initial states come from one continuous dry run at nominal aeration: two full
+# dry cycles of warm-up after the constant-influent steady state, then a pass in
+# which the plant state is read at each window start.
+WARMUP_MINUTES = 2 * DRY_MINUTES
+RAIN_FLOW_UNIT = 1000.0
+RAIN_FLOW_COLUMN = 15
 PRETEST_COUNTS = {
     "model_train": 160,
     "judge_calibration_id": 80,
@@ -84,11 +96,15 @@ def _package_data_dir() -> Path:
 
 
 def influent_file_status() -> dict[str, str]:
-    """Say whether each weather file can be used as a BSM1 disturbance."""
+    """Say whether each weather file can be used as a BSM1 disturbance.
+
+    ``repaired`` means the file needs the fixes in ``load_rain_influent``. ``ok``
+    for rain or storm means the package changed, and the policy must be revisited.
+    """
     data_dir = _package_data_dir()
     return {
         "dry": _status(data_dir / "dryinfluent.csv"),
-        "rain": _status(data_dir / "raininfluent.csv"),
+        "rain": _rain_status(),
         "storm": _status(data_dir / "storminfluent.csv"),
     }
 
@@ -106,6 +122,74 @@ def _status(path: Path) -> str:
     if not np.isfinite(flow).all() or float(np.median(flow)) < 1000.0:
         return "implausible flow"
     return "ok"
+
+
+def _rain_status() -> str:
+    path = _package_data_dir() / "raininfluent.csv"
+    if not path.exists():
+        return "missing"
+    try:
+        table, repairs = load_rain_influent()
+    except (RuntimeError, ValueError):
+        return "unreadable"
+    if table.shape != (1344, 22):
+        return "bad shape"
+    return "repaired" if repairs else "ok"
+
+
+def load_rain_influent() -> tuple[np.ndarray, list[dict[str, object]]]:
+    """The packaged rain file with its malformed flow cells repaired and flow in m3/d.
+
+    Three flow cells carry a second decimal point, such as ``30.044.50``. Removing it
+    gives a value on the straight line between the readable cells around it, which is
+    checked here. The flow column is in thousands of m3/d and is multiplied by 1000 so
+    it matches the dry file. Any other malformed cell raises. This only reads influent
+    inputs. No rain split is generated before the protocol freeze.
+    """
+    path = _package_data_dir() / "raininfluent.csv"
+    with open(path, newline="", encoding="utf-8") as handle:
+        rows = list(csv.reader(handle))
+    width = 22
+    table = np.empty((len(rows), width), dtype=float)
+    repairs: list[dict[str, object]] = []
+    for row_index, row in enumerate(rows):
+        if len(row) != width:
+            raise RuntimeError(f"rain row {row_index} has {len(row)} cells, expected {width}")
+        for column, cell in enumerate(row):
+            if cell.count(".") > 1:
+                if column != RAIN_FLOW_COLUMN or cell.count(".") != 2:
+                    raise RuntimeError(f"unexpected malformed rain cell {cell!r} at row {row_index}, column {column}")
+                second = cell.index(".", cell.index(".") + 1)
+                value = float(cell[:second] + cell[second + 1 :])
+                repairs.append({"row": row_index, "column": column, "raw": cell, "value": value})
+            else:
+                value = float(cell)
+            table[row_index, column] = value
+    _check_rain_repairs(table, repairs)
+    table[:, RAIN_FLOW_COLUMN] *= RAIN_FLOW_UNIT
+    return table, repairs
+
+
+def _check_rain_repairs(table: np.ndarray, repairs: list[dict[str, object]]) -> None:
+    """Each repaired run of cells must follow the line between its readable neighbours."""
+    rows = sorted(int(repair["row"]) for repair in repairs)
+    flow = table[:, RAIN_FLOW_COLUMN]
+    index = 0
+    while index < len(rows):
+        run = [rows[index]]
+        while index + 1 < len(rows) and rows[index + 1] <= run[-1] + 1:
+            index += 1
+            run.append(rows[index])
+        index += 1
+        before, after = run[0] - 1, run[-1] + 1
+        while before in rows:
+            before -= 1
+        while after in rows:
+            after += 1
+        for row in run:
+            line = flow[before] + (flow[after] - flow[before]) * (row - before) / (after - before)
+            if abs(flow[row] - line) > 0.05 * max(abs(flow[before] - flow[after]), 1e-9) + 0.02:
+                raise RuntimeError(f"repaired rain flow at row {row} is {flow[row]}, off the line value {line}")
 
 
 def _measured(performance: object, effluent: np.ndarray) -> np.ndarray:
@@ -140,16 +224,17 @@ def apply_hydraulic_flows(states: np.ndarray, disturbances: np.ndarray) -> np.nd
 
 
 def rollout_with_known_hydraulics(model, initial_states: np.ndarray, actions: np.ndarray, disturbances: np.ndarray) -> np.ndarray:
-    """Roll out one step at a time and replace the flow channels with the hydraulic values."""
-    state = np.asarray(initial_states, dtype=float)
-    horizon = actions.shape[1]
-    predicted = np.empty((state.shape[0], horizon + 1, state.shape[1]), dtype=float)
-    predicted[:, 0] = state
-    for time in range(horizon):
-        step = model.predict_rollouts(state, actions[:, time : time + 1], disturbances[:, time : time + 1])
-        state = apply_hydraulic_flows(step[:, 1], disturbances[:, time])
-        predicted[:, time + 1] = state
-    return predicted
+    """Roll out the model with the flow channels assigned from the influent at every step.
+
+    The assignment runs inside the model's own rollout through ``project``, so a
+    recurrent model keeps its hidden state from one step to the next.
+    """
+    disturbances = np.asarray(disturbances, dtype=float)
+
+    def project(step: int, states: np.ndarray) -> np.ndarray:
+        return apply_hydraulic_flows(states, disturbances[:, step])
+
+    return model.predict_rollouts(initial_states, actions, disturbances, project=project)
 
 
 def effluent_measurements(states: np.ndarray) -> np.ndarray:
@@ -247,21 +332,28 @@ def rollout_scenario(
 
 
 def assert_split_allowed(split: str) -> None:
-    """Refuse weather files that are not usable and any confirmatory test split."""
+    """Refuse the confirmatory test splits and weather that is not available before the freeze."""
     if split.startswith("judge_test"):
         raise RuntimeError("confirmatory BSM1 test split is not generated before the protocol freeze")
     tokens = set(split.split("_"))
-    if "rain" in tokens or "storm" in tokens:
-        raise RuntimeError(f"{split} is not generated; the packaged weather file is not usable")
+    if "rain" in tokens:
+        raise RuntimeError(f"{split} is not generated; the rain event is reserved for the confirmatory test")
+    if "storm" in tokens:
+        raise RuntimeError(f"{split} is not generated; the package has no storm file")
 
 
 def load_dry_influent() -> np.ndarray:
+    """The 7 unique dry days, as 672 rows of 15-minute samples."""
     status = influent_file_status()
     if status["dry"] != "ok":
         raise RuntimeError(f"dry influent is {status['dry']}")
     if status["rain"] == "ok" or status["storm"] == "ok":
-        raise RuntimeError("weather status changed; refuse the old rain and storm policy before using those files")
-    return np.loadtxt(_package_data_dir() / "dryinfluent.csv", delimiter=",")
+        raise RuntimeError("weather status changed; revisit the rain and storm policy before using those files")
+    table = np.loadtxt(_package_data_dir() / "dryinfluent.csv", delimiter=",")
+    half = len(table) // 2
+    if len(table) != 1344 or not np.array_equal(table[:half, 1:], table[half:, 1:]):
+        raise RuntimeError("the dry file no longer repeats after 7 days; revisit the split design")
+    return table[:half]
 
 
 def pretest_specs(
@@ -450,6 +542,13 @@ def generate_bsm1_pretest_dataset(
         "seed": seed,
         "nominal_scale": list(NOMINAL_SCALE),
         "control_scale": list(CONTROL_SCALE),
+        "unique_dry_days": DRY_DAYS,
+        "independent_windows": {
+            split: int((split_minutes(split)[1] - split_minutes(split)[0]) // (history + horizon)) for split in dataset
+        },
+        "rain_repairs": [
+            {key: repair[key] for key in ("row", "raw", "value")} for repair in load_rain_influent()[1]
+        ],
         "dry_minutes": DRY_MINUTES,
         "split_minutes": {split: list(split_minutes(split)) for split in dataset},
         "reserved_test_days": RESERVED_TEST_DAYS,

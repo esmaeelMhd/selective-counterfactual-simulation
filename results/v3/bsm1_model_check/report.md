@@ -1,14 +1,15 @@
 # Exploratory BSM1 model check
 
-Scored on `judge_calibration_id` after fitting `model_train`.
-`judge_calibration_id` is the eligibility split, but this is not the eligibility rule: RMSE is pooled over rows rather than averaged per scenario.
-Splits read disjoint blocks of the dry file, and each window starts from its own minute of one continuous dry run.
-Reactor and effluent flow are set from the influent with the open-loop recycle and waste flows.
+Fit on `model_train`, scored on `judge_calibration_id`, one seed (0). No judge-test row exists.
+Eligible means the mean per-scenario state RMSE is strictly below both `hold_last` and `linear_narx`, the working rule in `docs/v3/protocol.md`. Stage A pools ten seeds for the ODE systems. This check has one.
+Splits read disjoint blocks of the 7 unique dry days, and each window starts from its own minute of one continuous dry run.
+Reactor and effluent flow are set from the influent with the open-loop recycle and waste flows, inside each model's own rollout, so recurrent models keep their state.
+The calibration split holds 2 independent influent windows, so these numbers are noisy.
 
-| model | fit seconds | state RMSE | one-step RMSE | flow | temperature | settler | concentration | effluent RMSE | final train loss |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| hold_last | 0.0 | 108.2 | 1.137 | 4.618e-13 | 0 | 363.6 | 48.73 | 2.413 | nan |
-| linear_narx | 0.9 | 21.65 | 0.4662 | 4.618e-13 | 0 | 77.66 | 5.501 | 0.5444 | nan |
-| lstm_world | 15.6 | 100.9 | 7.056 | 4.618e-13 | 8.947e-10 | 342 | 43.39 | 2 | 0.000519 |
-| recurrent_world | 39.5 | 81.88 | 6.863 | 4.618e-13 | 0 | 281.6 | 32.25 | 1.9 | 0.003648 |
-| mlp_state_space | 14.4 | 94.46 | 0.3318 | 4.618e-13 | 0.1427 | 340.2 | 22.16 | 0.8281 | nan |
+| model | fit seconds | mean scenario RMSE | eligible | pooled state RMSE | one-step RMSE | flow | temperature | settler | concentration | effluent RMSE | final train loss |
+|---|---:|---:|:---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| hold_last | 0.0 | 95.69 | n/a | 103.2 | 0.947 | 3.836e-13 | 0 | 348.3 | 45.39 | 1.843 | nan |
+| linear_narx | 1.5 | 30.4 | n/a | 35.56 | 0.3272 | 3.836e-13 | 0 | 127.3 | 9.389 | 0.2938 | nan |
+| lstm_world | 42.5 | 27.42 | True | 28.36 | 48.23 | 3.836e-13 | 9.672e-09 | 81.1 | 19.55 | 0.5818 | 0.00387 |
+| recurrent_world | 154.6 | 42.14 | False | 46.83 | 29.81 | 3.836e-13 | 2.073e-08 | 159.4 | 19.66 | 1.068 | 0.01126 |
+| mlp_state_space | 9.1 | 21.08 | True | 22.08 | 0.2407 | 3.836e-13 | 1.821e-07 | 79.39 | 5.38 | 0.3847 | nan |
