@@ -70,11 +70,13 @@ def test_stage_a_rejects_a_small_ensemble(tmp_path: Path) -> None:
 def test_eligibility_requires_both_baselines() -> None:
     frame = pd.DataFrame(
         [
-            {"system_id": "two_tank", "split": "judge_test_id", "model_id": "hold_last", "rmse": 1.0},
-            {"system_id": "two_tank", "split": "judge_test_id", "model_id": "linear_narx", "rmse": 0.2},
-            {"system_id": "two_tank", "split": "judge_test_id", "model_id": "mlp_state_space", "rmse": 0.3},
-            {"system_id": "two_tank", "split": "judge_test_id", "model_id": "ensemble_mlp", "rmse": 0.1},
-            {"system_id": "two_tank", "split": "judge_test_ood", "model_id": "ensemble_mlp", "rmse": 5.0},
+            {"system_id": "two_tank", "split": "judge_calibration_id", "model_id": "hold_last", "rmse": 1.0},
+            {"system_id": "two_tank", "split": "judge_calibration_id", "model_id": "linear_narx", "rmse": 0.2},
+            {"system_id": "two_tank", "split": "judge_calibration_id", "model_id": "mlp_state_space", "rmse": 0.3},
+            {"system_id": "two_tank", "split": "judge_calibration_id", "model_id": "ensemble_mlp", "rmse": 0.1},
+            {"system_id": "two_tank", "split": "judge_calibration_ood", "model_id": "ensemble_mlp", "rmse": 5.0},
+            # Test rows must not move eligibility, however good they look.
+            {"system_id": "two_tank", "split": "judge_test_id", "model_id": "mlp_state_space", "rmse": 1e-9},
         ]
     )
     config = {
@@ -84,6 +86,19 @@ def test_eligibility_requires_both_baselines() -> None:
     table = eligibility_table(frame, config)
     eligible = set(table.loc[table["eligible"], "model_id"])
     assert eligible == {"ensemble_mlp"}
+
+
+def test_eligibility_refuses_a_judge_test_split() -> None:
+    frame = pd.DataFrame(
+        [{"system_id": "two_tank", "split": "judge_test_id", "model_id": "hold_last", "rmse": 1.0}]
+    )
+    config = {
+        "learned_models": [],
+        "eligibility_baselines": ["hold_last"],
+        "eligibility_split": "judge_test_id",
+    }
+    with pytest.raises(ValueError, match="judge-test"):
+        eligibility_table(frame, config)
 
 
 def test_relative_margin_is_undefined_when_random_far_is_zero() -> None:
