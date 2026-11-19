@@ -25,6 +25,25 @@ def _linear_batch() -> TrajectoryBatch:
     )
 
 
+def test_lstm_first_rollout_step_matches_training() -> None:
+    pytest.importorskip("torch")
+    pytest.importorskip("timesim")
+    import torch
+
+    from scs.models.lstm_world import LSTMWorldModel, _sequence_tensors
+
+    train = _linear_batch()
+    model = LSTMWorldModel(random_state=0, hidden_dim=16, num_layers=1, epochs=5, learning_rate=1e-2)
+    model.fit(train)
+    features, _targets = _sequence_tensors(train)
+    scaled = (features[:, :1, :] - model.x_mean) / model.x_std
+    with torch.no_grad():
+        hidden, _cell = model.net.lstm(torch.tensor(scaled, dtype=torch.float32))
+        first = model.net.fc(hidden[:, 0]).numpy() * model.y_std + model.y_mean
+    rolled = model.predict_rollouts(train.states[:, 0], train.actions[:, :1], train.disturbances[:, :1])
+    assert np.allclose(rolled[:, 1], first, atol=1e-5)
+
+
 def test_lstm_world_learns_a_linear_step() -> None:
     pytest.importorskip("torch")
     pytest.importorskip("timesim")
@@ -51,6 +70,27 @@ def test_ensemble_lstm_matches_member_shape() -> None:
     samples = model.predict_rollout_samples(train.states[0, 0], train.actions[0], train.disturbances[0], n_samples=3)
     assert samples.shape == (3, train.states.shape[1], train.states.shape[2])
     assert np.isfinite(samples).all()
+
+
+def test_recurrent_first_rollout_step_matches_training() -> None:
+    pytest.importorskip("torch")
+    pytest.importorskip("timesim")
+    import torch
+
+    from scs.models.recurrent_world import RecurrentWorldModel, _prior_next
+
+    train = _linear_batch()
+    model = RecurrentWorldModel(random_state=0, hidden_dim=8, latent_dim=4, encoder_dim=8, epochs=2, learning_rate=1e-2)
+    model.fit(train)
+    state = ((train.states[:, 0] - model.state_mean) / model.state_std).astype(np.float32)
+    action = ((train.actions[:, :1] - model.action_mean) / model.action_std).astype(np.float32)
+    disturbance = ((train.disturbances[:, :1] - model.disturbance_mean) / model.disturbance_std).astype(np.float32)
+    with torch.no_grad():
+        filtered = model.model.observe(torch.tensor(action), torch.tensor(disturbance), torch.tensor(state[:, None, :]))
+        first = _prior_next(model.model, filtered, torch.tensor(action), torch.tensor(disturbance)).numpy()
+    restored = first[:, 0, :] * model.state_std + model.state_mean
+    rolled = model.predict_rollouts(train.states[:, 0], train.actions[:, :1], train.disturbances[:, :1])
+    assert np.allclose(rolled[:, 1], restored, atol=1e-5)
 
 
 def test_recurrent_world_one_step_loss_drops() -> None:

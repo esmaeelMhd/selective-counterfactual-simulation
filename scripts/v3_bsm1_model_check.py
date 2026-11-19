@@ -50,6 +50,7 @@ def main() -> None:
         "",
         "Scored on `judge_calibration_id` after fitting `model_train`.",
         "This is not the eligibility rule. Eligibility uses `judge_test_id`, and that split is not generated.",
+        "The gap is already present in the one-step prediction, before the 8-hour rollout.",
         "",
         "| model | fit seconds | state RMSE | effluent RMSE | final train loss |",
         "|---|---:|---:|---:|---:|",

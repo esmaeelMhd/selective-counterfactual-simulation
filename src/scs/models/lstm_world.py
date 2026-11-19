@@ -115,28 +115,21 @@ class LSTMWorldModel:
         state_dim = initial_states.shape[1]
         states = np.empty((batch, horizon + 1, state_dim), dtype=float)
         states[:, 0, :] = initial_states
-        warmup = np.concatenate(
-            [
-                np.zeros((batch, 1, action_dim), dtype=np.float32),
-                np.zeros((batch, 1, disturbance_dim), dtype=np.float32),
-                self._scale_state(initial_states).astype(np.float32)[:, None, :],
-            ],
-            axis=-1,
+        controls = torch.tensor(self._scale_columns(actions, 0, action_dim).astype(np.float32))
+        exogenous = torch.tensor(
+            self._scale_columns(disturbances, action_dim, action_dim + disturbance_dim).astype(np.float32)
         )
-        controls = self._scale_columns(actions, 0, action_dim)
-        exogenous = self._scale_columns(disturbances, action_dim, action_dim + disturbance_dim)
+        hidden = torch.zeros(self.net.num_layers, batch, self.net.hidden_dim)
+        cell = torch.zeros(self.net.num_layers, batch, self.net.hidden_dim)
+        previous = torch.tensor(self._scale_state(initial_states).astype(np.float32))
+        predicted = []
         with torch.no_grad():
-            rolled = self.net.rollout(
-                warmup_seq={"inputs": torch.tensor(warmup)},
-                rollout_inputs={
-                    "controls": torch.tensor(controls.astype(np.float32)),
-                    "exogenous": torch.tensor(exogenous.astype(np.float32)),
-                },
-                horizon=horizon,
-                feedback="model",
-            )
-        predicted = rolled["predictions"].numpy() * self.y_std + self.y_mean
-        states[:, 1:, :] = predicted
+            for time in range(horizon):
+                (hidden, cell), step = self.net.step((hidden, cell), controls[:, time], exogenous[:, time], previous)
+                previous = step
+                predicted.append(step)
+            restored = torch.stack(predicted, dim=1).numpy() * self.y_std + self.y_mean
+        states[:, 1:, :] = restored
         return states
 
     def predict_rollout_samples(

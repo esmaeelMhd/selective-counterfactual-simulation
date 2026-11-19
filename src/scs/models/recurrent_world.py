@@ -140,23 +140,22 @@ class RecurrentWorldModel:
         scaled_state = ((initial_states - self.state_mean) / self.state_std).astype(np.float32)
         scaled_actions = ((actions - self.action_mean) / self.action_std).astype(np.float32)
         scaled_disturbances = ((disturbances - self.disturbance_mean) / self.disturbance_std).astype(np.float32)
-        warmup = np.concatenate(
-            [
-                np.zeros((batch, 1, self.action_dim), dtype=np.float32),
-                np.zeros((batch, 1, self.disturbance_dim), dtype=np.float32),
-                scaled_state[:, None, :],
-            ],
-            axis=-1,
-        )
         states = np.empty((batch, horizon + 1, initial_states.shape[-1]), dtype=float)
         states[:, 0, :] = initial_states
+        controls = torch.tensor(scaled_actions)
+        exogenous = torch.tensor(scaled_disturbances)
+        previous = torch.tensor(scaled_state)
+        predicted = []
         with torch.no_grad():
-            latent = self.model.init_state(torch.tensor(warmup))
-            controls = torch.tensor(scaled_actions)
-            exogenous = torch.tensor(scaled_disturbances)
-            predicted = []
             for time in range(horizon):
-                latent, step = self.model.step(latent, controls[:, time], exogenous[:, time])
+                filtered = self.model.observe(
+                    controls[:, time : time + 1],
+                    exogenous[:, time : time + 1],
+                    previous[:, None, :],
+                )
+                latent = {"h": filtered["deter"][:, 0], "z": filtered["stoch"][:, 0]}
+                _latent, step = self.model.step(latent, controls[:, time], exogenous[:, time])
+                previous = step
                 predicted.append(step)
             restored = torch.stack(predicted, dim=1).numpy() * self.state_std + self.state_mean
         states[:, 1:, :] = restored
