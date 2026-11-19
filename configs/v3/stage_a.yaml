@@ -20,6 +20,9 @@ learned_models:
   - ensemble_mlp
   - gradient_boosted_narx
 
+# Eligibility is scored before any judge-test row is read.
+eligibility_split: judge_calibration_id
+
 eligibility_baselines:
   - hold_last
   - linear_narx

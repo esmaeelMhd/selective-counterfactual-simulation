@@ -211,9 +211,27 @@ def _prediction_frame(system_id: str, seed: int, config: dict[str, Any], event_c
     return frame
 
 
+DEFAULT_ELIGIBILITY_SPLIT = "judge_calibration_id"
+
+
+def eligibility_split(config: dict[str, Any]) -> str:
+    """The in-distribution split that decides eligibility. Never a judge-test split.
+
+    Eligibility has to be known before the confirmatory test split exists, and a
+    model must not be kept or dropped on test outcomes.
+    """
+    split = str(config.get("eligibility_split", DEFAULT_ELIGIBILITY_SPLIT))
+    if _split_role(split) == "judge_test":
+        raise ValueError(f"eligibility cannot use the judge-test split {split}")
+    return split
+
+
 def eligibility_table(frame: pd.DataFrame, config: dict[str, Any]) -> pd.DataFrame:
     """A learned model is eligible when its mean in-distribution RMSE is strictly lower than both baselines."""
-    in_distribution = frame[frame["split"] == "judge_test_id"]
+    split = eligibility_split(config)
+    in_distribution = frame[frame["split"] == split]
+    if in_distribution.empty:
+        raise RuntimeError(f"no rows on the eligibility split {split}")
     means = (
         in_distribution.groupby(["system_id", "model_id"], as_index=False)["rmse"]
         .mean()
@@ -487,7 +505,7 @@ The margin is the random false-accept rate minus the judge false-accept rate. A 
 
 ## Eligibility
 
-Working rule for this run: mean RMSE on `judge_test_id` is strictly below both `hold_last` and `linear_narx` on that system. Learned models passing: {len(systems_passed)} system(s) ({", ".join(systems_passed) if len(systems_passed) else "none"}). The plan's Stage A check wants at least two systems.
+Working rule for this run: mean RMSE on `{eligibility_split(config)}` is strictly below both `hold_last` and `linear_narx` on that system. Eligibility does not read judge-test rows. Learned models passing: {len(systems_passed)} system(s) ({", ".join(systems_passed) if len(systems_passed) else "none"}). The plan's Stage A check wants at least two systems.
 
 {_markdown_table(eligibility, ["system_id", "model_id", "id_rmse", "baseline_hold_last_id_rmse", "baseline_linear_narx_id_rmse", "eligible"])}
 

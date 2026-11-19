@@ -6,25 +6,25 @@ The margin is the random false-accept rate minus the judge false-accept rate. A 
 
 ## Eligibility
 
-Working rule for this run: mean RMSE on `judge_test_id` is strictly below both `hold_last` and `linear_narx` on that system. Learned models passing: 2 system(s) (cstr, two_tank). The plan's Stage A check wants at least two systems.
+Working rule for this run: mean RMSE on `judge_calibration_id` is strictly below both `hold_last` and `linear_narx` on that system. Eligibility does not read judge-test rows. Learned models passing: 2 system(s) (cstr, two_tank). The plan's Stage A check wants at least two systems.
 
 | system_id | model_id | id_rmse | baseline_hold_last_id_rmse | baseline_linear_narx_id_rmse | eligible |
 | --- | --- | --- | --- | --- | --- |
-| cstr | ensemble_mlp | 0.0082 | 2.0573 | 0.0463 | True |
-| cstr | gradient_boosted_narx | 0.0110 | 2.0573 | 0.0463 | True |
-| cstr | hold_last | 2.0573 | 2.0573 | 0.0463 | False |
-| cstr | linear_narx | 0.0463 | 2.0573 | 0.0463 | False |
-| cstr | mlp_state_space | 0.0103 | 2.0573 | 0.0463 | True |
-| heat_exchanger | ensemble_mlp | 0.0226 | 6.8112 | 0.0032 | False |
-| heat_exchanger | gradient_boosted_narx | 0.0132 | 6.8112 | 0.0032 | False |
-| heat_exchanger | hold_last | 6.8112 | 6.8112 | 0.0032 | False |
-| heat_exchanger | linear_narx | 0.0032 | 6.8112 | 0.0032 | False |
-| heat_exchanger | mlp_state_space | 0.0259 | 6.8112 | 0.0032 | False |
-| two_tank | ensemble_mlp | 0.0022 | 0.4524 | 0.0094 | True |
-| two_tank | gradient_boosted_narx | 0.0068 | 0.4524 | 0.0094 | True |
-| two_tank | hold_last | 0.4524 | 0.4524 | 0.0094 | False |
-| two_tank | linear_narx | 0.0094 | 0.4524 | 0.0094 | False |
-| two_tank | mlp_state_space | 0.0024 | 0.4524 | 0.0094 | True |
+| cstr | ensemble_mlp | 0.0086 | 2.0492 | 0.0483 | True |
+| cstr | gradient_boosted_narx | 0.0105 | 2.0492 | 0.0483 | True |
+| cstr | hold_last | 2.0492 | 2.0492 | 0.0483 | False |
+| cstr | linear_narx | 0.0483 | 2.0492 | 0.0483 | False |
+| cstr | mlp_state_space | 0.0110 | 2.0492 | 0.0483 | True |
+| heat_exchanger | ensemble_mlp | 0.0222 | 6.7997 | 0.0032 | False |
+| heat_exchanger | gradient_boosted_narx | 0.0131 | 6.7997 | 0.0032 | False |
+| heat_exchanger | hold_last | 6.7997 | 6.7997 | 0.0032 | False |
+| heat_exchanger | linear_narx | 0.0032 | 6.7997 | 0.0032 | False |
+| heat_exchanger | mlp_state_space | 0.0256 | 6.7997 | 0.0032 | False |
+| two_tank | ensemble_mlp | 0.0022 | 0.4520 | 0.0095 | True |
+| two_tank | gradient_boosted_narx | 0.0066 | 0.4520 | 0.0095 | True |
+| two_tank | hold_last | 0.4520 | 0.4520 | 0.0095 | False |
+| two_tank | linear_narx | 0.0095 | 0.4520 | 0.0095 | False |
+| two_tank | mlp_state_space | 0.0024 | 0.4520 | 0.0095 | True |
 
 ## Interval at 5% coverage
 

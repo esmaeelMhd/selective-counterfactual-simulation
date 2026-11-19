@@ -44,7 +44,7 @@ The comparator for Q1 and Q2 is `random_baseline`, drawn without using test labe
 
 The interval is a 95% bootstrap of the seed-level mean of that margin, resampling seeds with replacement, separately at each primary coverage. A yes requires the lower end above zero. An interval that sits entirely below zero excludes zero and is a no. If the random FAR is zero, the relative reduction is undefined and the relative half of the rule does not pass.
 
-**Model eligibility, working definition.** A learned model counts on a system when its mean RMSE on `judge_test_id` is strictly below both `hold_last` and `linear_narx` on that system. Models that fail are reported and left out of the decision margins. This metric is a Stage A working rule and stays in the open table until the freeze.
+**Model eligibility, working definition.** A learned model counts on a system when its mean RMSE on `judge_calibration_id` is strictly below both `hold_last` and `linear_narx` on that system. Models that fail are reported and left out of the decision margins. Eligibility never reads a judge-test split: on BSM1 the test split does not exist until after the freeze, and a model must not be kept or dropped on test outcomes. This metric is a Stage A working rule and stays in the open table until the freeze.
 
 ## Judges
 
@@ -104,7 +104,7 @@ A row with a Stage A value is a working setting. It is part of the freeze only w
 | BSM1 horizon | working value, not frozen: 15 minutes of measured history and 480 minutes of prediction, one reactor hydraulic time |
 | BSM1 event bit | working definition, not frozen: a trajectory is positive when any measured effluent series exceeds its benchmark limit (ammonia 4, total nitrogen 18, COD 100, suspended solids 30, BOD 10). This is not the BSM1 refusal guard |
 | `bad_rmse` threshold per system | Stage A uses 0.05 for all three systems; not frozen |
-| Eligibility metric | mean RMSE on `judge_test_id`, strict improvement on both baselines |
+| Eligibility metric | mean RMSE on `judge_calibration_id`, strict improvement on both baselines; never a judge-test split |
 | Seed list | Stage A uses seeds 0–9; not frozen |
 | BSM1 measured variables | working list, not frozen: ammonia, total nitrogen, COD, suspended solids, BOD |
 | Bootstrap draw count | 500 |

@@ -55,7 +55,8 @@ negative result and still goes in the paper.
 Rules that apply to all three:
 
 - **Model eligibility.** A learned model counts only if it beats both `hold_last` and
-  `linear_narx` on in-distribution rollout error on that system.
+  `linear_narx` on in-distribution rollout error on that system, scored on a split that exists
+  before the freeze. Eligibility never reads test rows.
 - **Sample size.** At least 2,000 test scenarios per system, seed and model, and 8,000 where
   simulation is cheap. That gives 100 to 400 accepted scenarios at 5% coverage, against 3 or
   4 today.
