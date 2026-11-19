@@ -18,10 +18,15 @@ from scs.models.lstm_world import LSTMWorldModel
 from scs.models.mlp_state_space import MLPStateSpaceModel
 from scs.models.recurrent_world import RecurrentWorldModel
 from scs.systems.base import TrajectoryBatch
-from scs.systems.bsm1 import effluent_measurements
+from scs.systems.bsm1 import REACTOR_WIDTH, effluent_measurements
+
+_FLOW = [14 + REACTOR_WIDTH * block for block in range(6)]
+_TEMPERATURE = [15 + REACTOR_WIDTH * block for block in range(6)]
+_SETTLER = list(range(6 * REACTOR_WIDTH, 6 * REACTOR_WIDTH + 10))
+_CONCENTRATIONS = [index for index in range(6 * REACTOR_WIDTH) if index not in set(_FLOW + _TEMPERATURE)]
 
 
-def _score(model, batch: TrajectoryBatch) -> tuple[float, float, float]:
+def _score(model, batch: TrajectoryBatch) -> dict[str, float]:
     if hasattr(model, "predict_rollouts"):
         predicted = model.predict_rollouts(batch.states[:, 0, :], batch.actions, batch.disturbances)
     else:
@@ -33,11 +38,15 @@ def _score(model, batch: TrajectoryBatch) -> tuple[float, float, float]:
         )
     measured_pred = np.stack([effluent_measurements(predicted[index]) for index in range(batch.n_trajectories)])
     measured_true = np.stack([effluent_measurements(batch.states[index]) for index in range(batch.n_trajectories)])
-    return (
-        rmse(predicted, batch.states),
-        rmse(predicted[:, 1], batch.states[:, 1]),
-        rmse(measured_pred, measured_true),
-    )
+    return {
+        "state": rmse(predicted, batch.states),
+        "one_step": rmse(predicted[:, 1], batch.states[:, 1]),
+        "effluent": rmse(measured_pred, measured_true),
+        "flow": rmse(predicted[..., _FLOW], batch.states[..., _FLOW]),
+        "temperature": rmse(predicted[..., _TEMPERATURE], batch.states[..., _TEMPERATURE]),
+        "settler": rmse(predicted[..., _SETTLER], batch.states[..., _SETTLER]),
+        "concentration": rmse(predicted[..., _CONCENTRATIONS], batch.states[..., _CONCENTRATIONS]),
+    }
 
 
 def main() -> None:
@@ -57,17 +66,22 @@ def main() -> None:
         "Scored on `judge_calibration_id` after fitting `model_train`.",
         "This is not the eligibility rule. Eligibility uses `judge_test_id`, and that split is not generated.",
         "",
-        "| model | fit seconds | state RMSE | one-step RMSE | effluent RMSE | final train loss |",
-        "|---|---:|---:|---:|---:|---:|",
+        "| model | fit seconds | state RMSE | one-step RMSE | flow | temperature | settler | concentration | effluent RMSE | final train loss |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for model in models:
         started = time.perf_counter()
         model.fit(train)
         fit_seconds = time.perf_counter() - started
-        state_error, one_step_error, effluent_error = _score(model, calibration)
+        scored = _score(model, calibration)
         final_loss = getattr(model, "train_losses", [float("nan")])[-1]
         lines.append(
-            f"| {model.model_id} | {fit_seconds:.1f} | {state_error:.4g} | {one_step_error:.4g} | {effluent_error:.4g} | {final_loss:.4g} |"
+            "| {model_id} | {fit_seconds:.1f} | {state:.4g} | {one_step:.4g} | {flow:.4g} | {temperature:.4g} | {settler:.4g} | {concentration:.4g} | {effluent:.4g} | {final_loss:.4g} |".format(
+                model_id=model.model_id,
+                fit_seconds=fit_seconds,
+                final_loss=final_loss,
+                **scored,
+            )
         )
         print(lines[-1], flush=True)
     output = Path("results/v3/bsm1_model_check/report.md")
