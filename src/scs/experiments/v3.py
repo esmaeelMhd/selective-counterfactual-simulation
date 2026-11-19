@@ -64,10 +64,24 @@ def load_v3_config(path: str | Path) -> dict[str, Any]:
     missing = [key for key in required if key not in data]
     if missing:
         raise ValueError(f"missing v3 config keys: {missing}")
+    threshold = data["rmse_threshold"]
+    if isinstance(threshold, dict):
+        absent = [str(name) for name in data["systems"] if name not in threshold]
+        if absent:
+            raise ValueError(f"rmse_threshold has no value for systems: {absent}")
     members = int(data["model_runtime"].get("ensemble_members", 0))
     if members < 5:
         raise ValueError("Stage A requires an ensemble of at least 5 members")
     return data
+
+
+DEFAULT_DEGENERATE_SHARE = 0.01
+
+
+def rmse_threshold_for(config: dict[str, Any], system_id: str) -> float:
+    """The ``bad_rmse`` threshold for one system. A single number applies to every system."""
+    value = config["rmse_threshold"]
+    return float(value[system_id]) if isinstance(value, dict) else float(value)
 
 
 def _batch_disagreement(predictions: list[np.ndarray]) -> np.ndarray:
@@ -95,21 +109,31 @@ def _uncertainty_scores(
     disturbances: np.ndarray,
     n_samples: int,
     rng: np.random.Generator,
+    history: np.ndarray | None = None,
 ) -> np.ndarray:
+    """Spread of sampled rollouts, or NaN when the model has no way to sample.
+
+    Ensembles use their members. Other models add noise with their fitted
+    residual spread. A model with neither returns NaN, which the judges treat
+    as a missing signal. A model that predicts no change has no spread and
+    returns zeros.
+    """
     n_rows, horizon, _action_dim = actions.shape
     if model.model_id == "hold_last" or n_samples <= 0:
         return np.zeros(n_rows, dtype=float)
     samples = []
-    if model.model_id == "ensemble_mlp":
+    members = getattr(model, "members", None)
+    if members:
         for sample_index in range(n_samples):
-            member = model.members[sample_index % len(model.members)]
-            samples.append(member.predict_rollouts(initial_states, actions, disturbances))
+            member = members[sample_index % len(members)]
+            samples.append(member.predict_rollouts(initial_states, actions, disturbances, history=history))
     else:
-        if model.residual_std is None:
-            return np.zeros(n_rows, dtype=float)
+        residual_std = getattr(model, "residual_std", None)
+        if residual_std is None:
+            return np.full(n_rows, np.nan, dtype=float)
         for _sample_index in range(n_samples):
-            noise = rng.normal(0.0, model.residual_std, size=(n_rows, horizon, initial_states.shape[1]))
-            samples.append(model.predict_rollouts(initial_states, actions, disturbances, noise=noise))
+            noise = rng.normal(0.0, residual_std, size=(n_rows, horizon, initial_states.shape[1]))
+            samples.append(model.predict_rollouts(initial_states, actions, disturbances, history=history, noise=noise))
     stacked = np.stack(samples, axis=0)
     return np.mean(np.std(stacked, axis=0), axis=(1, 2))
 
@@ -128,7 +152,7 @@ def _score_batch(
     system = make_system(system_id)
     initial = batch.states[:, 0, :]
     predictions = {
-        model_id: model.predict_rollouts(initial, batch.actions, batch.disturbances)
+        model_id: model.predict_rollouts(initial, batch.actions, batch.disturbances, history=batch.measured_history)
         for model_id, model in models.items()
     }
     disagreement = _batch_disagreement([predictions[model_id] for model_id in models])
@@ -141,6 +165,7 @@ def _score_batch(
             batch.disturbances,
             n_uncertainty,
             np.random.default_rng(10_000 + seed * 100 + sum(ord(char) for char in model_id)),
+            history=batch.measured_history,
         )
         for model_id, model in models.items()
     }
@@ -323,12 +348,12 @@ def _assign_random(test: pd.DataFrame, seed: int) -> np.ndarray:
 
 def result_rows_for_frame(frame: pd.DataFrame, config: dict[str, Any], eligibility: pd.DataFrame) -> pd.DataFrame:
     coverages = [float(value) for value in config["primary_coverages"]]
-    threshold = float(config["rmse_threshold"])
     eligible = {
         (row.system_id, row.model_id): bool(row.eligible) for row in eligibility.itertuples(index=False)
     }
     pieces = []
     for (system_id, seed), group in frame.groupby(["system_id", "seed"], sort=True):
+        threshold = rmse_threshold_for(config, str(system_id))
         for target in config["badness_targets"]:
             labelled = group.copy()
             if target == "bad_rmse":
@@ -351,20 +376,23 @@ def result_rows_for_frame(frame: pd.DataFrame, config: dict[str, Any], eligibili
             for model_id, model_test in test.groupby("model_id", sort=True):
                 model_calibration = calibration[calibration["model_id"] == model_id]
                 simple_name = _best_simple_baseline(model_calibration, coverages)
-                guard_inputs = [
-                    column
-                    for column in config["event_guard_inputs"]
-                    if np.isfinite(model_calibration[column].to_numpy(dtype=float)).all()
+                guard_ready = all(
+                    np.isfinite(model_calibration[column].to_numpy(dtype=float)).all()
                     and np.isfinite(model_test[column].to_numpy(dtype=float)).all()
-                ]
+                    for column in config["event_guard_inputs"]
+                )
                 judge_scores = {
                     name: model_test[f"risk_{name}"].to_numpy(dtype=float)
                     for name in _finite_signal_names(model_test)
                 }
                 judge_scores[RANDOM_JUDGE] = model_test["risk_random_baseline"].to_numpy(dtype=float)
                 judge_scores[PRIMARY_JUDGE] = model_test["risk_calibration_selected_candidate_ranker"].to_numpy(dtype=float)
-                if guard_inputs:
-                    judge_scores["event_guard"] = event_guarded_score(model_calibration, model_test, guard_inputs)
+                # The guard is defined by all of its inputs. When one is missing it is not
+                # computed on a smaller set: the system has no guard until the protocol names one.
+                if guard_ready:
+                    judge_scores["event_guard"] = event_guarded_score(
+                        model_calibration, model_test, list(config["event_guard_inputs"])
+                    )
                 labels = model_test["bad_label"].to_numpy(dtype=bool)
                 random_curve = _risk_curve_from_labels(labels, judge_scores[RANDOM_JUDGE], coverages)
                 primary_curve = _risk_curve_from_labels(labels, judge_scores[PRIMARY_JUDGE], coverages)
@@ -390,6 +418,7 @@ def result_rows_for_frame(frame: pd.DataFrame, config: dict[str, Any], eligibili
                                 "relative_margin": _relative_margin(absolute, float(random_row.false_accept_rate)),
                                 "primary_far": primary_far[float(row.coverage)],
                                 "calibration_simple_far": simple_far[float(row.coverage)],
+                                "bad_share": float(np.mean(labels)),
                                 "accepted_count": int(row.accepted_count),
                                 "n_scenarios": int(len(model_test)),
                                 "calibration_simple_baseline": simple_name,
@@ -410,24 +439,34 @@ def bootstrap_interval(values: np.ndarray, rng: np.random.Generator, n_samples: 
 
 
 def interval_table(results: pd.DataFrame, config: dict[str, Any]) -> pd.DataFrame:
-    """Bootstrap the seed-level mean margin of eligible models, separately at each coverage."""
+    """Bootstrap the seed-level mean margin of eligible models, separately at each coverage.
+
+    A row is degenerate when almost none or almost all test scenarios are bad. The
+    margin is then fixed near zero by the labels, so a narrow interval says nothing.
+    """
     primary = results[(results["judge_id"] == PRIMARY_JUDGE) & (results["eligible"])].copy()
     rng = np.random.default_rng(int(config["bootstrap_seed"]))
     rows = []
     if primary.empty:
         return pd.DataFrame(rows)
-    grouped = primary.groupby(["system_id", "badness_target", "coverage", "seed"], as_index=False)["absolute_margin"].mean()
+    grouped = primary.groupby(["system_id", "badness_target", "coverage", "seed"], as_index=False).agg(
+        absolute_margin=("absolute_margin", "mean"), bad_share=("bad_share", "mean")
+    )
     limit = float(config["interval_width_limit"])
     n_samples = int(config["bootstrap_samples"])
+    edge = float(config.get("degenerate_share", DEFAULT_DEGENERATE_SHARE))
     for (system_id, target, coverage), group in grouped.groupby(["system_id", "badness_target", "coverage"], sort=True):
         low, high = bootstrap_interval(group["absolute_margin"].to_numpy(dtype=float), rng, n_samples)
         width = high - low if math.isfinite(low) and math.isfinite(high) else float("nan")
+        share = float(group["bad_share"].mean())
         rows.append(
             {
                 "system_id": system_id,
                 "badness_target": target,
                 "coverage": float(coverage),
                 "n_seeds": int(group["seed"].nunique()),
+                "bad_share": share,
+                "degenerate": bool(share < edge or share > 1.0 - edge),
                 "mean_margin": float(group["absolute_margin"].mean()),
                 "bootstrap_low": low,
                 "bootstrap_high": high,
@@ -436,6 +475,21 @@ def interval_table(results: pd.DataFrame, config: dict[str, Any]) -> pd.DataFram
             }
         )
     return pd.DataFrame(rows)
+
+
+def precision_check(intervals: pd.DataFrame) -> tuple[bool, int]:
+    """Whether every informative 5% interval is narrow, and how many 5% rows were degenerate.
+
+    Degenerate rows are named, not counted as passes. The check also needs at
+    least one informative row on every system that has an interval.
+    """
+    if intervals.empty:
+        return False, 0
+    at_five = intervals[np.isclose(intervals["coverage"], 0.05)]
+    informative = at_five[~at_five["degenerate"]]
+    covered = set(informative["system_id"]) == set(at_five["system_id"])
+    passed = bool(covered and not informative.empty and informative["narrower_than_limit"].all())
+    return passed, int(at_five["degenerate"].sum())
 
 
 def _markdown_table(frame: pd.DataFrame, columns: list[str]) -> str:
@@ -457,14 +511,29 @@ def _markdown_table(frame: pd.DataFrame, columns: list[str]) -> str:
 
 
 def _guard_lines(results: pd.DataFrame) -> str:
-    guard = results[(results["judge_id"] == "event_guard") & np.isclose(results["coverage"], 0.05)].copy()
+    """Event guard against the primary ranker and the calibration-chosen simple baseline.
+
+    Only eligible models enter, so a model that is worse than the baselines does
+    not move the averages. Systems with no guard rows or no eligible model are named.
+    """
+    systems = sorted(results["system_id"].unique())
+    at_five = results[np.isclose(results["coverage"], 0.05)]
+    guard = at_five[(at_five["judge_id"] == "event_guard") & at_five["eligible"]].copy()
+    notes = []
+    no_guard = [name for name in systems if name not in set(at_five.loc[at_five["judge_id"] == "event_guard", "system_id"])]
+    if no_guard:
+        notes.append(f"No event guard is defined on: {', '.join(no_guard)}. A required guard input is missing there.")
+    no_eligible = [name for name in systems if name not in set(guard["system_id"]) and name not in no_guard]
+    if no_eligible:
+        notes.append(f"No eligible model, so no guard row: {', '.join(no_eligible)}.")
     if guard.empty:
-        return "_none_"
+        return "\n\n".join(["_none_", *notes])
     guard["margin_vs_primary"] = guard["primary_far"] - guard["false_accept_rate"]
     guard["margin_vs_calibration_simple"] = guard["calibration_simple_far"] - guard["false_accept_rate"]
     summary = (
         guard.groupby(["system_id", "badness_target"], as_index=False)
         .agg(
+            n_models=("model_id", "nunique"),
             event_guard_far=("false_accept_rate", "mean"),
             primary_far=("primary_far", "mean"),
             calibration_simple_far=("calibration_simple_far", "mean"),
@@ -472,11 +541,12 @@ def _guard_lines(results: pd.DataFrame) -> str:
             margin_vs_calibration_simple=("margin_vs_calibration_simple", "mean"),
         )
     )
-    return _markdown_table(
+    table = _markdown_table(
         summary,
         [
             "system_id",
             "badness_target",
+            "n_models",
             "event_guard_far",
             "primary_far",
             "calibration_simple_far",
@@ -484,6 +554,7 @@ def _guard_lines(results: pd.DataFrame) -> str:
             "margin_vs_calibration_simple",
         ],
     )
+    return "\n\n".join([table, *notes])
 
 
 def _write_report(
@@ -496,7 +567,11 @@ def _write_report(
     learned = eligibility[eligibility["model_id"].isin(config["learned_models"])]
     systems_passed = sorted(learned.loc[learned["eligible"], "system_id"].unique())
     at_five = intervals[np.isclose(intervals["coverage"], 0.05)] if not intervals.empty else intervals
-    precision_ok = (not at_five.empty) and bool(at_five["narrower_than_limit"].all())
+    precision_ok, degenerate_rows = precision_check(intervals)
+    runtime_text = ", ".join(
+        f"{key} {value}" for key, value in sorted(config["model_runtime"].items()) if key != "ensemble_members"
+    )
+    thresholds = ", ".join(f"{name} {rmse_threshold_for(config, str(name)):g}" for name in config["systems"])
     text = f"""# v3 Stage A report
 
 Label: exploratory. This report does not answer Q1, Q2, or Q3.
@@ -511,9 +586,9 @@ Working rule for this run: mean RMSE on `{eligibility_split(config)}` is strictl
 
 ## Interval at 5% coverage
 
-Bootstrap of the seed-level mean margin of eligible models, for `{PRIMARY_JUDGE}` only. One seed cannot make an interval. The width limit is {float(config["interval_width_limit"]):.2f}. All 5% rows narrower than the limit: {precision_ok}.
+Bootstrap of the seed-level mean margin of eligible models, for `{PRIMARY_JUDGE}` only. One seed cannot make an interval. The width limit is {float(config["interval_width_limit"]):.2f}. A row is degenerate when under {float(config.get("degenerate_share", DEFAULT_DEGENERATE_SHARE)):.0%} or over {1 - float(config.get("degenerate_share", DEFAULT_DEGENERATE_SHARE)):.0%} of scenarios are bad. Its margin is fixed by the labels, so it does not count toward the check. Degenerate 5% rows: {degenerate_rows}. All informative 5% rows narrower than the limit, with one on every system: {precision_ok}.
 
-{_markdown_table(at_five, ["system_id", "badness_target", "n_seeds", "mean_margin", "bootstrap_low", "bootstrap_high", "interval_width", "narrower_than_limit"])}
+{_markdown_table(at_five, ["system_id", "badness_target", "n_seeds", "bad_share", "degenerate", "mean_margin", "bootstrap_low", "bootstrap_high", "interval_width", "narrower_than_limit"])}
 
 ## Settings used
 
@@ -521,14 +596,14 @@ These numbers are Stage A choices. They are not the freeze.
 
 - horizon: {config["data"]["horizon"]}
 - ensemble members: {config["model_runtime"]["ensemble_members"]}
-- training iteration cap: mlp {config["model_runtime"]["mlp_max_iter"]}, ensemble {config["model_runtime"]["ensemble_mlp_max_iter"]}, gradient boosting {config["model_runtime"]["gradient_boosting_max_iter"]}
-- `bad_rmse` threshold: {config["rmse_threshold"]}
+- training settings: {runtime_text}
+- `bad_rmse` threshold per system: {thresholds}
 - seeds: {", ".join(str(seed) for seed in config["seeds"])}
 - minimum judge-test scenarios: {config["min_test_scenarios"]}
 
 ## Event guard at 5% coverage
 
-Exploratory only. The guard is the v2 candidate: the maximum calibration-percentile rank of invariant, disagreement, and support. `margin_vs_primary` and `margin_vs_calibration_simple` use the simple baseline chosen on calibration rows. They are not a Q3 answer. The same guard cannot be used on BSM1, because that system does not provide the invariant signal, and no replacement is written yet.
+Exploratory only. The guard is the v2 candidate: the maximum calibration-percentile rank of invariant, disagreement, and support. `margin_vs_primary` and `margin_vs_calibration_simple` use the simple baseline chosen on calibration rows. They are not a Q3 answer. Only eligible models enter the averages. The guard is not computed when one of its inputs is missing. On BSM1 that is the invariant signal, and no replacement guard is written yet.
 
 {_guard_lines(results)}
 """
@@ -555,11 +630,12 @@ def run_v3_stage(config_path: str | Path, output: str | Path) -> dict[str, Any]:
     _write_report(report_path, eligibility, intervals, results, config)
     learned = eligibility[eligibility["model_id"].isin(config["learned_models"])]
     systems_passed = int(learned.loc[learned["eligible"], "system_id"].nunique())
-    at_five = intervals[np.isclose(intervals["coverage"], 0.05)] if not intervals.empty else intervals
+    precision_pass, degenerate_rows = precision_check(intervals)
     return {
         "results": str(results_path),
         "report": str(report_path),
         "eligible_systems": systems_passed,
-        "precision_pass": bool(not at_five.empty and at_five["narrower_than_limit"].all()),
+        "precision_pass": precision_pass,
+        "degenerate_rows": degenerate_rows,
         "rows": int(len(results)),
     }

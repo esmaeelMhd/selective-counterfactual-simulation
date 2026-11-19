@@ -35,8 +35,17 @@ badness_targets:
   - bad_rmse
   - bad_event
 
-# One working threshold for this run. It is not frozen.
-rmse_threshold: 0.05
+# Working thresholds, one per system, not frozen. Each is 10 times the 99th percentile of the
+# best model's RMSE on judge_calibration_id for that system, over seeds 0-2. Only calibration
+# rows were read. A scenario is bad when its error is far outside what the best model does
+# on almost every in-distribution scenario.
+rmse_threshold:
+  two_tank: 0.08
+  cstr: 0.38
+  heat_exchanger: 0.095
+
+# A 5% row whose test labels are under 1% or over 99% bad is reported as degenerate.
+degenerate_share: 0.01
 
 seeds:
   - 0

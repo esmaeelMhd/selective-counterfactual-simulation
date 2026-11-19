@@ -13,6 +13,7 @@ def main() -> None:
     result = run_v3_stage(args.config, args.output)
     print(
         f"eligible_systems={result['eligible_systems']} precision_pass={result['precision_pass']} "
+        f"degenerate_rows={result['degenerate_rows']} "
         f"results={result['results']} report={result['report']}"
     )
 

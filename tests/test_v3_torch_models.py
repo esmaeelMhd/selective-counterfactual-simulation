@@ -112,3 +112,144 @@ def test_recurrent_world_one_step_loss_drops() -> None:
     predicted = model.predict_rollout(train.states[0, 0], train.actions[0], train.disturbances[0])
     assert predicted.shape == train.states[0].shape
     assert np.isfinite(predicted).all()
+
+
+def _fitted_lstm():
+    from scs.models.lstm_world import LSTMWorldModel
+
+    train = _linear_batch()
+    model = LSTMWorldModel(random_state=0, hidden_dim=16, num_layers=1, epochs=30, learning_rate=1e-2, batch_trajectories=4, chunk_length=3)
+    model.fit(train)
+    return model, train
+
+
+def _fitted_recurrent():
+    from scs.models.recurrent_world import RecurrentWorldModel
+
+    train = _linear_batch()
+    model = RecurrentWorldModel(
+        random_state=0, hidden_dim=8, latent_dim=4, encoder_dim=8, epochs=15, learning_rate=1e-2, batch_trajectories=4, chunk_length=3
+    )
+    model.fit(train)
+    return model, train
+
+
+def _chained_one_step(model, train, steps: int) -> np.ndarray:
+    """Roll one step at a time and restart the model each step, which drops any recurrent state."""
+    state = train.states[:, 0]
+    for time in range(steps):
+        state = model.predict_rollouts(state, train.actions[:, time : time + 1], train.disturbances[:, time : time + 1])[:, 1]
+    return state
+
+
+@pytest.mark.parametrize("fitted", [_fitted_lstm, _fitted_recurrent])
+def test_rollout_carries_the_recurrent_state(fitted) -> None:
+    pytest.importorskip("torch")
+    pytest.importorskip("timesim")
+    model, train = fitted()
+    carried = model.predict_rollouts(train.states[:, 0], train.actions[:, :3], train.disturbances[:, :3])[:, 3]
+    restarted = _chained_one_step(model, train, 3)
+    assert np.isfinite(carried).all()
+    assert not np.allclose(carried, restarted, atol=1e-6)
+
+
+def test_lstm_rollout_equals_one_pass_of_the_lstm_over_its_own_inputs() -> None:
+    pytest.importorskip("torch")
+    pytest.importorskip("timesim")
+    import torch
+
+    model, train = _fitted_lstm()
+    horizon = 4
+    rolled = model.predict_rollouts(train.states[:, 0], train.actions[:, :horizon], train.disturbances[:, :horizon])
+    inputs = np.concatenate([train.actions[:, :horizon], train.disturbances[:, :horizon], rolled[:, :horizon]], axis=-1)
+    scaled = (inputs - model.x_mean) / model.x_std
+    with torch.no_grad():
+        output, _state = model.net.lstm(torch.tensor(scaled, dtype=torch.float32))
+        one_pass = model.net.fc(output).numpy() * model.y_std + model.y_mean
+    assert np.allclose(rolled[:, 1:], one_pass, atol=1e-4)
+
+
+@pytest.mark.parametrize("fitted", [_fitted_lstm, _fitted_recurrent])
+def test_project_and_noise_reach_the_rollout(fitted) -> None:
+    pytest.importorskip("torch")
+    pytest.importorskip("timesim")
+    model, train = fitted()
+    initial, actions, disturbances = train.states[:, 0], train.actions[:, :3], train.disturbances[:, :3]
+    plain = model.predict_rollouts(initial, actions, disturbances)
+
+    def pin(step: int, states: np.ndarray) -> np.ndarray:
+        updated = states.copy()
+        updated[:, 0] = 7.0
+        return updated
+
+    pinned = model.predict_rollouts(initial, actions, disturbances, project=pin)
+    assert np.allclose(pinned[:, 1:, 0], 7.0)
+    assert not np.allclose(pinned[:, 1:, 1], plain[:, 1:, 1])
+    zero = model.predict_rollouts(initial, actions, disturbances, noise=np.zeros((initial.shape[0], 3, initial.shape[1])))
+    assert np.allclose(zero, plain, atol=1e-6)
+    noisy = model.predict_rollouts(initial, actions, disturbances, noise=np.full((initial.shape[0], 3, initial.shape[1]), 0.5))
+    assert not np.allclose(noisy, plain)
+
+
+@pytest.mark.parametrize("fitted", [_fitted_lstm, _fitted_recurrent])
+def test_history_is_checked_and_does_not_change_the_rollout(fitted) -> None:
+    pytest.importorskip("torch")
+    pytest.importorskip("timesim")
+    model, train = fitted()
+    initial, actions, disturbances = train.states[:, 0], train.actions[:, :3], train.disturbances[:, :3]
+    plain = model.predict_rollouts(initial, actions, disturbances)
+    with_history = model.predict_rollouts(initial, actions, disturbances, history=np.ones((initial.shape[0], 2, 5)))
+    assert np.allclose(plain, with_history)
+    with pytest.raises(ValueError, match="history"):
+        model.predict_rollouts(initial, actions, disturbances, history=np.ones((initial.shape[0] + 1, 2, 5)))
+
+
+def test_stage_a_runs_with_the_torch_models(tmp_path) -> None:
+    pytest.importorskip("torch")
+    pytest.importorskip("timesim")
+    import yaml
+
+    from scs.experiments.v3 import run_v3_stage
+
+    config = {
+        "stage": "A",
+        "label": "exploratory",
+        "event_config": "configs/v2/v2_event_targets.yaml",
+        "systems": ["two_tank"],
+        "models": ["hold_last", "linear_narx", "lstm_world", "ensemble_lstm", "recurrent_world"],
+        "learned_models": ["lstm_world", "ensemble_lstm", "recurrent_world"],
+        "eligibility_baselines": ["hold_last", "linear_narx"],
+        "primary_coverages": [0.1],
+        "badness_targets": ["bad_rmse"],
+        "rmse_threshold": {"two_tank": 0.05},
+        "seeds": [0],
+        "event_guard_inputs": ["risk_invariant_only", "risk_disagreement_only", "risk_support_only"],
+        "bootstrap_samples": 10,
+        "bootstrap_seed": 1,
+        "interval_width_limit": 0.5,
+        "min_test_scenarios": 1,
+        "data": {
+            "horizon": 4,
+            "dt": 0.1,
+            "n_model_train": 6,
+            "n_calibration_id": 3,
+            "n_calibration_ood": 3,
+            "n_test_id": 4,
+            "n_test_ood": 3,
+            "uncertainty_samples": 2,
+        },
+        "model_runtime": {
+            "ensemble_members": 5,
+            "lstm_hidden": 4,
+            "lstm_layers": 1,
+            "lstm_epochs": 1,
+            "rssm_hidden": 4,
+            "rssm_latent": 2,
+            "rssm_epochs": 1,
+        },
+    }
+    path = tmp_path / "torch.yaml"
+    path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    result = run_v3_stage(path, tmp_path / "out")
+    assert result["rows"] > 0
+    assert (tmp_path / "out" / "stage_a_report.md").is_file()
