@@ -39,7 +39,7 @@ def test_lstm_first_rollout_step_matches_training() -> None:
     scaled = (features[:, :1, :] - model.x_mean) / model.x_std
     with torch.no_grad():
         hidden, _cell = model.net.lstm(torch.tensor(scaled, dtype=torch.float32))
-        first = model.net.fc(hidden[:, 0]).numpy() * model.y_std + model.y_mean
+        first = train.states[:, 0] + model.net.fc(hidden[:, 0]).numpy() * model.y_std + model.y_mean
     rolled = model.predict_rollouts(train.states[:, 0], train.actions[:, :1], train.disturbances[:, :1])
     assert np.allclose(rolled[:, 1], first, atol=1e-5)
 
@@ -88,7 +88,7 @@ def test_recurrent_first_rollout_step_matches_training() -> None:
     with torch.no_grad():
         filtered = model.model.observe(torch.tensor(action), torch.tensor(disturbance), torch.tensor(state[:, None, :]))
         first = _prior_next(model.model, filtered, torch.tensor(action), torch.tensor(disturbance)).numpy()
-    restored = first[:, 0, :] * model.state_std + model.state_mean
+    restored = train.states[:, 0] + first[:, 0, :] * model.delta_std + model.delta_mean
     rolled = model.predict_rollouts(train.states[:, 0], train.actions[:, :1], train.disturbances[:, :1])
     assert np.allclose(rolled[:, 1], restored, atol=1e-5)
 
@@ -165,7 +165,7 @@ def test_lstm_rollout_equals_one_pass_of_the_lstm_over_its_own_inputs() -> None:
     scaled = (inputs - model.x_mean) / model.x_std
     with torch.no_grad():
         output, _state = model.net.lstm(torch.tensor(scaled, dtype=torch.float32))
-        one_pass = model.net.fc(output).numpy() * model.y_std + model.y_mean
+        one_pass = rolled[:, :-1] + model.net.fc(output).numpy() * model.y_std + model.y_mean
     assert np.allclose(rolled[:, 1:], one_pass, atol=1e-4)
 
 

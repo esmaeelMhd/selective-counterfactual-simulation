@@ -8,6 +8,11 @@ trajectories in chunks, teacher-forced on the true previous state, and carries
 the hidden and cell state from one chunk to the next, starting from zero. A
 rollout starts from the same zero state and carries it step by step, feeding
 back its own prediction. ``history`` is accepted and ignored.
+
+The network predicts the change in state over one step, scaled per channel, and
+the rollout adds it to the previous state. Predicting the absolute state leaves
+an error of a few percent of each channel's range at every step, which is far
+above the one-step change on large channels.
 """
 
 from __future__ import annotations
@@ -64,10 +69,11 @@ class LSTMWorldModel:
         self.x_mean = features.mean(axis=(0, 1))
         self.x_std = np.maximum(features.std(axis=(0, 1)), 1e-6)
         state_dim = int(targets.shape[-1])
-        self.y_mean = self.x_mean[-state_dim:]
-        self.y_std = self.x_std[-state_dim:]
+        deltas = targets - np.asarray(train.states, dtype=float)[:, :-1, :]
+        self.y_mean = deltas.mean(axis=(0, 1))
+        self.y_std = np.maximum(deltas.std(axis=(0, 1)), 1e-6)
         x_scaled = (features - self.x_mean) / self.x_std
-        y_scaled = (targets - self.y_mean) / self.y_std
+        y_scaled = (deltas - self.y_mean) / self.y_std
         action_dim = int(train.actions.shape[-1])
         disturbance_dim = int(train.disturbances.shape[-1])
         net = timesim_lstm(
@@ -112,7 +118,7 @@ class LSTMWorldModel:
             output, _state = net.lstm(x_tensor)
             predicted = net.fc(output).numpy()
         restored = predicted * self.y_std + self.y_mean
-        residual = targets.reshape(-1, targets.shape[-1]) - restored.reshape(-1, restored.shape[-1])
+        residual = deltas.reshape(-1, deltas.shape[-1]) - restored.reshape(-1, restored.shape[-1])
         self.residual_std = np.maximum(np.std(residual, axis=0), 1e-5)
         self.net = net
 
@@ -166,13 +172,13 @@ class LSTMWorldModel:
         with torch.no_grad():
             for time in range(horizon):
                 (hidden, cell), step = self.net.step((hidden, cell), controls[:, time], exogenous[:, time], previous)
-                raw = step.numpy().astype(float) * self.y_std + self.y_mean
+                raw = states[:, time, :] + step.numpy().astype(float) * self.y_std + self.y_mean
                 if noise is not None:
                     raw = raw + noise[:, time]
                 if project is not None:
                     raw = np.asarray(project(time, raw), dtype=float)
                 states[:, time + 1, :] = raw
-                previous = torch.tensor(((raw - self.y_mean) / self.y_std).astype(np.float32))
+                previous = torch.tensor(self._scale_state(raw).astype(np.float32))
         return states
 
     def predict_rollout_samples(

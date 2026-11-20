@@ -6,6 +6,9 @@ next, starting from zero. A rollout starts from the same zero state, filters
 its own previous prediction at every step, and carries the latent state. The
 confirmatory BSM1 test split is not used here. ``history`` is accepted and
 ignored.
+
+The decoder predicts the change in state over one step, scaled per channel,
+and the rollout adds it to the previous state. See ``lstm_world`` for why.
 """
 
 from __future__ import annotations
@@ -65,6 +68,8 @@ class RecurrentWorldModel:
         self.disturbance_dim: int | None = None
         self.state_mean: np.ndarray | None = None
         self.state_std: np.ndarray | None = None
+        self.delta_mean: np.ndarray | None = None
+        self.delta_std: np.ndarray | None = None
         self.action_mean: np.ndarray | None = None
         self.action_std: np.ndarray | None = None
         self.disturbance_mean: np.ndarray | None = None
@@ -88,8 +93,11 @@ class RecurrentWorldModel:
         self.action_std = np.maximum(actions.std(axis=(0, 1)), 1e-6)
         self.disturbance_mean = disturbances.mean(axis=(0, 1))
         self.disturbance_std = np.maximum(disturbances.std(axis=(0, 1)), 1e-6)
+        deltas = targets - states
+        self.delta_mean = deltas.mean(axis=(0, 1))
+        self.delta_std = np.maximum(deltas.std(axis=(0, 1)), 1e-6)
         states = (states - self.state_mean) / self.state_std
-        targets = (targets - self.state_mean) / self.state_std
+        targets = (deltas - self.delta_mean) / self.delta_std
         actions = (actions - self.action_mean) / self.action_std
         disturbances = (disturbances - self.disturbance_mean) / self.disturbance_std
         model = factory(
@@ -150,7 +158,7 @@ class RecurrentWorldModel:
         with torch.no_grad():
             filtered = model.observe(controls, exogenous, observed)
             predicted = _prior_next(model, filtered, controls, exogenous).numpy()
-        residual = (predicted - targets) * self.state_std
+        residual = (predicted - targets) * self.delta_std
         self.residual_std = np.maximum(np.std(residual.reshape(-1, self.state_dim), axis=0), 1e-5)
         self.model = model
 
@@ -208,7 +216,7 @@ class RecurrentWorldModel:
                 carried = filtered["state"]
                 latent = {"h": filtered["deter"][:, 0], "z": filtered["stoch"][:, 0]}
                 _latent, step = self.model.step(latent, controls[:, time], exogenous[:, time])
-                raw = step.numpy().astype(float) * self.state_std + self.state_mean
+                raw = states[:, time, :] + step.numpy().astype(float) * self.delta_std + self.delta_mean
                 if noise is not None:
                     raw = raw + noise[:, time]
                 if project is not None:
