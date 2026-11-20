@@ -28,6 +28,7 @@ from scs.experiments.v2 import (
     load_event_config,
     split_overlap_report,
     trajectory_bad_event,
+    trajectory_event_flags,
 )
 from scs.experiments.v2_event_risk import event_guarded_score
 from scs.signals import available_signals
@@ -138,6 +139,18 @@ def _uncertainty_scores(
     return np.mean(np.std(stacked, axis=0), axis=(1, 2))
 
 
+def event_mismatch_per_limit(true_states: np.ndarray, predicted_states: np.ndarray, event_config: dict[str, Any]) -> bool:
+    """BSM1 target: bad when any of the five effluent-limit bits differs, not only the combined bit.
+
+    On the dry calibration rows the combined any-limit bit never disagrees, because the open-loop
+    plant is nearly always over the ammonia limit. The limits are separate constraints, so each
+    one is its own bit.
+    """
+    true_flags = trajectory_event_flags("bsm1", true_states, event_config)
+    predicted_flags = trajectory_event_flags("bsm1", predicted_states, event_config)
+    return any(true_flags[name] != predicted_flags[name] for name in true_flags)
+
+
 def _score_batch(
     system_id: str,
     seed: int,
@@ -193,7 +206,11 @@ def _score_batch(
                     "rmse": float(np.sqrt(np.mean(diff**2))),
                     "true_event": bool(true_events[index]),
                     "pred_event": bool(pred_event),
-                    "event_mismatch": bool(true_events[index] != pred_event),
+                    "event_mismatch": (
+                        event_mismatch_per_limit(true_states, pred, event_config)
+                        if system_id == "bsm1"
+                        else bool(true_events[index] != pred_event)
+                    ),
                     "support_distance": float(support_scores[index]),
                     "uncertainty_score": float(uncertainty[model_id][index]),
                     "disagreement_score": float(disagreement[index]),

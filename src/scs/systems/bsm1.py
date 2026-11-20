@@ -77,6 +77,13 @@ RESERVED_TEST_DAYS = RESERVED_DAYS[1] - RESERVED_DAYS[0]
 # dry cycles of warm-up after the constant-influent steady state, then a pass in
 # which the plant state is read at each window start.
 WARMUP_MINUTES = 2 * DRY_MINUTES
+# Per-window influent perturbation. Each window gets one flow factor and one load factor,
+# held constant over the window and drawn within +-10 percent, which is about the day-to-day
+# spread of daily mean flow in the dry file. Concentrations and total suspended solids
+# scale with the load factor. Alkalinity and temperature are not loads and stay as they are.
+# The same scheme applies to every split, including the confirmatory test.
+INFLUENT_SCALE = (0.9, 1.1)
+LOAD_COLUMNS = tuple(index for index in range(14) if index != 12)
 RAIN_FLOW_UNIT = 1000.0
 RAIN_FLOW_COLUMN = 15
 PRETEST_COUNTS = {
@@ -390,6 +397,8 @@ def pretest_specs(
                     "scenario_type": label,
                     "start_minute": int(start),
                     "kla": _scaled_kla(rng, scale),
+                    "flow_scale": float(rng.uniform(*INFLUENT_SCALE)),
+                    "load_scale": float(rng.uniform(*INFLUENT_SCALE)),
                 }
             )
     return specs
@@ -529,6 +538,8 @@ def generate_bsm1_pretest_dataset(
             initial_state=start_states[int(spec["start_minute"])],
             split=str(spec["split"]),
             scenario_type=str(spec["scenario_type"]),
+            flow_scale=float(spec["flow_scale"]),
+            load_scale=float(spec["load_scale"]),
         )
         grouped.setdefault(str(spec["split"]), []).append(batch)
     dataset = {split: _concat_batches(pieces) for split, pieces in grouped.items()}
@@ -543,6 +554,11 @@ def generate_bsm1_pretest_dataset(
         "nominal_scale": list(NOMINAL_SCALE),
         "control_scale": list(CONTROL_SCALE),
         "unique_dry_days": DRY_DAYS,
+        "influent_scale": list(INFLUENT_SCALE),
+        "influent_scales": {
+            split: [[round(float(spec["flow_scale"]), 4), round(float(spec["load_scale"]), 4)] for spec in specs if spec["split"] == split]
+            for split in dataset
+        },
         "independent_windows": {
             split: int((split_minutes(split)[1] - split_minutes(split)[0]) // (history + horizon)) for split in dataset
         },
@@ -565,13 +581,24 @@ def _constant_series(n_steps: int) -> np.ndarray:
     return np.column_stack([times, influent])
 
 
-def _dry_series(dry: np.ndarray, start_minute: int, n_steps: int) -> np.ndarray:
+def history_start_sample(start_minute: int, history: int, n_rows: int) -> int:
+    """Row of the dry file that holds the first predicted minute of a window."""
+    return ((start_minute + history) // 15) % n_rows
+
+
+def _dry_series(
+    dry: np.ndarray, start_minute: int, n_steps: int, flow_scale: float = 1.0, load_scale: float = 1.0
+) -> np.ndarray:
+    """Dry influent from ``start_minute``, with the window's flow and load factors applied."""
     rows = []
     for minute in range(start_minute, start_minute + n_steps + 2):
         sample = (minute // 15) % len(dry)
         rows.append(dry[sample, 1:])
+    influent = np.asarray(rows, dtype=float)
+    influent[:, FLOW_INDEX] *= flow_scale
+    influent[:, list(LOAD_COLUMNS)] *= load_scale
     times = np.arange(len(rows)) / 1440.0
-    return np.column_stack([times, np.asarray(rows, dtype=float)])
+    return np.column_stack([times, influent])
 
 
 def _new_plant(data: np.ndarray, kla: np.ndarray):
@@ -592,10 +619,12 @@ def _rollout_from_state(
     initial_state: dict[str, np.ndarray],
     split: str,
     scenario_type: str,
+    flow_scale: float = 1.0,
+    load_scale: float = 1.0,
 ) -> TrajectoryBatch:
     assert_split_allowed(split)
     total = history + horizon
-    plant = _new_plant(_dry_series(dry, start_minute, total), kla)
+    plant = _new_plant(_dry_series(dry, start_minute, total, flow_scale, load_scale), kla)
     apply_plant(plant, initial_state)
     measured = np.empty((total, len(MEASURED_NAMES)), dtype=float)
     states = np.empty((total + 1, STATE_DIM), dtype=float)
