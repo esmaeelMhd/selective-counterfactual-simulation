@@ -19,7 +19,15 @@ from __future__ import annotations
 
 import numpy as np
 
-from scs.models.base import validate_history, validate_rollout_batch, validate_rollout_inputs
+from scs.models.base import (
+    EarlyStopping,
+    subset_batch,
+    time_blocked_split,
+    validate_history,
+    validate_rollout_batch,
+    validate_rollout_inputs,
+    validation_rmse,
+)
 from scs.systems.base import TrajectoryBatch
 
 
@@ -44,9 +52,23 @@ class LSTMWorldModel:
         learning_rate: float = 1e-3,
         batch_trajectories: int = 16,
         chunk_length: int = 48,
+        early_stopping: bool = False,
+        validation_fraction: float = 0.15,
+        validation_gap: int = 0,
+        check_every: int = 5,
+        patience: int = 3,
+        projection_factory=None,
     ) -> None:
-        if batch_trajectories < 1 or chunk_length < 1:
-            raise ValueError("batch_trajectories and chunk_length must be positive")
+        if batch_trajectories < 1 or chunk_length < 1 or check_every < 1:
+            raise ValueError("batch_trajectories, chunk_length, and check_every must be positive")
+        self.early_stopping = bool(early_stopping)
+        self.validation_fraction = float(validation_fraction)
+        self.validation_gap = int(validation_gap)
+        self.check_every = int(check_every)
+        self.patience = int(patience)
+        self.projection_factory = projection_factory
+        self.selected_epochs: int | None = None
+        self.validation_curve: list[tuple[int, float]] = []
         self.batch_trajectories = int(batch_trajectories)
         self.chunk_length = int(chunk_length)
         self.random_state = int(random_state)
@@ -63,8 +85,22 @@ class LSTMWorldModel:
         self.train_losses: list[float] = []
 
     def fit(self, train: TrajectoryBatch) -> None:
+        """Train for ``epochs`` epochs, or stop earlier when ``early_stopping`` is set.
+
+        With early stopping the last ``validation_fraction`` of the trajectories, less a
+        gap that keeps their windows apart in time, are held out of training. Every
+        ``check_every`` epochs the free-running rollout error on them is scored, the
+        best weights are kept, and training stops after ``patience`` checks without
+        improvement. ``epochs`` is then the cap. Only ``train`` is read.
+        """
         torch, timesim_lstm = _require_lstm()
         torch.manual_seed(self.random_state)
+        validation = None
+        if self.early_stopping:
+            fit_rows, validation_rows = time_blocked_split(train.n_trajectories, self.validation_fraction, self.validation_gap)
+            validation = subset_batch(train, validation_rows)
+            train = subset_batch(train, fit_rows)
+        stopper = EarlyStopping(self.patience)
         features, targets = _sequence_tensors(train)
         self.x_mean = features.mean(axis=(0, 1))
         self.x_std = np.maximum(features.std(axis=(0, 1)), 1e-6)
@@ -91,8 +127,9 @@ class LSTMWorldModel:
         n_rows, length, _features = x_tensor.shape
         generator = torch.Generator().manual_seed(self.random_state)
         self.train_losses = []
+        self.net = net
         net.train()
-        for _ in range(self.epochs):
+        for epoch in range(self.epochs):
             order = torch.randperm(n_rows, generator=generator)
             total = 0.0
             weight = 0
@@ -113,6 +150,20 @@ class LSTMWorldModel:
                     total += float(loss.detach()) * count
                     weight += count
             self.train_losses.append(total / weight)
+            if validation is not None and ((epoch + 1) % self.check_every == 0 or epoch + 1 == self.epochs):
+                score = validation_rmse(self, validation, self.projection_factory)
+                net.train()
+                snapshot = lambda: {key: value.clone() for key, value in net.state_dict().items()}
+                if stopper.update(epoch + 1, score, snapshot):
+                    break
+        if validation is not None:
+            if stopper.best_state is None:
+                raise RuntimeError("validation score never improved; the rollout may have diverged")
+            net.load_state_dict(stopper.best_state)
+            self.selected_epochs = stopper.best_epoch
+            self.validation_curve = stopper.curve
+        else:
+            self.selected_epochs = self.epochs
         net.eval()
         with torch.no_grad():
             output, _state = net.lstm(x_tensor)
