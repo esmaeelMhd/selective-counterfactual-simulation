@@ -253,3 +253,71 @@ def test_stage_a_runs_with_the_torch_models(tmp_path) -> None:
     result = run_v3_stage(path, tmp_path / "out")
     assert result["rows"] > 0
     assert (tmp_path / "out" / "stage_a_report.md").is_file()
+
+
+def test_time_blocked_split_keeps_a_gap_between_fit_and_validation_windows() -> None:
+    from scs.models.base import time_blocked_split
+
+    fit, validation = time_blocked_split(160, 0.15, 18)
+    assert (fit.start, fit.stop) == (0, 118)
+    assert (validation.start, validation.stop) == (136, 160)
+    assert validation.start - fit.stop == 18
+    with pytest.raises(ValueError, match="too few"):
+        time_blocked_split(20, 0.15, 18)
+    with pytest.raises(ValueError):
+        time_blocked_split(100, 1.5, 0)
+
+
+def test_early_stopping_keeps_the_best_snapshot_and_stops_after_patience() -> None:
+    from scs.models.base import EarlyStopping
+
+    stopper = EarlyStopping(patience=2)
+    scores = [5.0, 3.0, 3.5, 3.4, 9.0]
+    stopped_at = None
+    for epoch, score in enumerate(scores, start=1):
+        if stopper.update(epoch, score, lambda epoch=epoch: f"state{epoch}"):
+            stopped_at = epoch
+            break
+    assert stopped_at == 4
+    assert stopper.best_epoch == 2 and stopper.best_state == "state2"
+    assert stopper.curve[:2] == [(1, 5.0), (2, 3.0)]
+
+
+def test_bsm1_overlap_gap_and_projection() -> None:
+    from scs.systems.bsm1 import FLOW_INDEX, REACTOR_WIDTH, hydraulic_projection, pretest_overlap_gap
+
+    assert pretest_overlap_gap() == 18
+    disturbances = np.zeros((2, 3, 21))
+    disturbances[:, :, FLOW_INDEX] = 20000.0
+    projected = hydraulic_projection(disturbances)(1, np.zeros((2, 136)))
+    assert np.allclose(projected[:, FLOW_INDEX], 20000.0 + 4.0 * 18446.0)
+    assert np.allclose(projected[:, FLOW_INDEX + 5 * REACTOR_WIDTH], 20000.0 - 385.0)
+
+
+@pytest.mark.parametrize("kind", ["lstm", "recurrent"])
+def test_early_stopping_restores_the_best_weights_and_reads_only_the_training_batch(kind) -> None:
+    pytest.importorskip("torch")
+    pytest.importorskip("timesim")
+    from scs.models.base import subset_batch, time_blocked_split, validation_rmse
+    from scs.models.lstm_world import LSTMWorldModel
+    from scs.models.recurrent_world import RecurrentWorldModel
+
+    train = _linear_batch()
+    common = dict(
+        random_state=0, epochs=12, learning_rate=1e-2, batch_trajectories=4, chunk_length=3,
+        early_stopping=True, validation_fraction=0.25, validation_gap=1, check_every=3, patience=2,
+    )
+    if kind == "lstm":
+        model = LSTMWorldModel(hidden_dim=8, num_layers=1, **common)
+    else:
+        model = RecurrentWorldModel(hidden_dim=8, latent_dim=4, encoder_dim=8, **common)
+    model.fit(train)
+    assert model.validation_curve and model.selected_epochs in {epoch for epoch, _score in model.validation_curve}
+    best = min(score for _epoch, score in model.validation_curve)
+    _fit_rows, validation_rows = time_blocked_split(train.n_trajectories, 0.25, 1)
+    assert validation_rmse(model, subset_batch(train, validation_rows)) == pytest.approx(best, rel=1e-4)
+    assert len(model.train_losses) <= 12
+    # Without early stopping the full budget is used and nothing is held out.
+    plain = LSTMWorldModel(random_state=0, hidden_dim=8, num_layers=1, epochs=4, batch_trajectories=4, chunk_length=3)
+    plain.fit(train)
+    assert plain.selected_epochs == 4 and len(plain.train_losses) == 4

@@ -20,7 +20,9 @@ class EnsembleLSTMModel:
         num_layers: int = 2,
         epochs: int = 30,
         learning_rate: float = 1e-3,
+        **member_options,
     ) -> None:
+        """``member_options`` go to every ``LSTMWorldModel``, such as the early-stopping settings."""
         self.random_state = int(random_state)
         self.n_members = int(n_members)
         if self.n_members < 2:
@@ -32,6 +34,7 @@ class EnsembleLSTMModel:
                 num_layers=num_layers,
                 epochs=epochs,
                 learning_rate=learning_rate,
+                **member_options,
             )
             for index in range(self.n_members)
         ]

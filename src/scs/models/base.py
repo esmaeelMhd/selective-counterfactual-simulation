@@ -119,3 +119,71 @@ def rollout_from_delta(
             states[:, step + 1] = project(step, states[:, step + 1])
     return states
 
+
+
+def subset_batch(batch: TrajectoryBatch, rows: slice) -> TrajectoryBatch:
+    """The trajectories in ``rows``, with the same split and system labels."""
+    history = None if batch.measured_history is None else batch.measured_history[rows]
+    return TrajectoryBatch(
+        states=batch.states[rows],
+        actions=batch.actions[rows],
+        disturbances=batch.disturbances[rows],
+        scenario_type=list(batch.scenario_type[rows]),
+        split=batch.split,
+        system_id=batch.system_id,
+        measured_history=history,
+    )
+
+
+def time_blocked_split(n_rows: int, fraction: float, gap: int) -> tuple[slice, slice]:
+    """Fit rows and validation rows from one training batch, in trajectory order.
+
+    The validation rows are the last ``fraction`` of the trajectories. ``gap``
+    trajectories before them are dropped, so that no fit window overlaps a
+    validation window in time. This assumes trajectories are stored in time
+    order, as the BSM1 generator writes them.
+    """
+    if not 0.0 < fraction < 1.0 or gap < 0:
+        raise ValueError("fraction must be in (0, 1) and gap must not be negative")
+    n_validation = max(1, int(round(n_rows * fraction)))
+    stop = n_rows - n_validation - gap
+    if stop < 1:
+        raise ValueError(f"{n_rows} trajectories are too few for a validation block of {n_validation} and a gap of {gap}")
+    return slice(0, stop), slice(n_rows - n_validation, n_rows)
+
+
+def validation_rmse(model, batch: TrajectoryBatch, projection_factory=None) -> float:
+    """Mean per-scenario RMSE of free-running rollouts on ``batch``.
+
+    ``projection_factory(disturbances)`` returns the ``project`` hook for those
+    disturbances, such as the BSM1 flow assignment. Without it nothing is projected.
+    """
+    project = None if projection_factory is None else projection_factory(batch.disturbances)
+    predicted = model.predict_rollouts(batch.states[:, 0, :], batch.actions, batch.disturbances, project=project)
+    return float(np.sqrt(np.mean((predicted - batch.states) ** 2, axis=(1, 2))).mean())
+
+
+class EarlyStopping:
+    """Keep the best snapshot and stop after ``patience`` checks without improvement."""
+
+    def __init__(self, patience: int) -> None:
+        if patience < 1:
+            raise ValueError("patience must be at least 1")
+        self.patience = int(patience)
+        self.best_score = float("inf")
+        self.best_epoch = 0
+        self.best_state = None
+        self.misses = 0
+        self.curve: list[tuple[int, float]] = []
+
+    def update(self, epoch: int, score: float, snapshot) -> bool:
+        """Record a check at ``epoch``. Returns True when training should stop."""
+        self.curve.append((int(epoch), float(score)))
+        if score < self.best_score:
+            self.best_score = float(score)
+            self.best_epoch = int(epoch)
+            self.best_state = snapshot()
+            self.misses = 0
+        else:
+            self.misses += 1
+        return self.misses >= self.patience

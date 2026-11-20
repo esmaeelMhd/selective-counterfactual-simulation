@@ -230,18 +230,38 @@ def apply_hydraulic_flows(states: np.ndarray, disturbances: np.ndarray) -> np.nd
     return updated
 
 
+def hydraulic_projection(disturbances: np.ndarray):
+    """The ``project`` hook that assigns the flow channels from these disturbances."""
+    disturbances = np.asarray(disturbances, dtype=float)
+
+    def project(step: int, states: np.ndarray) -> np.ndarray:
+        return apply_hydraulic_flows(states, disturbances[:, step])
+
+    return project
+
+
+def pretest_overlap_gap(split: str = "model_train", horizon: int = HORIZON_MINUTES, history: int = HISTORY_MINUTES) -> int:
+    """How many neighbouring windows of ``split`` overlap one window in time.
+
+    The windows are spread evenly over the split's block of days, so a window
+    overlaps every neighbour closer than one window length.
+    """
+    first, end = split_minutes(split)
+    count = PRETEST_COUNTS[split]
+    span = history + horizon
+    stride = (end - first - span) / max(count - 1, 1)
+    return int(np.ceil(span / stride)) if stride > 0 else count
+
+
 def rollout_with_known_hydraulics(model, initial_states: np.ndarray, actions: np.ndarray, disturbances: np.ndarray) -> np.ndarray:
     """Roll out the model with the flow channels assigned from the influent at every step.
 
     The assignment runs inside the model's own rollout through ``project``, so a
     recurrent model keeps its hidden state from one step to the next.
     """
-    disturbances = np.asarray(disturbances, dtype=float)
-
-    def project(step: int, states: np.ndarray) -> np.ndarray:
-        return apply_hydraulic_flows(states, disturbances[:, step])
-
-    return model.predict_rollouts(initial_states, actions, disturbances, project=project)
+    return model.predict_rollouts(
+        initial_states, actions, disturbances, project=hydraulic_projection(disturbances)
+    )
 
 
 def effluent_measurements(states: np.ndarray) -> np.ndarray:
