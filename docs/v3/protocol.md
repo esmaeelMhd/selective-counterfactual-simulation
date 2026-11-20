@@ -113,6 +113,7 @@ A row with a Stage A value is a working setting. It is part of the freeze only w
 | `bad_rmse` threshold per system | Stage A uses TwoTank 0.08, CSTR 0.38, heat exchanger 0.095, not frozen. Each is 10 times the 99th percentile of the best model's RMSE on `judge_calibration_id`, over seeds 0–2, from calibration rows only |
 | Degenerate target | a 5% row is reported as degenerate, and does not count toward the precision check, when under 1% or over 99% of its test scenarios are bad |
 | Eligibility metric | mean RMSE on `judge_calibration_id`, strict improvement on both baselines; never a judge-test split |
+| BSM1 learned-model budgets | working value, not frozen: delta MLP 80 iterations, LSTM and LSTM ensemble 40 epochs at hidden size 64, recurrent model 40 epochs, ensemble of 5, seeds 0–2. The LSTM epoch count was chosen after viewing the eligibility split at 15 and 40 epochs, which biases that result toward a pass. Fix the budgets by a rule that does not read the eligibility split before the freeze |
 | Seed list | Stage A uses seeds 0–9; not frozen |
 | BSM1 measured variables | working list, not frozen: ammonia, total nitrogen, COD, suspended solids, BOD |
 | Bootstrap draw count | 500 |
