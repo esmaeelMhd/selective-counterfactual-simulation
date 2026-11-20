@@ -201,7 +201,7 @@ def test_pretest_dataset_round_trip(tmp_path) -> None:
     from scs.data.schemas import load_dataset, save_dataset
     from scs.systems.bsm1 import generate_bsm1_pretest_dataset
 
-    from scs.systems.bsm1 import pretest_specs
+    from scs.systems.bsm1 import load_dry_influent, pretest_specs
 
     plant_state = _state_after_short_rollout()
     counts = {"n_model_train": 1, "n_calibration_id": 1, "n_calibration_control": 1, "horizon": 4, "history": 2}
@@ -212,6 +212,13 @@ def test_pretest_dataset_round_trip(tmp_path) -> None:
         **counts,
     )
     assert manifest["reserved_minutes"] == [int(5.5 * 1440), 7 * 1440]
+    assert manifest["influent_scale"] == [0.9, 1.1]
+    from scs.systems.bsm1 import FLOW_INDEX, history_start_sample
+
+    spec = pretest_specs(seed=1, **counts)[0]
+    window = dataset["model_train"].disturbances[0]
+    expected = load_dry_influent()[history_start_sample(int(spec["start_minute"]), 2, len(load_dry_influent())), FLOW_INDEX + 1]
+    assert window[0, FLOW_INDEX] == pytest.approx(expected * float(spec["flow_scale"]))
     assert manifest["unique_dry_days"] == 7
     assert [repair["raw"] for repair in manifest["rain_repairs"]] == ["30.044.50", "27.446.67", "26.880.33"]
     assert manifest["confirmatory_test_generated"] is False
@@ -326,3 +333,52 @@ def test_a_corrupted_rain_cell_outside_the_flow_column_is_refused(tmp_path, monk
     monkeypatch.setattr(bsm1, "_package_data_dir", lambda: tmp_path)
     with pytest.raises(RuntimeError, match="unexpected malformed"):
         bsm1.load_rain_influent()
+
+
+def test_influent_perturbation_touches_flow_and_loads_only() -> None:
+    pytest.importorskip("bsm2_python")
+    from scs.systems.bsm1 import FLOW_INDEX, LOAD_COLUMNS, _dry_series, load_dry_influent
+
+    dry = load_dry_influent()
+    plain = _dry_series(dry, 100, 6)[:, 1:]
+    scaled = _dry_series(dry, 100, 6, flow_scale=1.1, load_scale=0.9)[:, 1:]
+    assert np.allclose(scaled[:, FLOW_INDEX], 1.1 * plain[:, FLOW_INDEX])
+    assert np.allclose(scaled[:, list(LOAD_COLUMNS)], 0.9 * plain[:, list(LOAD_COLUMNS)])
+    untouched = [index for index in range(plain.shape[1]) if index != FLOW_INDEX and index not in LOAD_COLUMNS]
+    assert 12 in untouched and 15 in untouched  # alkalinity and temperature
+    assert np.allclose(scaled[:, untouched], plain[:, untouched])
+
+
+def test_pretest_specs_draw_window_scales_in_range_and_reproducibly() -> None:
+    from scs.systems.bsm1 import INFLUENT_SCALE, pretest_specs
+
+    first = pretest_specs(seed=3)
+    again = pretest_specs(seed=3)
+    other = pretest_specs(seed=4)
+    assert [spec["flow_scale"] for spec in first] == [spec["flow_scale"] for spec in again]
+    assert [spec["flow_scale"] for spec in first] != [spec["flow_scale"] for spec in other]
+    for key in ("flow_scale", "load_scale"):
+        values = np.array([spec[key] for spec in first])
+        assert values.min() >= INFLUENT_SCALE[0] and values.max() <= INFLUENT_SCALE[1]
+        assert len(set(values.round(6))) > 0.9 * len(values)
+    assert np.corrcoef([spec["flow_scale"] for spec in first], [spec["load_scale"] for spec in first])[0, 1] < 0.3
+
+
+def test_bsm1_event_target_compares_each_limit() -> None:
+    import yaml
+
+    from scs.experiments.v3 import event_mismatch_per_limit
+    from scs.experiments.v2 import trajectory_bad_event
+    from scs.systems.bsm1 import EFFLUENT_OFFSET, STATE_DIM
+
+    config = yaml.safe_load(open("configs/v3/bsm1_events.yaml", encoding="utf-8"))
+    quiet = np.zeros((3, STATE_DIM))
+    ammonia = quiet.copy()
+    ammonia[1, EFFLUENT_OFFSET + 9] = 4.5
+    nitrogen = quiet.copy()
+    nitrogen[1, EFFLUENT_OFFSET + 11] = 25.0
+    # Both trajectories break a limit, so the combined bit agrees. The limits differ.
+    assert trajectory_bad_event("bsm1", ammonia, config) == trajectory_bad_event("bsm1", nitrogen, config) is True
+    assert event_mismatch_per_limit(ammonia, nitrogen, config) is True
+    assert event_mismatch_per_limit(ammonia, ammonia.copy(), config) is False
+    assert event_mismatch_per_limit(quiet, quiet.copy(), config) is False

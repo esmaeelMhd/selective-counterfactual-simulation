@@ -8,8 +8,8 @@ The calibration split holds 2 independent influent windows, so these numbers are
 
 | model | fit seconds | mean scenario RMSE | eligible | pooled state RMSE | one-step RMSE | flow | temperature | settler | concentration | effluent RMSE | final train loss |
 |---|---:|---:|:---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| hold_last | 0.0 | 95.69 | n/a | 103.2 | 0.947 | 3.836e-13 | 0 | 348.3 | 45.39 | 1.843 | nan |
-| linear_narx | 1.5 | 30.4 | n/a | 35.56 | 0.3272 | 3.836e-13 | 0 | 127.3 | 9.389 | 0.2938 | nan |
-| lstm_world | 42.5 | 27.42 | True | 28.36 | 48.23 | 3.836e-13 | 9.672e-09 | 81.1 | 19.55 | 0.5818 | 0.00387 |
-| recurrent_world | 154.6 | 42.14 | False | 46.83 | 29.81 | 3.836e-13 | 2.073e-08 | 159.4 | 19.66 | 1.068 | 0.01126 |
-| mlp_state_space | 9.1 | 21.08 | True | 22.08 | 0.2407 | 3.836e-13 | 1.821e-07 | 79.39 | 5.38 | 0.3847 | nan |
+| hold_last | 0.0 | 96.49 | n/a | 104.1 | 1.047 | 5.422e-12 | 4.152e-15 | 351.6 | 45.72 | 1.885 | nan |
+| linear_narx | 0.2 | 21.47 | n/a | 24.69 | 0.3831 | 5.422e-12 | 4.152e-15 | 88.21 | 6.671 | 0.2959 | nan |
+| lstm_world | 12.8 | 68.95 | False | 71.45 | 48.32 | 5.422e-12 | 1.343e-08 | 216.3 | 44.59 | 1.412 | 0.007217 |
+| recurrent_world | 70.9 | 64.35 | False | 66.51 | 28.66 | 5.422e-12 | 2.649e-08 | 184.4 | 47.91 | 1.063 | 0.01931 |
+| mlp_state_space | 10.0 | 45.5 | False | 62.11 | 0.2131 | 5.422e-12 | 4.152e-15 | 223 | 15.51 | 0.8256 | nan |
