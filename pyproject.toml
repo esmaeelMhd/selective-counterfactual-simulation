@@ -26,6 +26,13 @@ dependencies = [
 dev = [
   "pytest",
 ]
+bsm1 = [
+  "bsm2-python",
+]
+learned = [
+  "torch",
+  "timesim @ git+https://github.com/esmaeelMhd/time-series-simulator.git",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

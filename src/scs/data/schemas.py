@@ -10,19 +10,22 @@ from scs.systems.base import TrajectoryBatch
 def save_batch(batch: TrajectoryBatch, path: str | Path) -> None:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(
-        target,
-        states=batch.states,
-        actions=batch.actions,
-        disturbances=batch.disturbances,
-        scenario_type=np.asarray(batch.scenario_type, dtype=str),
-        split=np.asarray(batch.split),
-        system_id=np.asarray(batch.system_id),
-    )
+    payload = {
+        "states": batch.states,
+        "actions": batch.actions,
+        "disturbances": batch.disturbances,
+        "scenario_type": np.asarray(batch.scenario_type, dtype=str),
+        "split": np.asarray(batch.split),
+        "system_id": np.asarray(batch.system_id),
+    }
+    if batch.measured_history is not None:
+        payload["measured_history"] = batch.measured_history
+    np.savez_compressed(target, **payload)
 
 
 def load_batch(path: str | Path) -> TrajectoryBatch:
     data = np.load(Path(path), allow_pickle=False)
+    history = np.asarray(data["measured_history"], dtype=float) if "measured_history" in data.files else None
     return TrajectoryBatch(
         states=np.asarray(data["states"], dtype=float),
         actions=np.asarray(data["actions"], dtype=float),
@@ -30,6 +33,7 @@ def load_batch(path: str | Path) -> TrajectoryBatch:
         scenario_type=[str(value) for value in data["scenario_type"].tolist()],
         split=str(data["split"].tolist()),
         system_id=str(data["system_id"].tolist()),
+        measured_history=history,
     )
 
 

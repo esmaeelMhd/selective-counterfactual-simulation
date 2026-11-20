@@ -66,6 +66,7 @@ class TrajectoryBatch:
     - ``actions``: ``(n_trajectories, horizon, action_dim)``
     - ``disturbances``: ``(n_trajectories, horizon, disturbance_dim)``
     - ``scenario_type``: one label per trajectory
+    - ``measured_history``: optional ``(n, window, n_measured)`` window of measured variables available before the rollout
     """
 
     states: np.ndarray
@@ -74,6 +75,7 @@ class TrajectoryBatch:
     scenario_type: list[str]
     split: str
     system_id: str
+    measured_history: np.ndarray | None = None
 
     def __post_init__(self) -> None:
         if self.states.ndim != 3:
@@ -93,6 +95,13 @@ class TrajectoryBatch:
             raise ValueError("disturbances horizon must match actions horizon")
         if len(self.scenario_type) != n:
             raise ValueError("scenario_type must contain one label per trajectory")
+        if self.measured_history is not None:
+            history = np.asarray(self.measured_history, dtype=float)
+            object.__setattr__(self, "measured_history", history)
+            if history.ndim != 3 or history.shape[0] != n or history.shape[1] < 1 or history.shape[2] < 1:
+                raise ValueError("measured_history must have shape (n, window, n_measured)")
+            if not np.isfinite(history).all():
+                raise ValueError("measured_history contains non-finite values")
         if not np.isfinite(self.states).all():
             raise ValueError("states contain non-finite values")
         if not np.isfinite(self.actions).all():

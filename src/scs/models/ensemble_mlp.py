@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from scs.models.base import validate_rollout_inputs
+from scs.models.base import validate_rollout_batch, validate_rollout_inputs
 from scs.models.mlp_state_space import MLPStateSpaceModel
 from scs.systems.base import TrajectoryBatch
 
@@ -37,13 +37,31 @@ class EnsembleMLPModel:
         initial_state: np.ndarray,
         actions: np.ndarray,
         disturbances: np.ndarray,
+        history: np.ndarray | None = None,
     ) -> np.ndarray:
         initial_state, actions, disturbances = validate_rollout_inputs(initial_state, actions, disturbances)
         predictions = [
-            member.predict_rollout(initial_state, actions, disturbances)
+            member.predict_rollout(initial_state, actions, disturbances, history=history)
             for member in self.members
         ]
         return np.mean(np.stack(predictions, axis=0), axis=0)
+
+    def predict_rollouts(
+        self,
+        initial_states: np.ndarray,
+        actions: np.ndarray,
+        disturbances: np.ndarray,
+        history: np.ndarray | None = None,
+        project=None,
+    ) -> np.ndarray:
+        initial_states, actions, disturbances = validate_rollout_batch(initial_states, actions, disturbances)
+        if not self.members:
+            raise RuntimeError("ensemble has no members")
+        stacked = [
+            member.predict_rollouts(initial_states, actions, disturbances, history=history, project=project)
+            for member in self.members
+        ]
+        return np.mean(np.stack(stacked, axis=0), axis=0)
 
     def predict_rollout_samples(
         self,

@@ -28,6 +28,7 @@ class UserSimulatorModelProtocol(Protocol):
         initial_state: np.ndarray,
         actions: np.ndarray,
         disturbances: np.ndarray,
+        history: np.ndarray | None = None,
     ) -> np.ndarray:
         """Return predicted states with shape ``(horizon + 1, state_dim)``."""
 
@@ -45,6 +46,7 @@ class UserSimulatorModel:
         initial_state: np.ndarray,
         actions: np.ndarray,
         disturbances: np.ndarray,
+        history: np.ndarray | None = None,
     ) -> np.ndarray:
         raise NotImplementedError("custom models must implement predict_rollout")
 

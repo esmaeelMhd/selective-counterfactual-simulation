@@ -1,0 +1,86 @@
+# Exploratory Stage A settings. Not the confirmatory freeze.
+stage: A
+label: exploratory
+event_config: configs/v2/v2_event_targets.yaml
+
+systems:
+  - two_tank
+  - cstr
+  - heat_exchanger
+
+models:
+  - hold_last
+  - linear_narx
+  - mlp_state_space
+  - ensemble_mlp
+  - gradient_boosted_narx
+
+learned_models:
+  - mlp_state_space
+  - ensemble_mlp
+  - gradient_boosted_narx
+
+# Eligibility is scored before any judge-test row is read.
+eligibility_split: judge_calibration_id
+
+eligibility_baselines:
+  - hold_last
+  - linear_narx
+
+primary_coverages:
+  - 0.05
+  - 0.10
+
+badness_targets:
+  - bad_rmse
+  - bad_event
+
+# Working thresholds, one per system, not frozen. Each is 10 times the 99th percentile of the
+# best model's RMSE on judge_calibration_id for that system, over seeds 0-2. Only calibration
+# rows were read. A scenario is bad when its error is far outside what the best model does
+# on almost every in-distribution scenario.
+rmse_threshold:
+  two_tank: 0.08
+  cstr: 0.38
+  heat_exchanger: 0.095
+
+# A 5% row whose test labels are under 1% or over 99% bad is reported as degenerate.
+degenerate_share: 0.01
+
+seeds:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+
+event_guard_inputs:
+  - risk_invariant_only
+  - risk_disagreement_only
+  - risk_support_only
+
+bootstrap_samples: 500
+bootstrap_seed: 2025
+interval_width_limit: 0.10
+min_test_scenarios: 2000
+
+data:
+  horizon: 32
+  dt: 0.1
+  n_model_train: 160
+  n_calibration_id: 80
+  n_calibration_ood: 80
+  n_test_id: 400
+  n_test_ood: 400
+  uncertainty_samples: 2
+
+model_runtime:
+  mlp_max_iter: 400
+  ensemble_members: 5
+  ensemble_mlp_max_iter: 400
+  gradient_boosting_max_iter: 200

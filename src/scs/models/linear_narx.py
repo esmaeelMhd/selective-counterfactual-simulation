@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 from sklearn.linear_model import Ridge
 
-from scs.models.base import flatten_supervised, validate_rollout_inputs
+from scs.models.base import flatten_supervised, rollout_from_delta, validate_history, validate_rollout_batch, validate_rollout_inputs
 from scs.systems.base import TrajectoryBatch
 
 
@@ -28,11 +28,29 @@ class LinearNARXModel:
         feature = np.concatenate([state, action, disturbance], axis=0)[None, :]
         return np.asarray(self.regressor.predict(feature)[0], dtype=float)
 
+    def _delta_batch(self, states: np.ndarray, actions: np.ndarray, disturbances: np.ndarray) -> np.ndarray:
+        features = np.concatenate([states, actions, disturbances], axis=1)
+        return np.asarray(self.regressor.predict(features), dtype=float)
+
+    def predict_rollouts(
+        self,
+        initial_states: np.ndarray,
+        actions: np.ndarray,
+        disturbances: np.ndarray,
+        history: np.ndarray | None = None,
+        noise: np.ndarray | None = None,
+        project=None,
+    ) -> np.ndarray:
+        initial_states, actions, disturbances = validate_rollout_batch(initial_states, actions, disturbances)
+        validate_history(history, initial_states.shape[0])
+        return rollout_from_delta(self._delta_batch, initial_states, actions, disturbances, noise, project)
+
     def predict_rollout(
         self,
         initial_state: np.ndarray,
         actions: np.ndarray,
         disturbances: np.ndarray,
+        history: np.ndarray | None = None,
     ) -> np.ndarray:
         initial_state, actions, disturbances = validate_rollout_inputs(initial_state, actions, disturbances)
         states = np.empty((len(actions) + 1, initial_state.shape[0]), dtype=float)

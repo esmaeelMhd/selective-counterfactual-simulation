@@ -7,7 +7,7 @@ from sklearn.exceptions import ConvergenceWarning
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
 
-from scs.models.base import flatten_supervised, validate_rollout_inputs
+from scs.models.base import flatten_supervised, rollout_from_delta, validate_history, validate_rollout_batch, validate_rollout_inputs
 from scs.systems.base import TrajectoryBatch
 
 
@@ -54,11 +54,30 @@ class MLPStateSpaceModel:
         y_scaled = self.regressor.predict(x_scaled)
         return np.asarray(self.y_scaler.inverse_transform(y_scaled)[0], dtype=float)
 
+    def _delta_batch(self, states: np.ndarray, actions: np.ndarray, disturbances: np.ndarray) -> np.ndarray:
+        features = np.concatenate([states, actions, disturbances], axis=1)
+        scaled = self.regressor.predict(self.x_scaler.transform(features))
+        return np.asarray(self.y_scaler.inverse_transform(scaled), dtype=float)
+
+    def predict_rollouts(
+        self,
+        initial_states: np.ndarray,
+        actions: np.ndarray,
+        disturbances: np.ndarray,
+        history: np.ndarray | None = None,
+        noise: np.ndarray | None = None,
+        project=None,
+    ) -> np.ndarray:
+        initial_states, actions, disturbances = validate_rollout_batch(initial_states, actions, disturbances)
+        validate_history(history, initial_states.shape[0])
+        return rollout_from_delta(self._delta_batch, initial_states, actions, disturbances, noise, project)
+
     def predict_rollout(
         self,
         initial_state: np.ndarray,
         actions: np.ndarray,
         disturbances: np.ndarray,
+        history: np.ndarray | None = None,
     ) -> np.ndarray:
         initial_state, actions, disturbances = validate_rollout_inputs(initial_state, actions, disturbances)
         states = np.empty((len(actions) + 1, initial_state.shape[0]), dtype=float)
