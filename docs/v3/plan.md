@@ -1,6 +1,6 @@
 # v3 plan: a powered, pre-registered refusal benchmark on a recognised process model
 
-Status: WP0 drafted. WP1 Stage A has been run and is exploratory, with a `bad_rmse` threshold per system and a check that does not count degenerate targets as a pass. WP2 has a checked BSM1 port, the measured-history API, effluent-limit events, and a dry-weather train and calibration dataset at an 8-hour horizon. The packaged dry file holds 7 unique days, not 14, so the splits share them out (train 0–3.5, calibration 3.5–5.5, days 5.5–7 reserved), and each calibration split holds about 2 independent influent windows. The rain file is repaired and loadable, but its only rain event belongs to the confirmatory test, so no rain split exists yet. The package has no storm file, so storm is unset. WP3 adapters call the LSTM and the recurrent state-space model from time-series-simulator. Both now train on whole trajectories in chunks and carry their state in the rollout. On BSM1 calibration rows, one seed, the delta MLP (21.1) and the LSTM (27.4) pass the working eligibility rule against `linear_narx` (30.4), and the recurrent state-space model does not (42.1). The margin is thin and the split is small, so this is not a result. The per-channel gradient-boosted model was not scored on BSM1: fitting one model for each of the 136 states did not finish. Eligibility is scored on `judge_calibration_id`, so it is decided before the freeze. The protocol is not frozen. Nothing in this plan changes v1 or v2 artifacts or claims.
+Status: WP0 drafted. WP1 Stage A has been run and is exploratory, with a `bad_rmse` threshold per system and a check that does not count degenerate targets as a pass. WP2 has a checked BSM1 port, the measured-history API, effluent-limit events, and a dry-weather train and calibration dataset at an 8-hour horizon with a per-window influent perturbation. The packaged dry file holds 7 unique days, not 14, so the splits share them out (train 0–3.5, calibration 3.5–5.5, days 5.5–7 reserved), and each calibration split holds about 2 independent influent windows. The rain file is repaired and loadable, but its only rain event belongs to the confirmatory test, so no rain split exists yet. The package has no storm file, so storm is dropped. WP3 adapters call the LSTM and the recurrent state-space model from time-series-simulator. Both now train on whole trajectories in chunks and carry their state in the rollout. With each window's influent flow and load perturbed by up to 10%, no learned model is eligible on BSM1 calibration rows (one seed): `linear_narx` has a mean scenario RMSE of 21.5, against 45.5 for the delta MLP, 64.4 for the recurrent state-space model and 69.0 for the LSTM. Larger training budgets (400 MLP iterations, 80 LSTM epochs at hidden size 128, 40 recurrent epochs) did not help. An earlier check without the perturbation had two learned models passing, and that result came from near-duplicate windows, so it was dropped. The WP3 done criterion is not met. The per-channel gradient-boosted model was not scored on BSM1: fitting one model for each of the 136 states did not finish. Eligibility is scored on `judge_calibration_id`, so it is decided before the freeze. The protocol is not frozen. Nothing in this plan changes v1 or v2 artifacts or claims.
 
 ## Goal
 
@@ -99,8 +99,8 @@ Hours assume 6 to 8 a week.
 
 - **New system: BSM1**, the standard activated-sludge wastewater benchmark. It defines its
   own events (effluent limits on ammonia, total nitrogen, COD, suspended solids and BOD) and
-  its own shifted conditions (dry, rain and storm influent files).
-- Splits: train on dry weather with controls in the nominal range. Test on rain, storm,
+  its own shifted conditions (dry and rain influent files; storm is dropped, see Open decisions).
+- Splits: train on dry weather with controls in the nominal range. Test on rain,
   control moves outside the training range, and the combination.
 - Use an existing open Python implementation. Check its licence, check it against the
   published BSM1 steady-state values, and time one run before generating data.
@@ -174,6 +174,7 @@ could test refusal on unusual historical periods of one wastewater plant dataset
 
 | Decision | Default |
 |---|---|
+| Storm weather on BSM1 | Dropped. The package has no storm file, and the public benchmark repository checked has none. Back in only if an official file is supplied before the freeze |
 | Real-plant section | Out, unless permission arrives by week 8 |
 | Neural SDE model | Stretch goal, only after WP3 is done |
 | Venue | arXiv plus one workshop or journal, chosen in week 12 |
