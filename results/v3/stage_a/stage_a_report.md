@@ -32,7 +32,7 @@ Bootstrap of the seed-level mean margin of eligible models, for `calibration_sel
 
 | system_id | badness_target | n_seeds | bad_share | degenerate | n_models | thin_models | mean_margin | bootstrap_low | bootstrap_high | interval_width | narrower_than_limit |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| cstr | bad_event | 10 | 0.2268 | False | 3 | 0 | 0.2264 | 0.1978 | 0.2533 | 0.0555 | True |
+| cstr | bad_event | 10 | 0.2268 | False | 3 | 0 | 0.2279 | 0.2007 | 0.2539 | 0.0532 | True |
 | cstr | bad_rmse | 10 | 0.4667 | False | 3 | 0 | 0.4621 | 0.4421 | 0.4853 | 0.0431 | True |
 | two_tank | bad_event | 10 | 0.0000 | True | 3 | 3 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | True |
 | two_tank | bad_rmse | 10 | 0.6744 | False | 3 | 0 | 0.6850 | 0.6690 | 0.7005 | 0.0315 | True |
@@ -48,21 +48,42 @@ These numbers are the working settings in the config. A freeze is a later commit
 - seeds: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
 - minimum judge-test scenarios: 2000
 
+## Descriptive coverages
+
+Descriptive only. These coverages are not part of any decision rule, and nothing was selected or tuned on them. They show how the judges compare where fewer in-distribution scenarios are left to accept. Mean false-accept rate over eligible models and seeds.
+
+| system_id | badness_target | coverage | random | primary | best_simple_on_calibration | support_only | uncertainty_only | disagreement_only | invariant_only | repair_only | event_guard | event_guard_no_invariant | bad_share |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| cstr | bad_event | 0.2500 | 0.2288 | 0.0745 | 0.0760 | 0.0707 | 0.1467 | 0.2221 | 0.0751 | 0.0796 | 0.0941 | 0.1049 | 0.2268 |
+| cstr | bad_event | 0.5000 | 0.2280 | 0.1066 | 0.1039 | 0.0992 | 0.1789 | 0.1941 | 0.1024 | 0.1004 | 0.1287 | 0.1642 | 0.2268 |
+| cstr | bad_event | 0.7500 | 0.2263 | 0.1832 | 0.1948 | 0.1869 | 0.2183 | 0.2004 | 0.1880 | 0.1916 | 0.1904 | 0.2013 | 0.2268 |
+| cstr | bad_rmse | 0.2500 | 0.4628 | 0.0468 | 0.0459 | 0.0627 | 0.3294 | 0.0470 | 0.0468 | 0.0795 | 0.0573 | 0.1310 | 0.4667 |
+| cstr | bad_rmse | 0.5000 | 0.4670 | 0.0614 | 0.0784 | 0.2013 | 0.3559 | 0.1060 | 0.0614 | 0.2025 | 0.0735 | 0.1981 | 0.4667 |
+| cstr | bad_rmse | 0.7500 | 0.4668 | 0.2889 | 0.2889 | 0.3191 | 0.4080 | 0.2889 | 0.2889 | 0.2889 | 0.2978 | 0.3503 | 0.4667 |
+| two_tank | bad_event | 0.2500 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| two_tank | bad_event | 0.5000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| two_tank | bad_event | 0.7500 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| two_tank | bad_rmse | 0.2500 | 0.6729 | 0.0733 | 0.1526 | 0.0739 | 0.4635 | 0.3655 | 0.1487 | 0.2000 | 0.1749 | 0.3184 | 0.6744 |
+| two_tank | bad_rmse | 0.5000 | 0.6757 | 0.3487 | 0.3990 | 0.3487 | 0.5460 | 0.4683 | 0.3511 | 0.6000 | 0.3760 | 0.4753 | 0.6744 |
+| two_tank | bad_rmse | 0.7500 | 0.6741 | 0.5658 | 0.5689 | 0.5658 | 0.6220 | 0.5738 | 0.5658 | 0.7333 | 0.5658 | 0.5878 | 0.6744 |
+
 ## Event guard at 5% coverage
 
 Exploratory only. `event_guard` is the v2 candidate: the maximum calibration-percentile rank of invariant, disagreement, and support. `event_guard_no_invariant` replaces invariant with uncertainty, so it needs no full-state signal. `margin_vs_primary` and `margin_vs_calibration_simple` use the simple baseline chosen on calibration rows. They are not a Q3 answer. Only eligible models enter the averages. A guard is not computed when one of its inputs is missing.
 
-| guard | system_id | badness_target | n_models | event_guard_far | primary_far | calibration_simple_far | margin_vs_primary | margin_vs_calibration_simple |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| event_guard | cstr | bad_event | 3 | 0.0102 | 0.0074 | 0.0045 | -0.0029 | -0.0057 |
-| event_guard | cstr | bad_rmse | 3 | 0.0000 | 0.0000 | 0.0010 | 0.0000 | 0.0010 |
-| event_guard | two_tank | bad_event | 3 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
-| event_guard | two_tank | bad_rmse | 3 | 0.0000 | 0.0000 | 0.0003 | 0.0000 | 0.0003 |
-| event_guard_no_invariant | cstr | bad_event | 3 | 0.0783 | 0.0074 | 0.0045 | -0.0710 | -0.0738 |
-| event_guard_no_invariant | cstr | bad_rmse | 3 | 0.0533 | 0.0000 | 0.0010 | -0.0533 | -0.0524 |
-| event_guard_no_invariant | two_tank | bad_event | 3 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
-| event_guard_no_invariant | two_tank | bad_rmse | 3 | 0.1123 | 0.0000 | 0.0003 | -0.1123 | -0.1120 |
+| guard | system_id | badness_target | n_models | event_guard_far | primary_far | calibration_simple_far | margin_vs_primary | margin_vs_calibration_simple | room_for_q3 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| event_guard | cstr | bad_event | 3 | 0.0102 | 0.0060 | 0.0045 | -0.0043 | -0.0057 | False |
+| event_guard | cstr | bad_rmse | 3 | 0.0000 | 0.0000 | 0.0010 | 0.0000 | 0.0010 | False |
+| event_guard | two_tank | bad_event | 3 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | False |
+| event_guard | two_tank | bad_rmse | 3 | 0.0000 | 0.0000 | 0.0003 | 0.0000 | 0.0003 | False |
+| event_guard_no_invariant | cstr | bad_event | 3 | 0.0700 | 0.0060 | 0.0045 | -0.0640 | -0.0655 | False |
+| event_guard_no_invariant | cstr | bad_rmse | 3 | 0.0510 | 0.0000 | 0.0010 | -0.0510 | -0.0500 | False |
+| event_guard_no_invariant | two_tank | bad_event | 3 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | False |
+| event_guard_no_invariant | two_tank | bad_rmse | 3 | 0.1237 | 0.0000 | 0.0003 | -0.1237 | -0.1233 | False |
 
 `event_guard` has no eligible model, so no row, on: heat_exchanger.
 
 `event_guard_no_invariant` has no eligible model, so no row, on: heat_exchanger.
+
+`room_for_q3` is true only when both the primary ranker and the calibration-chosen simple baseline have a false-accept rate of at least 0.05. The yes rule asks for an absolute improvement of 0.05 over both, and a false-accept rate cannot fall below zero, so where this is false Q3 cannot be yes whatever the guard does.

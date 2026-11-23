@@ -31,6 +31,13 @@ primary_coverages:
   - 0.05
   - 0.10
 
+# Reported for every judge, and part of no decision rule. The task is easier at the primary coverages,
+# where the accepted set can be mostly in-distribution scenarios.
+descriptive_coverages:
+  - 0.25
+  - 0.50
+  - 0.75
+
 badness_targets:
   - bad_rmse
   - bad_event
@@ -84,7 +91,7 @@ data:
   n_calibration_ood: 80
   n_test_id: 400
   n_test_ood: 400
-  uncertainty_samples: 2
+  uncertainty_samples: 5
 
 model_runtime:
   mlp_max_iter: 400

@@ -315,3 +315,54 @@ def test_thin_models_are_counted_inside_a_row_that_is_not_degenerate() -> None:
     row = table.iloc[0]
     assert bool(row["degenerate"]) is False
     assert (int(row["n_models"]), int(row["thin_models"])) == (2, 1)
+
+
+def test_descriptive_coverages_are_scored_but_stay_out_of_the_decision_tables(tmp_path: Path) -> None:
+    from scs.experiments.v3 import interval_table
+
+    path = _tiny_config(tmp_path / "tiny.yaml")
+    config = yaml.safe_load(path.read_text(encoding="utf-8"))
+    config["descriptive_coverages"] = [0.5, 0.75]
+    path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    run_v3_stage(path, tmp_path / "out")
+    results = pd.read_csv(tmp_path / "out" / "stage_a_results.csv")
+    roles = results.groupby("coverage")["coverage_role"].first().to_dict()
+    assert roles == {0.05: "primary", 0.1: "primary", 0.5: "descriptive", 0.75: "descriptive"}
+    # No judge or baseline was selected on a descriptive coverage: the simple baseline is the same one.
+    assert results.groupby(["system_id", "seed", "model_id", "badness_target"])["calibration_simple_baseline"].nunique().max() == 1
+    report = (tmp_path / "out" / "stage_a_report.md").read_text(encoding="utf-8")
+    assert "## Descriptive coverages" in report and "part of any decision rule" in report
+
+
+def test_the_guard_table_says_where_q3_has_no_room() -> None:
+    from scs.experiments.v3 import _guard_lines
+
+    def row(system, model, far, primary, simple):
+        return {
+            "system_id": system,
+            "model_id": model,
+            "judge_id": "event_guard",
+            "eligible": True,
+            "coverage": 0.05,
+            "badness_target": "bad_event",
+            "false_accept_rate": far,
+            "primary_far": primary,
+            "calibration_simple_far": simple,
+        }
+
+    text = _guard_lines(pd.DataFrame([row("full", "m", 0.01, 0.30, 0.20), row("floor", "m", 0.0, 0.01, 0.0)]))
+    lines = {line.split("|")[2].strip(): line for line in text.splitlines() if line.startswith("| event_guard")}
+    assert lines["full"].rstrip().endswith("| True |")
+    assert lines["floor"].rstrip().endswith("| False |")
+    assert "cannot be yes" in text
+
+
+def test_the_interval_table_reads_primary_coverages_only() -> None:
+    from scs.experiments.v3 import interval_table
+
+    rows = _margin_rows("cstr", "bad_rmse", 0.4, [0.30, 0.31, 0.29])
+    rows += [{**row, "coverage": 0.5} for row in _margin_rows("cstr", "bad_rmse", 0.4, [0.0, 0.1, 0.2])]
+    for row in rows:
+        row["coverage_role"] = "primary" if row["coverage"] == 0.05 else "descriptive"
+    table = interval_table(pd.DataFrame(rows), {"bootstrap_seed": 1, "bootstrap_samples": 20, "interval_width_limit": 0.10})
+    assert list(table["coverage"]) == [0.05]

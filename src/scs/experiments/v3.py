@@ -78,6 +78,10 @@ def load_v3_config(path: str | Path) -> dict[str, Any]:
 
 
 DEFAULT_DEGENERATE_SHARE = 0.01
+# The practical thresholds of the yes rule in the protocol. Q3 has to beat the primary ranker
+# and the best simple baseline by at least the absolute one, so it needs room above zero.
+PRACTICAL_ABSOLUTE_REDUCTION = 0.05
+PRACTICAL_RELATIVE_REDUCTION = 0.10
 FULL_STATE_RISK_COLUMNS = ("risk_invariant_only", "risk_repair_only")
 
 
@@ -420,6 +424,9 @@ def _assign_random(test: pd.DataFrame, seed: int) -> np.ndarray:
 
 def result_rows_for_frame(frame: pd.DataFrame, config: dict[str, Any], eligibility: pd.DataFrame) -> pd.DataFrame:
     coverages = [float(value) for value in config["primary_coverages"]]
+    # Descriptive coverages are scored for every judge, but nothing is selected or decided on them.
+    descriptive = [float(value) for value in config.get("descriptive_coverages", [])]
+    curve_coverages = coverages + [value for value in descriptive if not any(np.isclose(value, c) for c in coverages)]
     eligible = {
         (row.system_id, row.model_id): bool(row.eligible) for row in eligibility.itertuples(index=False)
     }
@@ -465,13 +472,13 @@ def result_rows_for_frame(frame: pd.DataFrame, config: dict[str, Any], eligibili
                     if ready:
                         judge_scores[guard_id] = event_guarded_score(model_calibration, model_test, list(inputs))
                 labels = model_test["bad_label"].to_numpy(dtype=bool)
-                random_curve = _risk_curve_from_labels(labels, judge_scores[RANDOM_JUDGE], coverages)
-                primary_curve = _risk_curve_from_labels(labels, judge_scores[PRIMARY_JUDGE], coverages)
-                simple_curve = _risk_curve_from_labels(labels, judge_scores[simple_name], coverages)
+                random_curve = _risk_curve_from_labels(labels, judge_scores[RANDOM_JUDGE], curve_coverages)
+                primary_curve = _risk_curve_from_labels(labels, judge_scores[PRIMARY_JUDGE], curve_coverages)
+                simple_curve = _risk_curve_from_labels(labels, judge_scores[simple_name], curve_coverages)
                 primary_far = {float(row.coverage): float(row.false_accept_rate) for row in primary_curve.itertuples(index=False)}
                 simple_far = {float(row.coverage): float(row.false_accept_rate) for row in simple_curve.itertuples(index=False)}
                 for judge_id, scores in judge_scores.items():
-                    curve = _risk_curve_from_labels(labels, scores, coverages)
+                    curve = _risk_curve_from_labels(labels, scores, curve_coverages)
                     for row, random_row in zip(curve.itertuples(index=False), random_curve.itertuples(index=False), strict=True):
                         absolute = float(random_row.false_accept_rate - row.false_accept_rate)
                         pieces.append(
@@ -482,6 +489,9 @@ def result_rows_for_frame(frame: pd.DataFrame, config: dict[str, Any], eligibili
                                 "eligible": bool(eligible.get((system_id, model_id), False)),
                                 "badness_target": target,
                                 "coverage": float(row.coverage),
+                                "coverage_role": (
+                                    "primary" if any(np.isclose(float(row.coverage), c) for c in coverages) else "descriptive"
+                                ),
                                 "judge_id": judge_id,
                                 "false_accept_rate": float(row.false_accept_rate),
                                 "random_far": float(random_row.false_accept_rate),
@@ -516,6 +526,8 @@ def interval_table(results: pd.DataFrame, config: dict[str, Any]) -> pd.DataFram
     margin is then fixed near zero by the labels, so a narrow interval says nothing.
     """
     primary = results[(results["judge_id"] == PRIMARY_JUDGE) & (results["eligible"])].copy()
+    if "coverage_role" in primary.columns:
+        primary = primary[primary["coverage_role"] == "primary"]
     rng = np.random.default_rng(int(config["bootstrap_seed"]))
     rows = []
     if primary.empty:
@@ -634,6 +646,9 @@ def _guard_lines(results: pd.DataFrame) -> str:
                 margin_vs_calibration_simple=("margin_vs_calibration_simple", "mean"),
             )
         )
+        summary["room_for_q3"] = (summary["primary_far"] >= PRACTICAL_ABSOLUTE_REDUCTION) & (
+            summary["calibration_simple_far"] >= PRACTICAL_ABSOLUTE_REDUCTION
+        )
         summary.insert(0, "guard", guard_id)
         tables.append(summary)
     if not tables:
@@ -650,9 +665,46 @@ def _guard_lines(results: pd.DataFrame) -> str:
             "calibration_simple_far",
             "margin_vs_primary",
             "margin_vs_calibration_simple",
+            "room_for_q3",
         ],
     )
+    notes.append(
+        f"`room_for_q3` is true only when both the primary ranker and the calibration-chosen simple baseline have a "
+        f"false-accept rate of at least {PRACTICAL_ABSOLUTE_REDUCTION}. The yes rule asks for an absolute improvement of "
+        f"{PRACTICAL_ABSOLUTE_REDUCTION} over both, and a false-accept rate cannot fall below zero, so where this is false Q3 "
+        "cannot be yes whatever the guard does."
+    )
     return "\n\n".join([table, *notes])
+
+
+def _descriptive_lines(results: pd.DataFrame) -> str:
+    """False-accept rates at the descriptive coverages. Not part of any decision rule."""
+    if "coverage_role" not in results.columns:
+        return "_none_"
+    rows = results[(results["coverage_role"] == "descriptive") & results["eligible"]]
+    if rows.empty:
+        return "_none_"
+    wide = rows.pivot_table(
+        index=["system_id", "badness_target", "coverage"], columns="judge_id", values="false_accept_rate", aggfunc="mean"
+    )
+    simple = rows[rows["judge_id"] == PRIMARY_JUDGE].groupby(["system_id", "badness_target", "coverage"])["calibration_simple_far"].mean()
+    wide["best_simple_on_calibration"] = simple
+    wide["bad_share"] = rows.groupby(["system_id", "badness_target", "coverage"])["bad_share"].mean()
+    order = [
+        "random_baseline",
+        PRIMARY_JUDGE,
+        "best_simple_on_calibration",
+        "support_only",
+        "uncertainty_only",
+        "disagreement_only",
+        "invariant_only",
+        "repair_only",
+        *sorted(column for column in wide.columns if str(column).startswith("event_guard")),
+        "bad_share",
+    ]
+    wide = wide[[column for column in order if column in wide.columns]].reset_index()
+    wide = wide.rename(columns={PRIMARY_JUDGE: "primary", "random_baseline": "random"})
+    return _markdown_table(wide, list(wide.columns))
 
 
 def _write_report(
@@ -672,9 +724,14 @@ def _write_report(
     thresholds = ", ".join(f"{name} {rmse_threshold_for(config, str(name)):g}" for name in config["systems"])
     stage = str(config.get("stage", "A"))
     label = str(config.get("label", "exploratory"))
+    reading = (
+        "This report lists the numbers the decision rules use. The reading of Q1, Q2, and Q3 is written by hand."
+        if stage == "B"
+        else "This report does not answer Q1, Q2, or Q3."
+    )
     text = f"""# v3 Stage {stage} report
 
-Label: {label}. This report does not answer Q1, Q2, or Q3.
+Label: {label}. {reading}
 
 The margin is the random false-accept rate minus the judge false-accept rate. A positive margin means the judge accepts fewer bad scenarios than that random ranking. This is not the v2 `absolute_margin`, which selects the lowest test-set false-accept rate among simple and stronger baselines.
 
@@ -700,6 +757,12 @@ These numbers are the working settings in the config. A freeze is a later commit
 - `bad_rmse` threshold per system: {thresholds}
 - seeds: {", ".join(str(seed) for seed in config["seeds"])}
 - minimum judge-test scenarios: {config["min_test_scenarios"]}
+
+## Descriptive coverages
+
+Descriptive only. These coverages are not part of any decision rule, and nothing was selected or tuned on them. They show how the judges compare where fewer in-distribution scenarios are left to accept. Mean false-accept rate over eligible models and seeds.
+
+{_descriptive_lines(results)}
 
 ## Event guard at 5% coverage
 
