@@ -21,7 +21,7 @@ Badness targets, same definitions as `docs/v2/benchmark_task.md`:
 - `bad_rmse`: trajectory RMSE exceeds the threshold fixed for that system before the run.
 - `bad_event`: predicted event status disagrees with true event status. On the three ODE systems that is one bit per trajectory, `true_event != pred_event`, not a count of limit crossings. On BSM1 each of the five effluent limits is its own bit, and a scenario is bad when any of the five bits differs. The combined any-limit bit is not used there, because on the dry calibration rows it never disagrees: the open-loop plant is nearly always over the ammonia limit.
 
-Primary coverages, carried from the v2 lock: 0.05 and 0.10. Both are reported. Whether a yes requires both, either, or a pooled margin is open until the freeze. Stage A does not collapse them.
+Primary coverages, carried from the v2 lock: 0.05 and 0.10. Both are reported. Working rule, not frozen: a yes requires both coverages to pass. The two accepted sets are nested and highly correlated, so requiring both costs little power, and "either" would give two chances at a yes. Stage A does not collapse them.
 
 ## Decision questions
 
@@ -62,13 +62,15 @@ Primary calibrated judge: `calibration_selected_candidate_ranker`. It is fit onl
 
 Event-guard candidate, starting definition, taken from `configs/v2/v2_event_risk_fix.yaml` and `event_guarded_score` in `src/scs/experiments/v2_event_risk.py`: the score is the maximum calibration-percentile rank of `risk_invariant_only`, `risk_disagreement_only`, and `risk_support_only`. Lower is safer. A scenario is low risk only when all three are low relative to calibration. Stage A may replace this definition. The replacement is written into this file before the freeze. No new raw signal is allowed in the replacement.
 
+Working BSM1 guard, not frozen: `event_guard_no_invariant`, the maximum calibration-percentile rank of `risk_support_only`, `risk_uncertainty_only`, and `risk_disagreement_only`. It replaces the invariant input of the v2 guard with the uncertainty input, adds no raw signal, and needs no full-state signal, so it is defined on every system. Stage A reports it next to the v2 guard on the three ODE systems, as exploratory. It is not tuned. If it does not beat the primary ranker and the best simple baseline, Q3 is a no.
+
 `oracle_error_rank` is diagnostic only and cannot count as a judge.
 
 ## Rules that apply to all three questions
 
 **Model eligibility.** See the working definition above.
 
-**Sample size.** At least 2,000 judge-test scenarios per system, seed, and model. At least 8,000 where simulation is cheap. At 5% coverage, 2,000 scenarios make one accepted case move the false-accept rate by 0.01. The decision interval is over seeds. The seed list is what makes that interval narrow, and it is still open.
+**Sample size.** At least 2,000 judge-test scenarios per system, seed, and model. At least 8,000 where simulation is cheap. At 5% coverage, 2,000 scenarios make one accepted case move the false-accept rate by 0.01. The decision interval is over seeds. Working Stage B seed list, not frozen: 0–9, as in Stage A. On BSM1 the 2,000 scenarios are 500 windows in each of four test splits, and overlapping windows count toward them (see Stage B).
 
 **Split separation.** Simulator models fit only on `model_train`. Judges and baselines fit only on judge-calibration rows. Effect estimates use only judge-test rows. If any calibration and test scenario hash overlaps, the run is invalid.
 
@@ -84,7 +86,16 @@ Each window also gets one influent flow factor and one load factor, drawn unifor
 
 The packaged rain file has three malformed flow cells, and its flow is in thousands of m³/d. The loader repairs both. Each bad cell has a stray second decimal point, and without it the value lies on the straight line between its readable neighbours, which the code checks. The only rain event is on days 8–10 of that file, and those days belong to the confirmatory test. No rain split is generated before the freeze, so judge calibration uses the control shift only. The package has no storm file, and the public benchmark repository checked has none, so storm is dropped from the confirmatory test. It comes back only if an official file is supplied before the freeze.
 
-Signals that need the full state (`invariant_residual`, `repair_amount`) are marked not available on BSM1. A judge must still return a score when a signal is missing. The v2 event guard uses the invariant signal, so that guard is not the BSM1 guard. The runner does not compute the guard on the inputs that remain, because that would be a different guard. It reports the guard as undefined on that system. Q3 stays unanswered until this file names the guard that runs when invariant and repair are absent.
+Confirmatory test splits, working layout, not frozen. Four splits, 500 windows each, so 2,000 per seed and model:
+
+- `judge_test_dry_holdout`: the reserved dry days 5.5–7, nominal aeration.
+- `judge_test_dry_control`: the same windows, with the same per-window flow and load factors, and control-shifted aeration. The shifted aeration is 1.8 to 2.2 times the nominal rate in reactors 3 to 5, outside the 1.5 to 1.8 family of `judge_calibration_control`.
+- `judge_test_rain`: the rain event, days 8–11 of the repaired rain file, nominal aeration.
+- `judge_test_rain_control`: the same rain windows with control-shifted aeration.
+
+Each control window reuses the influent days and the flow and load factors of the nominal window with the same index, so the pair differs in aeration only. Test splits may share influent with each other. Calibration and test may not, and the generator reads the reserved days only when this file says it is frozen. The windows are spread evenly over each block and overlap each other. The reserved dry block holds 4 non-overlapping 495-minute windows and the rain event holds 8, so the test rests on those independent windows and the interval is conditional on those days. Overlapping windows count toward the 2,000, because the sample-size rule is about how finely one accepted case moves the false-accept rate, not about independence. The reserved dry block is the weekend, with a daily mean flow near 16,200 m³/d against 18,700 to 19,800 on the weekdays that training uses, so the dry hold-out is a mild shift, not in-distribution data.
+
+Signals that need the full state (`invariant_residual`, `repair_amount`) are marked not available on BSM1. A judge must still return a score when a signal is missing. The v2 event guard uses the invariant signal, so that guard is not the BSM1 guard. The runner does not compute the guard on the inputs that remain, because that would be a different guard. It reports the guard as undefined on that system. On BSM1, Q3 uses `event_guard_no_invariant`, the working definition above.
 
 ## What this protocol does not support
 
@@ -102,8 +113,8 @@ A row with a Stage A value is a working setting. It is part of the freeze only w
 | Item | Now |
 |---|---|
 | Event-guard definition on the fully observed systems | v2 candidate above; Stage A may replace it |
-| Event-guard definition on BSM1 | unset. Q3 cannot be answered until this row is filled |
-| How 5% and 10% combine into one yes | unset. Stage A reports each coverage separately |
+| Event-guard definition on BSM1 | working, not frozen: `event_guard_no_invariant`, the maximum calibration-percentile rank of support, uncertainty and disagreement |
+| How 5% and 10% combine into one yes | working, not frozen: both must pass. Stage A reports each coverage separately |
 | Horizon, ensemble size, training stop | Stage A config sets a working value for the three ODE systems; not frozen |
 | BSM1 horizon | working value, not frozen: 15 minutes of measured history and 480 minutes of prediction, one reactor hydraulic time |
 | BSM1 dry-file blocks | working value, not frozen, of the 7 unique days: train 0–3.5, calibration ID 3.5–4.5, calibration control 4.5–5.5, reserved 5.5–7 |
@@ -115,6 +126,10 @@ A row with a Stage A value is a working setting. It is part of the freeze only w
 | Degenerate target | a 5% row is reported as degenerate, and does not count toward the precision check, when under 1% or over 99% of its test scenarios are bad |
 | Eligibility metric | mean RMSE on `judge_calibration_id`, strict improvement on both baselines; never a judge-test split |
 | BSM1 learned-model budgets | working rule, not frozen: LSTM, LSTM ensemble (5 members) and recurrent model use early stopping on the last 15% of the `model_train` windows, less a gap of 18 windows (the number of neighbours that overlap one window in time). The free-running rollout error with the BSM1 flow assignment is checked every 5 epochs, the best weights are kept, and training stops after 3 checks without improvement or at 120 epochs. Neither calibration split is read. The delta MLP keeps 80 iterations from before this work. Seeds 0–2 |
-| Seed list | Stage A uses seeds 0–9; not frozen |
+| Seed list | Stage A uses seeds 0–9; not frozen. Working Stage B list: seeds 0–9 |
+| Stage B test layout | working, not frozen: four splits of 500 windows (dry hold-out, dry control, rain, rain control), 2,000 per seed and model |
+| Overlapping test windows | working, not frozen: they count toward the 2,000. The test rests on 4 dry and 8 rain independent windows, and the interval is conditional on those days |
+| Control scale in the test | working, not frozen: 1.8 to 2.2 times nominal aeration in reactors 3 to 5. Chosen on 40 fresh windows per split from days that are not reserved, scored against the 61.761 threshold. The 1.5 to 1.8 calibration family marked 52% to 55% of LSTM scenarios and 0% of ensemble scenarios bad on control windows, and 1.8 to 2.2 marked 70% to 73% and 3% to 5%. `linear_narx` was 63% to 75% and then 100%. The strongest model stays almost always good, so its own bad share can be under 1% and the report counts such models as thin |
+| Control-split influent | working, not frozen: each control split reads the same influent days, with the same per-window factors, as the nominal split of the same weather |
 | BSM1 measured variables | working list, not frozen: ammonia, total nitrogen, COD, suspended solids, BOD |
 | Bootstrap draw count | 500 |
