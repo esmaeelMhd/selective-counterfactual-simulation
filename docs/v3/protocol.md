@@ -23,6 +23,8 @@ Badness targets, same definitions as `docs/v2/benchmark_task.md`:
 
 Primary coverages, carried from the v2 lock: 0.05 and 0.10. Both are reported. Working rule, not frozen: a yes requires both coverages to pass. The two accepted sets are nested and highly correlated, so requiring both costs little power, and "either" would give two chances at a yes. Stage A does not collapse them.
 
+Descriptive coverages: 0.25, 0.5, and 0.75 are also computed for every judge and reported. They are part of no decision rule, nothing is selected or tuned on them, and they are labelled descriptive. At the primary coverages the accepted set can be mostly in-distribution scenarios, which makes the task easy. The higher coverages show how the judges compare when it is harder.
+
 ## Decision questions
 
 | ID | Question | Counts as yes when |
@@ -32,6 +34,8 @@ Primary coverages, carried from the v2 lock: 0.05 and 0.10. Both are reported. W
 | Q3 | Does the pre-registered event guard reduce event FAR? | It beats both the primary calibrated ranker and the best simple baseline chosen on calibration rows, each under the same rule, on `bad_event`. Q3 has no definition on BSM1 until the guard's missing-signal rule is written in this file. |
 
 Every outcome is reported. "Q1 yes, Q2 no" is the v2 hypothesis confirmed. "Q3 no" is a negative result and still goes in the paper.
+
+**Q3 has a ceiling.** The yes rule asks for an absolute false-accept reduction of at least 0.05 over the primary ranker and over the best simple baseline. A false-accept rate cannot fall below zero, so Q3 can be yes only where both of those have a false-accept rate of at least 0.05 at that coverage. In Stage A the primary ranker is at 0.00 to 0.01 at both primary coverages on every system with an eligible model, so Q3 there is a no by construction. It says that the guard has no room to improve, and it does not say the guard fails. The rule is kept as written, and the report prints `room_for_q3` for every row so the reading is not left to inference. If Stage B shows no room either, Q3 is reported as a ceiling result.
 
 Practical thresholds from the plan, which keeps two of the three v2 cuts:
 
@@ -126,6 +130,8 @@ A row with a Stage A value is a working setting. It is part of the freeze only w
 | Degenerate target | a 5% row is reported as degenerate, and does not count toward the precision check, when under 1% or over 99% of its test scenarios are bad |
 | Eligibility metric | mean RMSE on `judge_calibration_id`, strict improvement on both baselines; never a judge-test split |
 | BSM1 learned-model budgets | working rule, not frozen: LSTM, LSTM ensemble (5 members) and recurrent model use early stopping on the last 15% of the `model_train` windows, less a gap of 18 windows (the number of neighbours that overlap one window in time). The free-running rollout error with the BSM1 flow assignment is checked every 5 epochs, the best weights are kept, and training stops after 3 checks without improvement or at 120 epochs. Neither calibration split is read. The delta MLP keeps 80 iterations from before this work. Seeds 0–2 |
+| Uncertainty samples | Stage A and the Stage B draft use 5 rollouts per scenario, so a five-member ensemble contributes all five members. Stage A first used 2, which let only two members contribute. Not frozen |
+| Descriptive coverages | 0.25, 0.5 and 0.75, descriptive only, in no decision rule. Not frozen |
 | Seed list | Stage A uses seeds 0–9; not frozen. Working Stage B list: seeds 0–9 |
 | Stage B test layout | working, not frozen: four splits of 500 windows (dry hold-out, dry control, rain, rain control), 2,000 per seed and model |
 | Overlapping test windows | working, not frozen: they count toward the 2,000. The test rests on 4 dry and 8 rain independent windows, and the interval is conditional on those days |
