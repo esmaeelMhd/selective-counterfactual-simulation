@@ -238,8 +238,17 @@ def _score_batch(
     return rows
 
 
+def generate_stage_dataset(system_id: str, config: dict[str, Any], seed: int) -> dict[str, Any]:
+    """The splits for one system and seed. BSM1 has its own generator."""
+    if system_id == "bsm1":
+        from scs.systems.bsm1 import generate_bsm1_stage_dataset
+
+        return generate_bsm1_stage_dataset(config, seed)
+    return generate_v2_dataset(system_id, config, seed=seed)
+
+
 def _prediction_frame(system_id: str, seed: int, config: dict[str, Any], event_config: dict[str, Any]) -> pd.DataFrame:
-    dataset = generate_v2_dataset(system_id, config, seed=seed)
+    dataset = generate_stage_dataset(system_id, config, seed)
     overlap = split_overlap_report(dataset)
     if overlap["overlap_count"] > 0:
         raise RuntimeError(f"calibration/test overlap for {system_id} seed {seed}")
@@ -309,6 +318,28 @@ def eligibility_table(frame: pd.DataFrame, config: dict[str, Any]) -> pd.DataFra
                 }
             )
     return pd.DataFrame(rows)
+
+
+def threshold_share_check(frame: pd.DataFrame, eligibility: pd.DataFrame, config: dict[str, Any]) -> None:
+    """Refuse a bad_rmse threshold that marks almost none or almost all calibration scenarios as bad.
+
+    Reads calibration rows of eligible learned models only. A threshold that does that makes
+    the margins on that target fixed by the labels. This catches it before test rows are scored.
+    """
+    edge = float(config.get("degenerate_share", DEFAULT_DEGENERATE_SHARE))
+    chosen = {(row.system_id, row.model_id) for row in eligibility.itertuples(index=False) if row.eligible}
+    for system_id in config["systems"]:
+        rows = frame[(frame["system_id"] == system_id) & (frame["role"] == "judge_calibration")]
+        rows = rows[[(system_id, model_id) in chosen for model_id in rows["model_id"]]]
+        if rows.empty:
+            continue
+        threshold = rmse_threshold_for(config, str(system_id))
+        share = float((rows["rmse"].to_numpy(dtype=float) > threshold).mean())
+        if share < edge or share > 1.0 - edge:
+            raise RuntimeError(
+                f"the bad_rmse threshold {threshold:g} marks {share:.1%} of {system_id} calibration scenarios "
+                f"for eligible models as bad, outside {edge:.0%} to {1 - edge:.0%}. Its margins would be set by the labels."
+            )
 
 
 def _relative_margin(absolute: float, baseline_far: float) -> float:
@@ -677,9 +708,9 @@ def stage_b_blockers(config: dict[str, Any]) -> list[str]:
     bsm1_threshold = threshold.get("bsm1") if isinstance(threshold, dict) else threshold
     if bsm1_threshold is None:
         blockers.append(
-            "The BSM1 bad_rmse threshold is unset. The written rule is 10 times the 99th percentile of the "
-            "best model's per-scenario RMSE on judge_calibration_id, over seeds 0-2. The best model on that "
-            "split is ensemble_lstm, with mean scenario RMSE 9.307."
+            "The BSM1 bad_rmse threshold is unset. The written rule is the smallest whole multiple of the "
+            "99th percentile of the best model's per-scenario RMSE on judge_calibration_id, over seeds 0-2, "
+            "that no eligible model's in-distribution calibration scenario exceeds. It gives 61.761."
         )
     if config.get("overlapping_test_windows") is None:
         capacity = confirmatory_window_capacity()
@@ -718,9 +749,11 @@ def run_v3_stage(config_path: str | Path, output: str | Path) -> dict[str, Any]:
             frames.append(_prediction_frame(str(system_id), int(seed), config, event_config))
     scored = pd.concat(frames, ignore_index=True)
     eligibility = eligibility_table(scored, config)
+    if config.get("check_threshold_share"):
+        threshold_share_check(scored, eligibility, config)
     results = result_rows_for_frame(scored, config, eligibility)
     intervals = interval_table(results, config)
-    stem = f"stage_{stage.lower()}"
+    stem = f"stage_{stage.lower().replace('-', '_')}"
     results_path = out_dir / f"{stem}_results.csv"
     report_path = out_dir / f"{stem}_report.md"
     results.to_csv(results_path, index=False)

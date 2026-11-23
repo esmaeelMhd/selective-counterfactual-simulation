@@ -639,6 +639,98 @@ def generate_bsm1_pretest_dataset(
     return dataset, manifest
 
 
+_STEADY_STATE: dict[str, np.ndarray] | None = None
+_START_STATES: dict[tuple[int, ...], dict[int, dict[str, np.ndarray]]] = {}
+
+
+def _cached_start_states(dry: np.ndarray, starts: list[int]) -> dict[int, dict[str, np.ndarray]]:
+    """Plant states at the given dry-file minutes. One continuous run per set of minutes and process.
+
+    The states do not depend on the seed, so a stage that scores several seeds pays for the
+    steady-state run and the warm-up once.
+    """
+    global _STEADY_STATE
+    key = tuple(sorted(set(int(start) for start in starts)))
+    if key not in _START_STATES:
+        if _STEADY_STATE is None:
+            _STEADY_STATE = open_loop_steady_state()
+        _START_STATES[key] = dry_start_states(dry, list(key), _STEADY_STATE)
+    return _START_STATES[key]
+
+
+def generate_bsm1_stage_dataset(config: dict[str, object], seed: int) -> dict[str, TrajectoryBatch]:
+    """The splits a v3 stage scores for BSM1, from a stage config.
+
+    ``model_train``, ``judge_calibration_id`` and ``judge_calibration_control`` come from the
+    pretest generator. A ``B-rehearsal`` stage adds ``judge_test_rehearsal``, windows cut from the
+    calibration days with fresh draws, so the whole scoring path can run before the freeze. Those
+    rows are not evidence. A confirmatory ``B`` stage has no generator here: it waits on the
+    freeze decisions about the control split and overlapping windows.
+    """
+    data = config["data"]
+    stage = str(config.get("stage", "A"))
+    if stage == "B":
+        raise RuntimeError("the confirmatory BSM1 test splits are not generated before the freeze decisions are made")
+    counts = dict(
+        n_model_train=int(data["n_model_train"]),
+        n_calibration_id=int(data["n_calibration_id"]),
+        n_calibration_control=int(data["n_calibration_ood"]),
+        horizon=int(data["horizon"]),
+        history=int(data.get("history_minutes", HISTORY_MINUTES)),
+    )
+    n_rehearsal = int(data.get("n_rehearsal_test", 0)) if stage == "B-rehearsal" else 0
+    dry = load_dry_influent()
+    starts = [int(spec["start_minute"]) for spec in pretest_specs(seed=seed, **counts)]
+    rehearsal = _rehearsal_specs(n_rehearsal, counts["horizon"], counts["history"], seed) if n_rehearsal else []
+    starts += [int(spec["start_minute"]) for spec in rehearsal]
+    dataset, _manifest = generate_bsm1_pretest_dataset(seed=seed, start_states=_cached_start_states(dry, starts), **counts)
+    if rehearsal:
+        states = _cached_start_states(dry, starts)
+        pieces = [
+            _rollout_from_state(
+                dry=dry,
+                start_minute=int(spec["start_minute"]),
+                history=counts["history"],
+                horizon=counts["horizon"],
+                kla=np.asarray(spec["kla"], dtype=float),
+                initial_state=states[int(spec["start_minute"])],
+                split="judge_test_rehearsal",
+                scenario_type=str(spec["scenario_type"]),
+                flow_scale=float(spec["flow_scale"]),
+                load_scale=float(spec["load_scale"]),
+                check_split=False,
+            )
+            for spec in rehearsal
+        ]
+        dataset["judge_test_rehearsal"] = _concat_batches(pieces)
+    return dataset
+
+
+def _rehearsal_specs(count: int, horizon: int, history: int, seed: int) -> list[dict[str, object]]:
+    """Windows for the rehearsal test split. They reuse the calibration days, never the reserved ones."""
+    span = history + horizon
+    first = split_minutes("judge_calibration_id")[0]
+    end = split_minutes("judge_calibration_control")[1]
+    if end - first < span:
+        raise ValueError("the calibration days are shorter than one window")
+    if end > reserved_minutes()[0]:
+        raise RuntimeError("rehearsal windows may not reach the reserved confirmatory days")
+    rng = np.random.default_rng(10_000 + int(seed))
+    specs = []
+    for index, start in enumerate(np.linspace(first, end - span, count).round().astype(int)):
+        shifted = index % 2 == 1
+        specs.append(
+            {
+                "scenario_type": "rehearsal_control_shift" if shifted else "rehearsal_nominal",
+                "start_minute": int(start),
+                "kla": _scaled_kla(rng, CONTROL_SCALE if shifted else NOMINAL_SCALE),
+                "flow_scale": float(rng.uniform(*INFLUENT_SCALE)),
+                "load_scale": float(rng.uniform(*INFLUENT_SCALE)),
+            }
+        )
+    return specs
+
+
 def _constant_series(n_steps: int) -> np.ndarray:
     times = np.arange(n_steps + 2) / 1440.0
     influent = np.repeat(PUBLISHED_CONSTANT_INFLUENT[None, :], len(times), axis=0)
@@ -685,8 +777,10 @@ def _rollout_from_state(
     scenario_type: str,
     flow_scale: float = 1.0,
     load_scale: float = 1.0,
+    check_split: bool = True,
 ) -> TrajectoryBatch:
-    assert_split_allowed(split)
+    if check_split:
+        assert_split_allowed(split)
     total = history + horizon
     plant = _new_plant(_dry_series(dry, start_minute, total, flow_scale, load_scale), kla)
     apply_plant(plant, initial_state)

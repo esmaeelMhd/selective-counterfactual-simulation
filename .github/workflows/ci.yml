@@ -33,3 +33,26 @@ jobs:
 
       - name: Check public benchmark package
         run: python scripts/v2_check_public_benchmark_package.py --config configs/v2/v2_public_benchmark_hardening.yaml --manifest results/v2_public_benchmark_hardening/package_manifest.json
+
+  # The v3 BSM1 and learned-model tests need extras that the required job does not install,
+  # so they are skipped there. This job runs them. It is not a required check: timesim brings
+  # a large dependency set, and a slow or failed install here should not block a merge.
+  v3-extras:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install CPU PyTorch
+        run: pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install package with the BSM1 and learned extras
+        run: pip install -e ".[dev,bsm1,learned]"
+
+      - name: Run the v3 tests and show what is skipped
+        run: pytest -q -rs tests/test_v3_bsm1_interface.py tests/test_v3_stage_a.py tests/test_v3_stage_b.py tests/test_v3_torch_models.py

@@ -1,0 +1,76 @@
+# Rehearsal of the Stage B scoring path on BSM1. Not evidence, and not Stage B.
+# The test split is cut from the calibration days with fresh draws, so every model, signal,
+# judge and report step runs before the freeze. No reserved day and no rain event is read.
+# Windows are short so the run takes minutes. Results go outside results/v3.
+stage: B-rehearsal
+label: rehearsal
+protocol_frozen: false
+event_config: configs/v3/bsm1_events.yaml
+check_threshold_share: true
+
+systems:
+  - bsm1
+
+models:
+  - hold_last
+  - linear_narx
+  - mlp_state_space
+  - lstm_world
+
+learned_models:
+  - mlp_state_space
+  - lstm_world
+
+eligibility_split: judge_calibration_id
+
+eligibility_baselines:
+  - hold_last
+  - linear_narx
+
+primary_coverages:
+  - 0.05
+  - 0.10
+
+badness_targets:
+  - bad_rmse
+  - bad_event
+
+rmse_threshold:
+  bsm1: 5.0
+
+event_guard_inputs:
+  - risk_invariant_only
+  - risk_disagreement_only
+  - risk_support_only
+
+seeds:
+  - 0
+  - 1
+
+bootstrap_samples: 50
+bootstrap_seed: 2025
+interval_width_limit: 0.10
+min_test_scenarios: 20
+degenerate_share: 0.01
+
+data:
+  horizon: 60
+  history_minutes: 15
+  dt: 0.0006944444444444
+  n_model_train: 40
+  n_calibration_id: 16
+  n_calibration_ood: 16
+  n_rehearsal_test: 24
+  uncertainty_samples: 2
+
+model_runtime:
+  ensemble_members: 5
+  mlp_max_iter: 40
+  lstm_epochs: 30
+  lstm_hidden: 16
+  lstm_layers: 1
+  early_stopping: true
+  validation_fraction: 0.2
+  validation_gap: 0
+  check_every: 5
+  patience: 2
