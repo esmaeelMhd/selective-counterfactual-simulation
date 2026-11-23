@@ -84,6 +84,8 @@ WARMUP_MINUTES = 2 * DRY_MINUTES
 # The same scheme applies to every split, including the confirmatory test.
 INFLUENT_SCALE = (0.9, 1.1)
 LOAD_COLUMNS = tuple(index for index in range(14) if index != 12)
+# The protocol's rain event, days 8–10. Not read until the freeze allows a confirmatory split.
+RAIN_EVENT_DAYS = (8.0, 11.0)
 RAIN_FLOW_UNIT = 1000.0
 RAIN_FLOW_COLUMN = 15
 PRETEST_COUNTS = {
@@ -356,6 +358,48 @@ def rollout_scenario(
         system_id="bsm1",
         measured_history=measured[:history][None, :, :],
     )
+
+
+class BSM1System:
+    """Identity for the packaged plant. Rollouts come from the generator, not this stepper.
+
+    Invariant and repair need the full state and are not available here. Calling them raises
+    so a missing-signal judge cannot silently receive a stand-in score.
+    """
+
+    system_id = "bsm1"
+    state_dim = STATE_DIM
+    action_dim = 5
+    disturbance_dim = REACTOR_WIDTH
+
+    def reset(self, seed: int | None = None) -> np.ndarray:
+        raise RuntimeError("BSM1 trajectories come from the packaged plant, not this stepper")
+
+    def step(self, state: np.ndarray, action: np.ndarray, disturbance: np.ndarray, dt: float) -> np.ndarray:
+        raise RuntimeError("BSM1 trajectories come from the packaged plant, not this stepper")
+
+    def rollout(self, initial_state: np.ndarray, actions: np.ndarray, disturbances: np.ndarray, dt: float) -> np.ndarray:
+        raise RuntimeError("BSM1 trajectories come from the packaged plant, not this stepper")
+
+    def invariant_residual(self, states: np.ndarray, actions: np.ndarray, disturbances: np.ndarray, dt: float) -> np.ndarray:
+        raise RuntimeError("invariant_residual is not available on BSM1")
+
+    def repair_amount(self, raw_states: np.ndarray, repaired_states: np.ndarray) -> float:
+        raise RuntimeError("repair_amount is not available on BSM1")
+
+
+def confirmatory_window_capacity() -> dict[str, int]:
+    """Non-overlapping 8-hour windows that fit in the weather the protocol already names."""
+    span = HISTORY_MINUTES + HORIZON_MINUTES
+    reserved = reserved_minutes()[1] - reserved_minutes()[0]
+    rain_minutes = round((RAIN_EVENT_DAYS[1] - RAIN_EVENT_DAYS[0]) * 1440)
+    return {
+        "span_minutes": span,
+        "dry_minutes": reserved,
+        "dry_nonoverlapping": reserved // span,
+        "rain_minutes": rain_minutes,
+        "rain_nonoverlapping": rain_minutes // span,
+    }
 
 
 def assert_split_allowed(split: str) -> None:

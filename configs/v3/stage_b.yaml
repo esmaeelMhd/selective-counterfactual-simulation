@@ -1,0 +1,91 @@
+# Draft Stage B settings. Not the confirmatory freeze.
+# The runner refuses to generate or score confirmatory rows while the blockers in
+# stage_b_blockers are open. Null rows are decisions this file does not make.
+stage: B
+label: confirmatory
+protocol_frozen: false
+event_config: configs/v3/bsm1_events.yaml
+
+systems:
+  - bsm1
+
+models:
+  - hold_last
+  - linear_narx
+  - mlp_state_space
+  - lstm_world
+  - ensemble_lstm
+  - recurrent_world
+
+learned_models:
+  - mlp_state_space
+  - lstm_world
+  - ensemble_lstm
+  - recurrent_world
+
+eligibility_split: judge_calibration_id
+
+eligibility_baselines:
+  - hold_last
+  - linear_narx
+
+primary_coverages:
+  - 0.05
+  - 0.10
+
+badness_targets:
+  - bad_rmse
+  - bad_event
+
+# Working value, not frozen. 10 times the 99th percentile of ensemble_lstm per-scenario RMSE
+# on judge_calibration_id, seeds 0-2 (240 scenarios). That percentile is 20.5869.
+rmse_threshold:
+  bsm1: 205.869
+
+# Unset in the protocol. Both, either, or a pooled margin.
+coverage_rule: null
+
+# Unset in the protocol. The v2 guard uses invariant, which BSM1 does not have.
+event_guard_on_bsm1: null
+
+# Unset. True means the 2000-scenario count may be overlapping windows.
+overlapping_test_windows: null
+
+# Unset. Which influent block the control-only confirmatory split reads.
+control_split_influent: null
+
+event_guard_inputs:
+  - risk_invariant_only
+  - risk_disagreement_only
+  - risk_support_only
+
+seeds:
+  - 0
+  - 1
+  - 2
+
+bootstrap_samples: 500
+bootstrap_seed: 2025
+interval_width_limit: 0.10
+min_test_scenarios: 2000
+degenerate_share: 0.01
+
+data:
+  horizon: 480
+  history_minutes: 15
+  dt: 0.0006944444444444
+  n_model_train: 160
+  n_calibration_id: 80
+  n_calibration_ood: 80
+  uncertainty_samples: 2
+
+model_runtime:
+  ensemble_members: 5
+  mlp_max_iter: 80
+  lstm_epochs: 120
+  rssm_epochs: 120
+  early_stopping: true
+  validation_fraction: 0.15
+  validation_gap: 18
+  check_every: 5
+  patience: 3

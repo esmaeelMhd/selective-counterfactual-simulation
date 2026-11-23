@@ -5,6 +5,7 @@ from scs.models.ensemble_mlp import EnsembleMLPModel
 from scs.models.gradient_boosted_narx import GradientBoostedNARXModel
 from scs.models.linear_narx import LinearNARXModel
 from scs.models.mlp_state_space import MLPStateSpaceModel
+from scs.systems.bsm1 import BSM1System
 from scs.systems.cstr import CSTRSystem
 from scs.systems.heat_exchanger import HeatExchangerSystem
 from scs.systems.two_tank import TwoTankSystem
@@ -17,6 +18,8 @@ def make_system(system_id: str):
         return CSTRSystem()
     if system_id == "heat_exchanger":
         return HeatExchangerSystem()
+    if system_id == "bsm1":
+        return BSM1System()
     raise ValueError(f"unknown system_id: {system_id}")
 
 

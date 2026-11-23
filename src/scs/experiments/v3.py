@@ -111,6 +111,7 @@ def _uncertainty_scores(
     n_samples: int,
     rng: np.random.Generator,
     history: np.ndarray | None = None,
+    project=None,
 ) -> np.ndarray:
     """Spread of sampled rollouts, or NaN when the model has no way to sample.
 
@@ -127,14 +128,16 @@ def _uncertainty_scores(
     if members:
         for sample_index in range(n_samples):
             member = members[sample_index % len(members)]
-            samples.append(member.predict_rollouts(initial_states, actions, disturbances, history=history))
+            samples.append(member.predict_rollouts(initial_states, actions, disturbances, history=history, project=project))
     else:
         residual_std = getattr(model, "residual_std", None)
         if residual_std is None:
             return np.full(n_rows, np.nan, dtype=float)
         for _sample_index in range(n_samples):
             noise = rng.normal(0.0, residual_std, size=(n_rows, horizon, initial_states.shape[1]))
-            samples.append(model.predict_rollouts(initial_states, actions, disturbances, history=history, noise=noise))
+            samples.append(
+                model.predict_rollouts(initial_states, actions, disturbances, history=history, noise=noise, project=project)
+            )
     stacked = np.stack(samples, axis=0)
     return np.mean(np.std(stacked, axis=0), axis=(1, 2))
 
@@ -164,8 +167,15 @@ def _score_batch(
 ) -> list[dict[str, Any]]:
     system = make_system(system_id)
     initial = batch.states[:, 0, :]
+    project = None
+    if system_id == "bsm1":
+        from scs.systems.bsm1 import hydraulic_projection
+
+        project = hydraulic_projection(batch.disturbances)
     predictions = {
-        model_id: model.predict_rollouts(initial, batch.actions, batch.disturbances, history=batch.measured_history)
+        model_id: model.predict_rollouts(
+            initial, batch.actions, batch.disturbances, history=batch.measured_history, project=project
+        )
         for model_id, model in models.items()
     }
     disagreement = _batch_disagreement([predictions[model_id] for model_id in models])
@@ -179,6 +189,7 @@ def _score_batch(
             n_uncertainty,
             np.random.default_rng(10_000 + seed * 100 + sum(ord(char) for char in model_id)),
             history=batch.measured_history,
+            project=project,
         )
         for model_id, model in models.items()
     }
@@ -589,9 +600,11 @@ def _write_report(
         f"{key} {value}" for key, value in sorted(config["model_runtime"].items()) if key != "ensemble_members"
     )
     thresholds = ", ".join(f"{name} {rmse_threshold_for(config, str(name)):g}" for name in config["systems"])
-    text = f"""# v3 Stage A report
+    stage = str(config.get("stage", "A"))
+    label = str(config.get("label", "exploratory"))
+    text = f"""# v3 Stage {stage} report
 
-Label: exploratory. This report does not answer Q1, Q2, or Q3.
+Label: {label}. This report does not answer Q1, Q2, or Q3.
 
 The margin is the random false-accept rate minus the judge false-accept rate. A positive margin means the judge accepts fewer bad scenarios than that random ranking. This is not the v2 `absolute_margin`, which selects the lowest test-set false-accept rate among simple and stronger baselines.
 
@@ -609,7 +622,7 @@ Bootstrap of the seed-level mean margin of eligible models, for `{PRIMARY_JUDGE}
 
 ## Settings used
 
-These numbers are Stage A choices. They are not the freeze.
+These numbers are the working settings in the config. A freeze is a later commit.
 
 - horizon: {config["data"]["horizon"]}
 - ensemble members: {config["model_runtime"]["ensemble_members"]}
@@ -627,22 +640,89 @@ Exploratory only. The guard is the v2 candidate: the maximum calibration-percent
     path.write_text(text, encoding="utf-8")
 
 
+PROTOCOL_PATH = Path("docs/v3/protocol.md")
+
+
+def protocol_is_frozen(path: str | Path = PROTOCOL_PATH) -> bool:
+    """True only when the protocol status line says frozen.
+
+    The draft says "not frozen", and that line does not count.
+    """
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        if line.startswith("Status:"):
+            return line.startswith("Status: frozen") and "not frozen" not in line.lower()
+    return False
+
+
+def stage_b_blockers(config: dict[str, Any]) -> list[str]:
+    """Decisions the freeze still has to make. A Stage B run does not guess them."""
+    from scs.systems.bsm1 import confirmatory_window_capacity
+
+    blockers = []
+    if not protocol_is_frozen():
+        blockers.append("docs/v3/protocol.md is still a draft. The freeze commit has to say the protocol is frozen.")
+    if config.get("protocol_frozen") is not True:
+        blockers.append("configs/v3/stage_b.yaml has protocol_frozen set to false.")
+    if not config.get("event_guard_on_bsm1"):
+        blockers.append(
+            "The BSM1 refusal guard is unset. Q3 has no definition until the protocol names the guard "
+            "that runs when invariant and repair are absent."
+        )
+    if not config.get("coverage_rule"):
+        blockers.append(
+            "How the 5% and 10% coverages combine into one yes is unset. "
+            "The protocol has to say both, either, or a pooled margin."
+        )
+    threshold = config.get("rmse_threshold", {})
+    bsm1_threshold = threshold.get("bsm1") if isinstance(threshold, dict) else threshold
+    if bsm1_threshold is None:
+        blockers.append(
+            "The BSM1 bad_rmse threshold is unset. The written rule is 10 times the 99th percentile of the "
+            "best model's per-scenario RMSE on judge_calibration_id, over seeds 0-2. The best model on that "
+            "split is ensemble_lstm, with mean scenario RMSE 9.307."
+        )
+    if config.get("overlapping_test_windows") is None:
+        capacity = confirmatory_window_capacity()
+        blockers.append(
+            "The sample-size rule asks for "
+            f"{int(config.get('min_test_scenarios', 2000))} judge-test scenarios per seed and model. "
+            f"The reserved dry block holds {capacity['dry_nonoverlapping']} non-overlapping "
+            f"{capacity['span_minutes']}-minute windows, and the rain event holds "
+            f"{capacity['rain_nonoverlapping']}. Reaching the sample size means overlapping windows. "
+            "The freeze has to say whether those count."
+        )
+    if not config.get("control_split_influent"):
+        blockers.append(
+            "The control-only confirmatory split has no influent block. Reserved dry days 5.5-7 are the only "
+            "unused dry influent. The calibration control split already uses days 4.5-5.5. Rain days 8-10 "
+            "are the rain event."
+        )
+    return blockers
+
+
 def run_v3_stage(config_path: str | Path, output: str | Path) -> dict[str, Any]:
     config = load_v3_config(config_path)
+    stage = str(config.get("stage", "A"))
+    if stage == "B":
+        blockers = stage_b_blockers(config)
+        if blockers:
+            joined = "\n- ".join(blockers)
+            raise RuntimeError(f"Stage B is not run before the freeze:\n- {joined}")
     event_config = load_event_config(config["event_config"])
     out_dir = Path(output)
     out_dir.mkdir(parents=True, exist_ok=True)
     frames = []
     for system_id in config["systems"]:
         for seed in config["seeds"]:
-            print(f"stage A {system_id} seed {seed}", flush=True)
+            print(f"stage {stage} {system_id} seed {seed}", flush=True)
             frames.append(_prediction_frame(str(system_id), int(seed), config, event_config))
     scored = pd.concat(frames, ignore_index=True)
     eligibility = eligibility_table(scored, config)
     results = result_rows_for_frame(scored, config, eligibility)
     intervals = interval_table(results, config)
-    results_path = out_dir / "stage_a_results.csv"
-    report_path = out_dir / "stage_a_report.md"
+    stem = f"stage_{stage.lower()}"
+    results_path = out_dir / f"{stem}_results.csv"
+    report_path = out_dir / f"{stem}_report.md"
     results.to_csv(results_path, index=False)
     _write_report(report_path, eligibility, intervals, results, config)
     learned = eligibility[eligibility["model_id"].isin(config["learned_models"])]

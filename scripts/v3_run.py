@@ -6,7 +6,7 @@ from scs.experiments.v3 import run_v3_stage
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run v3 Stage A and write one results table and one report.")
+    parser = argparse.ArgumentParser(description="Run a v3 stage and write one results table and one report.")
     parser.add_argument("--config", default="configs/v3/stage_a.yaml")
     parser.add_argument("--output", default="results/v3/stage_a")
     args = parser.parse_args()

@@ -330,8 +330,28 @@ def generate_v2_dataset(system_id: str, config: dict[str, Any], seed: int) -> di
     raise ValueError(f"unknown v2 system_id: {system_id}")
 
 
+def _learned_budget(config: dict[str, Any]) -> dict[str, Any]:
+    """Early-stopping settings from the config. Absent on the ODE stage, so those models are unchanged."""
+    runtime = config.get("model_runtime", {})
+    if not runtime.get("early_stopping"):
+        return {}
+    options: dict[str, Any] = {
+        "early_stopping": True,
+        "validation_fraction": float(runtime.get("validation_fraction", 0.15)),
+        "validation_gap": int(runtime.get("validation_gap", 0)),
+        "check_every": int(runtime.get("check_every", 5)),
+        "patience": int(runtime.get("patience", 3)),
+    }
+    if "bsm1" in config.get("systems", []):
+        from scs.systems.bsm1 import hydraulic_projection
+
+        options["projection_factory"] = hydraulic_projection
+    return options
+
+
 def _make_v2_model(model_id: str, seed: int, config: dict[str, Any]):
     runtime = config.get("model_runtime", {})
+    budget = _learned_budget(config)
     if model_id == "hold_last":
         return HoldLastModel()
     if model_id == "linear_narx":
@@ -361,6 +381,7 @@ def _make_v2_model(model_id: str, seed: int, config: dict[str, Any]):
             hidden_dim=int(runtime.get("lstm_hidden", 64)),
             num_layers=int(runtime.get("lstm_layers", 2)),
             epochs=int(runtime.get("lstm_epochs", 30)),
+            **budget,
         )
     if model_id == "ensemble_lstm":
         from scs.models.ensemble_lstm import EnsembleLSTMModel
@@ -371,6 +392,7 @@ def _make_v2_model(model_id: str, seed: int, config: dict[str, Any]):
             hidden_dim=int(runtime.get("lstm_hidden", 64)),
             num_layers=int(runtime.get("lstm_layers", 2)),
             epochs=int(runtime.get("lstm_epochs", 30)),
+            **budget,
         )
     if model_id == "recurrent_world":
         from scs.models.recurrent_world import RecurrentWorldModel
@@ -380,6 +402,7 @@ def _make_v2_model(model_id: str, seed: int, config: dict[str, Any]):
             hidden_dim=int(runtime.get("rssm_hidden", 32)),
             latent_dim=int(runtime.get("rssm_latent", 8)),
             epochs=int(runtime.get("rssm_epochs", 20)),
+            **budget,
         )
     raise ValueError(f"unknown v2 model_id: {model_id}")
 
