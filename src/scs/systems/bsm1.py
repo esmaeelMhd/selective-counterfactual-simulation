@@ -662,15 +662,13 @@ def generate_bsm1_stage_dataset(config: dict[str, object], seed: int) -> dict[st
     """The splits a v3 stage scores for BSM1, from a stage config.
 
     ``model_train``, ``judge_calibration_id`` and ``judge_calibration_control`` come from the
-    pretest generator. A ``B-rehearsal`` stage adds ``judge_test_rehearsal``, windows cut from the
-    calibration days with fresh draws, so the whole scoring path can run before the freeze. Those
-    rows are not evidence. A confirmatory ``B`` stage has no generator here: it waits on the
-    freeze decisions about the control split and overlapping windows.
+    pretest generator. Stage ``B`` adds the four confirmatory test splits, which the generator
+    refuses to read from the reserved days until the protocol is frozen. Stage ``B-rehearsal``
+    adds the same four splits cut from days that are not reserved, so every scoring step runs
+    before the freeze. Those rows are not evidence.
     """
     data = config["data"]
     stage = str(config.get("stage", "A"))
-    if stage == "B":
-        raise RuntimeError("the confirmatory BSM1 test splits are not generated before the freeze decisions are made")
     counts = dict(
         n_model_train=int(data["n_model_train"]),
         n_calibration_id=int(data["n_calibration_id"]),
@@ -678,57 +676,173 @@ def generate_bsm1_stage_dataset(config: dict[str, object], seed: int) -> dict[st
         horizon=int(data["horizon"]),
         history=int(data.get("history_minutes", HISTORY_MINUTES)),
     )
-    n_rehearsal = int(data.get("n_rehearsal_test", 0)) if stage == "B-rehearsal" else 0
     dry = load_dry_influent()
     starts = [int(spec["start_minute"]) for spec in pretest_specs(seed=seed, **counts)]
-    rehearsal = _rehearsal_specs(n_rehearsal, counts["horizon"], counts["history"], seed) if n_rehearsal else []
-    starts += [int(spec["start_minute"]) for spec in rehearsal]
     dataset, _manifest = generate_bsm1_pretest_dataset(seed=seed, start_states=_cached_start_states(dry, starts), **counts)
-    if rehearsal:
-        states = _cached_start_states(dry, starts)
-        pieces = [
-            _rollout_from_state(
-                dry=dry,
-                start_minute=int(spec["start_minute"]),
-                history=counts["history"],
+    if stage in ("B", "B-rehearsal"):
+        dataset.update(
+            generate_bsm1_confirmatory_dataset(
+                n_per_split=int(data["n_test_per_split"]),
                 horizon=counts["horizon"],
-                kla=np.asarray(spec["kla"], dtype=float),
-                initial_state=states[int(spec["start_minute"])],
-                split="judge_test_rehearsal",
-                scenario_type=str(spec["scenario_type"]),
-                flow_scale=float(spec["flow_scale"]),
-                load_scale=float(spec["load_scale"]),
-                check_split=False,
+                history=counts["history"],
+                seed=seed,
+                control_scale=data.get("test_control_scale"),
+                rehearsal=stage == "B-rehearsal",
             )
-            for spec in rehearsal
-        ]
-        dataset["judge_test_rehearsal"] = _concat_batches(pieces)
+        )
     return dataset
 
 
-def _rehearsal_specs(count: int, horizon: int, history: int, seed: int) -> list[dict[str, object]]:
-    """Windows for the rehearsal test split. They reuse the calibration days, never the reserved ones."""
+# The four confirmatory test splits. Control windows reuse the influent days and the flow and
+# load factors of the nominal window with the same index, so the pair differs in aeration only.
+CONFIRMATORY_SPLITS = {
+    "judge_test_dry_holdout": ("dry", False),
+    "judge_test_dry_control": ("dry", True),
+    "judge_test_rain": ("rain", False),
+    "judge_test_rain_control": ("rain", True),
+}
+_RAIN_START_STATES: dict[tuple[int, ...], dict[int, dict[str, np.ndarray]]] = {}
+
+
+def _rain_event_minutes() -> tuple[int, int]:
+    return round(RAIN_EVENT_DAYS[0] * 1440), round(RAIN_EVENT_DAYS[1] * 1440)
+
+
+def confirmatory_blocks(rehearsal: bool = False) -> dict[str, tuple[int, int]]:
+    """Half-open minute range each weather's confirmatory windows are cut from.
+
+    The real blocks are the reserved dry days and the rain event. The rehearsal blocks are
+    the calibration days of the dry file and the same days of the rain file, which hold no
+    rain event, so nothing reserved is read.
+    """
+    if rehearsal:
+        block = (split_minutes("judge_calibration_id")[0], split_minutes("judge_calibration_control")[1])
+        return {"dry": block, "rain": block}
+    return {"dry": reserved_minutes(), "rain": _rain_event_minutes()}
+
+
+def _reads_reserved(weather: str, first: int, end: int) -> bool:
+    reserved = reserved_minutes() if weather == "dry" else _rain_event_minutes()
+    return first < reserved[1] and end > reserved[0]
+
+
+def rain_start_states(
+    dry: np.ndarray,
+    rain: np.ndarray,
+    start_minutes: list[int],
+    steady_state: dict[str, np.ndarray],
+    warmup_minutes: int = WARMUP_MINUTES,
+) -> dict[int, dict[str, np.ndarray]]:
+    """Plant state at each start minute of the rain file, after the same dry warm-up.
+
+    The run warms up on the dry file for whole cycles, then follows the rain file from its
+    first row. The rain file's first week carries the dry flows, so the hand-over is smooth.
+    """
+    wanted = sorted({int(minute) for minute in start_minutes})
+    if not wanted:
+        return {}
+    if wanted[0] < 0 or wanted[-1] + 2 >= len(rain) * 15:
+        raise ValueError("start minutes must lie inside the rain file")
+    if warmup_minutes % DRY_MINUTES:
+        raise ValueError("warm-up must be a whole number of dry cycles so minutes stay aligned")
+    n_steps = warmup_minutes + wanted[-1]
+    rows = [
+        dry[(minute // 15) % len(dry), 1:] if minute < warmup_minutes else rain[(minute - warmup_minutes) // 15, 1:]
+        for minute in range(n_steps + 2)
+    ]
+    data = np.column_stack([np.arange(len(rows)) / 1440.0, np.asarray(rows, dtype=float)])
+    plant = _new_plant(data, NOMINAL_KLA)
+    apply_plant(plant, steady_state)
+    captured: dict[int, dict[str, np.ndarray]] = {}
+    targets = {warmup_minutes + minute: minute for minute in wanted}
+    for index in range(n_steps + 1):
+        if index in targets:
+            captured[targets[index]] = capture_plant(plant)
+        if index < n_steps:
+            plant.step(index, klas=NOMINAL_KLA)
+    return captured
+
+
+def _cached_rain_start_states(dry: np.ndarray, rain: np.ndarray, starts: list[int]) -> dict[int, dict[str, np.ndarray]]:
+    global _STEADY_STATE
+    key = tuple(sorted(set(int(start) for start in starts)))
+    if key not in _RAIN_START_STATES:
+        if _STEADY_STATE is None:
+            _STEADY_STATE = open_loop_steady_state()
+        _RAIN_START_STATES[key] = rain_start_states(dry, rain, list(key), _STEADY_STATE)
+    return _RAIN_START_STATES[key]
+
+
+def generate_bsm1_confirmatory_dataset(
+    *,
+    n_per_split: int,
+    horizon: int = HORIZON_MINUTES,
+    history: int = HISTORY_MINUTES,
+    seed: int = 0,
+    control_scale: tuple[float, float] | list[float] | None = None,
+    rehearsal: bool = False,
+) -> dict[str, TrajectoryBatch]:
+    """The four confirmatory test splits: dry hold-out and rain, each at nominal and control-shifted aeration.
+
+    Reading the reserved dry days or the rain event needs a frozen protocol, and this raises
+    otherwise. ``rehearsal`` cuts the same splits from days that are not reserved. Windows are
+    spread evenly over the block, so they overlap each other, and the protocol says so.
+    """
+    if n_per_split < 1:
+        raise ValueError("n_per_split must be positive")
+    scale = tuple(float(value) for value in (control_scale if control_scale is not None else CONTROL_SCALE))
     span = history + horizon
-    first = split_minutes("judge_calibration_id")[0]
-    end = split_minutes("judge_calibration_control")[1]
-    if end - first < span:
-        raise ValueError("the calibration days are shorter than one window")
-    if end > reserved_minutes()[0]:
-        raise RuntimeError("rehearsal windows may not reach the reserved confirmatory days")
-    rng = np.random.default_rng(10_000 + int(seed))
-    specs = []
-    for index, start in enumerate(np.linspace(first, end - span, count).round().astype(int)):
-        shifted = index % 2 == 1
-        specs.append(
-            {
-                "scenario_type": "rehearsal_control_shift" if shifted else "rehearsal_nominal",
-                "start_minute": int(start),
-                "kla": _scaled_kla(rng, CONTROL_SCALE if shifted else NOMINAL_SCALE),
-                "flow_scale": float(rng.uniform(*INFLUENT_SCALE)),
-                "load_scale": float(rng.uniform(*INFLUENT_SCALE)),
-            }
-        )
-    return specs
+    blocks = confirmatory_blocks(rehearsal)
+    for weather, (first, end) in blocks.items():
+        if end - first < span:
+            raise ValueError(f"the {weather} block is shorter than one window of {span} minutes")
+    reserved = [weather for weather, (first, end) in blocks.items() if _reads_reserved(weather, first, end)]
+    if reserved:
+        from scs.experiments.v3 import protocol_is_frozen
+
+        if not protocol_is_frozen():
+            raise RuntimeError(
+                f"the confirmatory {' and '.join(reserved)} windows are generated only after the freeze, "
+                "and docs/v3/protocol.md is still a draft"
+            )
+    dry = load_dry_influent()
+    rain = load_rain_influent()[0]
+    tables = {"dry": dry, "rain": rain}
+    rng = np.random.default_rng(20_000 + int(seed))
+    windows: dict[str, list[dict[str, object]]] = {}
+    for weather, (first, end) in blocks.items():
+        starts = np.linspace(first, end - span, n_per_split).round().astype(int)
+        factors = [(float(rng.uniform(*INFLUENT_SCALE)), float(rng.uniform(*INFLUENT_SCALE))) for _ in starts]
+        windows[weather] = [
+            {"start": int(start), "flow_scale": flow, "load_scale": load}
+            for start, (flow, load) in zip(starts, factors)
+        ]
+    states = {
+        "dry": _cached_start_states(dry, [int(window["start"]) for window in windows["dry"]]),
+        "rain": _cached_rain_start_states(dry, rain, [int(window["start"]) for window in windows["rain"]]),
+    }
+    dataset: dict[str, TrajectoryBatch] = {}
+    for split, (weather, shifted) in CONFIRMATORY_SPLITS.items():
+        pieces = []
+        for window in windows[weather]:
+            kla_rng = np.random.default_rng([int(seed), int(window["start"]), int(shifted), 1 if weather == "rain" else 0])
+            pieces.append(
+                _rollout_from_state(
+                    dry=tables[weather],
+                    start_minute=int(window["start"]),
+                    history=history,
+                    horizon=horizon,
+                    kla=_scaled_kla(kla_rng, scale if shifted else NOMINAL_SCALE),
+                    initial_state=states[weather][int(window["start"])],
+                    split=split,
+                    scenario_type=f"{weather}_{'control_shift' if shifted else 'nominal'}",
+                    flow_scale=float(window["flow_scale"]),
+                    load_scale=float(window["load_scale"]),
+                    check_split=False,
+                )
+            )
+        dataset[split] = _concat_batches(pieces)
+    return dataset
 
 
 def _constant_series(n_steps: int) -> np.ndarray:

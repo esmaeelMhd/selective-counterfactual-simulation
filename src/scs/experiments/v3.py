@@ -54,7 +54,6 @@ def load_v3_config(path: str | Path) -> dict[str, Any]:
         "badness_targets",
         "rmse_threshold",
         "event_config",
-        "event_guard_inputs",
         "data",
         "model_runtime",
         "bootstrap_samples",
@@ -65,6 +64,8 @@ def load_v3_config(path: str | Path) -> dict[str, Any]:
     missing = [key for key in required if key not in data]
     if missing:
         raise ValueError(f"missing v3 config keys: {missing}")
+    if "event_guards" not in data and "event_guard_inputs" not in data:
+        raise ValueError("config needs event_guards or event_guard_inputs")
     threshold = data["rmse_threshold"]
     if isinstance(threshold, dict):
         absent = [str(name) for name in data["systems"] if name not in threshold]
@@ -77,6 +78,18 @@ def load_v3_config(path: str | Path) -> dict[str, Any]:
 
 
 DEFAULT_DEGENERATE_SHARE = 0.01
+FULL_STATE_RISK_COLUMNS = ("risk_invariant_only", "risk_repair_only")
+
+
+def event_guard_definitions(config: dict[str, Any]) -> dict[str, list[str]]:
+    """Named event guards and their input columns.
+
+    ``event_guards`` maps a guard name to its inputs. A config with only
+    ``event_guard_inputs`` has one guard, named ``event_guard``.
+    """
+    if "event_guards" in config:
+        return {str(name): [str(column) for column in columns] for name, columns in config["event_guards"].items()}
+    return {"event_guard": [str(column) for column in config["event_guard_inputs"]]}
 
 
 def rmse_threshold_for(config: dict[str, Any], system_id: str) -> float:
@@ -435,23 +448,22 @@ def result_rows_for_frame(frame: pd.DataFrame, config: dict[str, Any], eligibili
             for model_id, model_test in test.groupby("model_id", sort=True):
                 model_calibration = calibration[calibration["model_id"] == model_id]
                 simple_name = _best_simple_baseline(model_calibration, coverages)
-                guard_ready = all(
-                    np.isfinite(model_calibration[column].to_numpy(dtype=float)).all()
-                    and np.isfinite(model_test[column].to_numpy(dtype=float)).all()
-                    for column in config["event_guard_inputs"]
-                )
                 judge_scores = {
                     name: model_test[f"risk_{name}"].to_numpy(dtype=float)
                     for name in _finite_signal_names(model_test)
                 }
                 judge_scores[RANDOM_JUDGE] = model_test["risk_random_baseline"].to_numpy(dtype=float)
                 judge_scores[PRIMARY_JUDGE] = model_test["risk_calibration_selected_candidate_ranker"].to_numpy(dtype=float)
-                # The guard is defined by all of its inputs. When one is missing it is not
-                # computed on a smaller set: the system has no guard until the protocol names one.
-                if guard_ready:
-                    judge_scores["event_guard"] = event_guarded_score(
-                        model_calibration, model_test, list(config["event_guard_inputs"])
+                # A guard is defined by all of its inputs. When one is missing it is not computed on
+                # a smaller set, because that would be a different guard. The system then has none.
+                for guard_id, inputs in event_guard_definitions(config).items():
+                    ready = all(
+                        np.isfinite(model_calibration[column].to_numpy(dtype=float)).all()
+                        and np.isfinite(model_test[column].to_numpy(dtype=float)).all()
+                        for column in inputs
                     )
+                    if ready:
+                        judge_scores[guard_id] = event_guarded_score(model_calibration, model_test, list(inputs))
                 labels = model_test["bad_label"].to_numpy(dtype=bool)
                 random_curve = _risk_curve_from_labels(labels, judge_scores[RANDOM_JUDGE], coverages)
                 primary_curve = _risk_curve_from_labels(labels, judge_scores[PRIMARY_JUDGE], coverages)
@@ -514,10 +526,24 @@ def interval_table(results: pd.DataFrame, config: dict[str, Any]) -> pd.DataFram
     limit = float(config["interval_width_limit"])
     n_samples = int(config["bootstrap_samples"])
     edge = float(config.get("degenerate_share", DEFAULT_DEGENERATE_SHARE))
+    per_model = (
+        primary.groupby(["system_id", "badness_target", "coverage", "model_id"], as_index=False)["bad_share"].mean()
+        if "model_id" in primary.columns
+        else None
+    )
     for (system_id, target, coverage), group in grouped.groupby(["system_id", "badness_target", "coverage"], sort=True):
         low, high = bootstrap_interval(group["absolute_margin"].to_numpy(dtype=float), rng, n_samples)
         width = high - low if math.isfinite(low) and math.isfinite(high) else float("nan")
         share = float(group["bad_share"].mean())
+        n_models, thin_models = 0, 0
+        if per_model is not None:
+            models = per_model[
+                (per_model["system_id"] == system_id)
+                & (per_model["badness_target"] == target)
+                & np.isclose(per_model["coverage"], coverage)
+            ]
+            n_models = int(len(models))
+            thin_models = int(((models["bad_share"] < edge) | (models["bad_share"] > 1.0 - edge)).sum())
         rows.append(
             {
                 "system_id": system_id,
@@ -526,6 +552,8 @@ def interval_table(results: pd.DataFrame, config: dict[str, Any]) -> pd.DataFram
                 "n_seeds": int(group["seed"].nunique()),
                 "bad_share": share,
                 "degenerate": bool(share < edge or share > 1.0 - edge),
+                "n_models": n_models,
+                "thin_models": thin_models,
                 "mean_margin": float(group["absolute_margin"].mean()),
                 "bootstrap_low": low,
                 "bootstrap_high": high,
@@ -570,39 +598,50 @@ def _markdown_table(frame: pd.DataFrame, columns: list[str]) -> str:
 
 
 def _guard_lines(results: pd.DataFrame) -> str:
-    """Event guard against the primary ranker and the calibration-chosen simple baseline.
+    """Each event guard against the primary ranker and the calibration-chosen simple baseline.
 
-    Only eligible models enter, so a model that is worse than the baselines does
-    not move the averages. Systems with no guard rows or no eligible model are named.
+    Only eligible models enter, so a model that is worse than the baselines does not move the
+    averages. Systems with no rows for a guard, or with no eligible model, are named.
     """
     systems = sorted(results["system_id"].unique())
     at_five = results[np.isclose(results["coverage"], 0.05)]
-    guard = at_five[(at_five["judge_id"] == "event_guard") & at_five["eligible"]].copy()
-    notes = []
-    no_guard = [name for name in systems if name not in set(at_five.loc[at_five["judge_id"] == "event_guard", "system_id"])]
-    if no_guard:
-        notes.append(f"No event guard is defined on: {', '.join(no_guard)}. A required guard input is missing there.")
-    no_eligible = [name for name in systems if name not in set(guard["system_id"]) and name not in no_guard]
-    if no_eligible:
-        notes.append(f"No eligible model, so no guard row: {', '.join(no_eligible)}.")
-    if guard.empty:
-        return "\n\n".join(["_none_", *notes])
-    guard["margin_vs_primary"] = guard["primary_far"] - guard["false_accept_rate"]
-    guard["margin_vs_calibration_simple"] = guard["calibration_simple_far"] - guard["false_accept_rate"]
-    summary = (
-        guard.groupby(["system_id", "badness_target"], as_index=False)
-        .agg(
-            n_models=("model_id", "nunique"),
-            event_guard_far=("false_accept_rate", "mean"),
-            primary_far=("primary_far", "mean"),
-            calibration_simple_far=("calibration_simple_far", "mean"),
-            margin_vs_primary=("margin_vs_primary", "mean"),
-            margin_vs_calibration_simple=("margin_vs_calibration_simple", "mean"),
+    guard_ids = sorted({str(name) for name in at_five["judge_id"].unique() if str(name).startswith("event_guard")})
+    if not guard_ids:
+        return "_none_"
+    eligible_rows = at_five[at_five["eligible"]]
+    tables, notes = [], []
+    for guard_id in guard_ids:
+        guard = eligible_rows[eligible_rows["judge_id"] == guard_id].copy()
+        has_rows = set(at_five.loc[at_five["judge_id"] == guard_id, "system_id"])
+        no_guard = [name for name in systems if name not in has_rows]
+        if no_guard:
+            notes.append(f"`{guard_id}` is not defined on: {', '.join(no_guard)}. A required input is missing there.")
+        no_eligible = [name for name in systems if name in has_rows and name not in set(guard["system_id"])]
+        if no_eligible:
+            notes.append(f"`{guard_id}` has no eligible model, so no row, on: {', '.join(no_eligible)}.")
+        if guard.empty:
+            continue
+        guard["margin_vs_primary"] = guard["primary_far"] - guard["false_accept_rate"]
+        guard["margin_vs_calibration_simple"] = guard["calibration_simple_far"] - guard["false_accept_rate"]
+        summary = (
+            guard.groupby(["system_id", "badness_target"], as_index=False)
+            .agg(
+                n_models=("model_id", "nunique"),
+                event_guard_far=("false_accept_rate", "mean"),
+                primary_far=("primary_far", "mean"),
+                calibration_simple_far=("calibration_simple_far", "mean"),
+                margin_vs_primary=("margin_vs_primary", "mean"),
+                margin_vs_calibration_simple=("margin_vs_calibration_simple", "mean"),
+            )
         )
-    )
+        summary.insert(0, "guard", guard_id)
+        tables.append(summary)
+    if not tables:
+        return "\n\n".join(["_none_", *notes])
     table = _markdown_table(
-        summary,
+        pd.concat(tables, ignore_index=True),
         [
+            "guard",
             "system_id",
             "badness_target",
             "n_models",
@@ -647,9 +686,9 @@ Working rule for this run: mean RMSE on `{eligibility_split(config)}` is strictl
 
 ## Interval at 5% coverage
 
-Bootstrap of the seed-level mean margin of eligible models, for `{PRIMARY_JUDGE}` only. One seed cannot make an interval. The width limit is {float(config["interval_width_limit"]):.2f}. A row is degenerate when under {float(config.get("degenerate_share", DEFAULT_DEGENERATE_SHARE)):.0%} or over {1 - float(config.get("degenerate_share", DEFAULT_DEGENERATE_SHARE)):.0%} of scenarios are bad. Its margin is fixed by the labels, so it does not count toward the check. Degenerate 5% rows: {degenerate_rows}. All informative 5% rows narrower than the limit, with one on every system: {precision_ok}.
+Bootstrap of the seed-level mean margin of eligible models, for `{PRIMARY_JUDGE}` only. One seed cannot make an interval. The width limit is {float(config["interval_width_limit"]):.2f}. A row is degenerate when under {float(config.get("degenerate_share", DEFAULT_DEGENERATE_SHARE)):.0%} or over {1 - float(config.get("degenerate_share", DEFAULT_DEGENERATE_SHARE)):.0%} of scenarios are bad. Its margin is fixed by the labels, so it does not count toward the check. `thin_models` counts the eligible models whose own bad share is under or over the same limits. Their margins are fixed by the labels and pull the average toward zero. Degenerate 5% rows: {degenerate_rows}. All informative 5% rows narrower than the limit, with one on every system: {precision_ok}.
 
-{_markdown_table(at_five, ["system_id", "badness_target", "n_seeds", "bad_share", "degenerate", "mean_margin", "bootstrap_low", "bootstrap_high", "interval_width", "narrower_than_limit"])}
+{_markdown_table(at_five, ["system_id", "badness_target", "n_seeds", "bad_share", "degenerate", "n_models", "thin_models", "mean_margin", "bootstrap_low", "bootstrap_high", "interval_width", "narrower_than_limit"])}
 
 ## Settings used
 
@@ -664,7 +703,7 @@ These numbers are the working settings in the config. A freeze is a later commit
 
 ## Event guard at 5% coverage
 
-Exploratory only. The guard is the v2 candidate: the maximum calibration-percentile rank of invariant, disagreement, and support. `margin_vs_primary` and `margin_vs_calibration_simple` use the simple baseline chosen on calibration rows. They are not a Q3 answer. Only eligible models enter the averages. The guard is not computed when one of its inputs is missing. On BSM1 that is the invariant signal, and no replacement guard is written yet.
+Exploratory only. `event_guard` is the v2 candidate: the maximum calibration-percentile rank of invariant, disagreement, and support. `event_guard_no_invariant` replaces invariant with uncertainty, so it needs no full-state signal. `margin_vs_primary` and `margin_vs_calibration_simple` use the simple baseline chosen on calibration rows. They are not a Q3 answer. Only eligible models enter the averages. A guard is not computed when one of its inputs is missing.
 
 {_guard_lines(results)}
 """
@@ -694,11 +733,17 @@ def stage_b_blockers(config: dict[str, Any]) -> list[str]:
         blockers.append("docs/v3/protocol.md is still a draft. The freeze commit has to say the protocol is frozen.")
     if config.get("protocol_frozen") is not True:
         blockers.append("configs/v3/stage_b.yaml has protocol_frozen set to false.")
-    if not config.get("event_guard_on_bsm1"):
+    guard = config.get("event_guard_on_bsm1")
+    guards = event_guard_definitions(config)
+    if not guard:
         blockers.append(
             "The BSM1 refusal guard is unset. Q3 has no definition until the protocol names the guard "
             "that runs when invariant and repair are absent."
         )
+    elif guard not in guards:
+        blockers.append(f"The BSM1 refusal guard {guard!r} is not one of the guards this config defines: {sorted(guards)}.")
+    elif any(column in FULL_STATE_RISK_COLUMNS for column in guards[guard]):
+        blockers.append(f"The BSM1 refusal guard {guard!r} uses a signal BSM1 does not have: {guards[guard]}.")
     if not config.get("coverage_rule"):
         blockers.append(
             "How the 5% and 10% coverages combine into one yes is unset. "

@@ -239,6 +239,79 @@ def test_guard_table_counts_only_eligible_models_and_names_missing_guards() -> N
         ]
     )
     text = _guard_lines(results)
-    assert "| two_tank | bad_event | 1 | 0.1000 | 0.2000 | 0.3000 | 0.1000 | 0.2000 |" in text
-    assert "No event guard is defined on: bsm1" in text
-    assert "No eligible model, so no guard row: cstr" in text
+    assert "| event_guard | two_tank | bad_event | 1 | 0.1000 | 0.2000 | 0.3000 | 0.1000 | 0.2000 |" in text
+    assert "`event_guard` is not defined on: bsm1" in text
+    assert "`event_guard` has no eligible model, so no row, on: cstr" in text
+
+
+def test_guards_come_from_the_config_with_a_default() -> None:
+    from scs.experiments.v3 import event_guard_definitions
+
+    assert event_guard_definitions({"event_guard_inputs": ["risk_support_only"]}) == {"event_guard": ["risk_support_only"]}
+    named = {"event_guards": {"a": ["risk_support_only"], "b": ["risk_uncertainty_only", "risk_support_only"]}}
+    assert event_guard_definitions(named) == {"a": ["risk_support_only"], "b": ["risk_uncertainty_only", "risk_support_only"]}
+
+
+def test_the_guard_without_invariant_runs_where_the_v2_guard_cannot() -> None:
+    rows = []
+    for role, bad in (("judge_calibration", True), ("judge_calibration", False), ("judge_test", True), ("judge_test", False)):
+        for index in range(4):
+            rows.append(
+                {
+                    "system_id": "bsm1",
+                    "seed": 0,
+                    "split": "judge_test_dry_holdout" if role == "judge_test" else "judge_calibration_id",
+                    "role": role,
+                    "model_id": "hold_last",
+                    "rmse": 0.2 if bad else 0.01,
+                    "event_mismatch": bad,
+                    "support_distance": 1.0 + index if bad else 0.1 + index / 10,
+                    "uncertainty_score": 0.5 + index / 10 if bad else 0.2,
+                    "disagreement_score": 0.4 if bad else 0.1 + index / 20,
+                    "invariant_residual": np.nan,
+                    "repair_amount": np.nan,
+                }
+            )
+    frame = pd.DataFrame(rows)
+    config = {
+        "learned_models": [],
+        "eligibility_baselines": ["hold_last"],
+        "primary_coverages": [0.5],
+        "badness_targets": ["bad_rmse"],
+        "rmse_threshold": 0.05,
+        "event_guards": {
+            "event_guard": ["risk_invariant_only", "risk_disagreement_only", "risk_support_only"],
+            "event_guard_no_invariant": ["risk_support_only", "risk_uncertainty_only", "risk_disagreement_only"],
+        },
+    }
+    from scs.experiments.v3 import eligibility_table, result_rows_for_frame
+
+    results = result_rows_for_frame(frame, config, eligibility_table(frame, config))
+    judges = set(results["judge_id"])
+    assert "event_guard_no_invariant" in judges
+    assert "event_guard" not in judges
+
+
+def test_thin_models_are_counted_inside_a_row_that_is_not_degenerate() -> None:
+    from scs.experiments.v3 import interval_table
+
+    rows = []
+    for model, share in (("strong", 0.0), ("weak", 0.6)):
+        for seed, margin in enumerate([0.1, 0.12, 0.11]):
+            rows.append(
+                {
+                    "system_id": "bsm1",
+                    "badness_target": "bad_rmse",
+                    "coverage": 0.05,
+                    "seed": seed,
+                    "model_id": model,
+                    "judge_id": "calibration_selected_candidate_ranker",
+                    "eligible": True,
+                    "absolute_margin": 0.0 if model == "strong" else margin,
+                    "bad_share": share,
+                }
+            )
+    table = interval_table(pd.DataFrame(rows), {"bootstrap_seed": 1, "bootstrap_samples": 20, "interval_width_limit": 0.10})
+    row = table.iloc[0]
+    assert bool(row["degenerate"]) is False
+    assert (int(row["n_models"]), int(row["thin_models"])) == (2, 1)

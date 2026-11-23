@@ -28,18 +28,18 @@ Working rule for this run: mean RMSE on `judge_calibration_id` is strictly below
 
 ## Interval at 5% coverage
 
-Bootstrap of the seed-level mean margin of eligible models, for `calibration_selected_candidate_ranker` only. One seed cannot make an interval. The width limit is 0.10. A row is degenerate when under 1% or over 99% of scenarios are bad. Its margin is fixed by the labels, so it does not count toward the check. Degenerate 5% rows: 1. All informative 5% rows narrower than the limit, with one on every system: True.
+Bootstrap of the seed-level mean margin of eligible models, for `calibration_selected_candidate_ranker` only. One seed cannot make an interval. The width limit is 0.10. A row is degenerate when under 1% or over 99% of scenarios are bad. Its margin is fixed by the labels, so it does not count toward the check. `thin_models` counts the eligible models whose own bad share is under or over the same limits. Their margins are fixed by the labels and pull the average toward zero. Degenerate 5% rows: 1. All informative 5% rows narrower than the limit, with one on every system: True.
 
-| system_id | badness_target | n_seeds | bad_share | degenerate | mean_margin | bootstrap_low | bootstrap_high | interval_width | narrower_than_limit |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| cstr | bad_event | 10 | 0.2268 | False | 0.2264 | 0.1978 | 0.2533 | 0.0555 | True |
-| cstr | bad_rmse | 10 | 0.4667 | False | 0.4621 | 0.4421 | 0.4853 | 0.0431 | True |
-| two_tank | bad_event | 10 | 0.0000 | True | 0.0000 | 0.0000 | 0.0000 | 0.0000 | True |
-| two_tank | bad_rmse | 10 | 0.6744 | False | 0.6850 | 0.6690 | 0.7005 | 0.0315 | True |
+| system_id | badness_target | n_seeds | bad_share | degenerate | n_models | thin_models | mean_margin | bootstrap_low | bootstrap_high | interval_width | narrower_than_limit |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| cstr | bad_event | 10 | 0.2268 | False | 3 | 0 | 0.2264 | 0.1978 | 0.2533 | 0.0555 | True |
+| cstr | bad_rmse | 10 | 0.4667 | False | 3 | 0 | 0.4621 | 0.4421 | 0.4853 | 0.0431 | True |
+| two_tank | bad_event | 10 | 0.0000 | True | 3 | 3 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | True |
+| two_tank | bad_rmse | 10 | 0.6744 | False | 3 | 0 | 0.6850 | 0.6690 | 0.7005 | 0.0315 | True |
 
 ## Settings used
 
-These numbers are Stage A choices. They are not the freeze.
+These numbers are the working settings in the config. A freeze is a later commit.
 
 - horizon: 32
 - ensemble members: 5
@@ -50,13 +50,19 @@ These numbers are Stage A choices. They are not the freeze.
 
 ## Event guard at 5% coverage
 
-Exploratory only. The guard is the v2 candidate: the maximum calibration-percentile rank of invariant, disagreement, and support. `margin_vs_primary` and `margin_vs_calibration_simple` use the simple baseline chosen on calibration rows. They are not a Q3 answer. Only eligible models enter the averages. The guard is not computed when one of its inputs is missing. On BSM1 that is the invariant signal, and no replacement guard is written yet.
+Exploratory only. `event_guard` is the v2 candidate: the maximum calibration-percentile rank of invariant, disagreement, and support. `event_guard_no_invariant` replaces invariant with uncertainty, so it needs no full-state signal. `margin_vs_primary` and `margin_vs_calibration_simple` use the simple baseline chosen on calibration rows. They are not a Q3 answer. Only eligible models enter the averages. A guard is not computed when one of its inputs is missing.
 
-| system_id | badness_target | n_models | event_guard_far | primary_far | calibration_simple_far | margin_vs_primary | margin_vs_calibration_simple |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| cstr | bad_event | 3 | 0.0102 | 0.0074 | 0.0045 | -0.0029 | -0.0057 |
-| cstr | bad_rmse | 3 | 0.0000 | 0.0000 | 0.0010 | 0.0000 | 0.0010 |
-| two_tank | bad_event | 3 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
-| two_tank | bad_rmse | 3 | 0.0000 | 0.0000 | 0.0003 | 0.0000 | 0.0003 |
+| guard | system_id | badness_target | n_models | event_guard_far | primary_far | calibration_simple_far | margin_vs_primary | margin_vs_calibration_simple |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| event_guard | cstr | bad_event | 3 | 0.0102 | 0.0074 | 0.0045 | -0.0029 | -0.0057 |
+| event_guard | cstr | bad_rmse | 3 | 0.0000 | 0.0000 | 0.0010 | 0.0000 | 0.0010 |
+| event_guard | two_tank | bad_event | 3 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| event_guard | two_tank | bad_rmse | 3 | 0.0000 | 0.0000 | 0.0003 | 0.0000 | 0.0003 |
+| event_guard_no_invariant | cstr | bad_event | 3 | 0.0783 | 0.0074 | 0.0045 | -0.0710 | -0.0738 |
+| event_guard_no_invariant | cstr | bad_rmse | 3 | 0.0533 | 0.0000 | 0.0010 | -0.0533 | -0.0524 |
+| event_guard_no_invariant | two_tank | bad_event | 3 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| event_guard_no_invariant | two_tank | bad_rmse | 3 | 0.1123 | 0.0000 | 0.0003 | -0.1123 | -0.1120 |
 
-No eligible model, so no guard row: heat_exchanger.
+`event_guard` has no eligible model, so no row, on: heat_exchanger.
+
+`event_guard_no_invariant` has no eligible model, so no row, on: heat_exchanger.

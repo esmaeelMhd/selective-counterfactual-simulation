@@ -38,10 +38,11 @@ badness_targets:
 rmse_threshold:
   bsm1: 5.0
 
-event_guard_inputs:
-  - risk_invariant_only
-  - risk_disagreement_only
-  - risk_support_only
+event_guards:
+  event_guard_no_invariant:
+    - risk_support_only
+    - risk_uncertainty_only
+    - risk_disagreement_only
 
 seeds:
   - 0
@@ -60,7 +61,8 @@ data:
   n_model_train: 40
   n_calibration_id: 16
   n_calibration_ood: 16
-  n_rehearsal_test: 24
+  n_test_per_split: 8
+  test_control_scale: [1.8, 2.2]
   uncertainty_samples: 2
 
 model_runtime:

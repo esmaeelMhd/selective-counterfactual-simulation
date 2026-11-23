@@ -59,10 +59,17 @@ seeds:
   - 8
   - 9
 
-event_guard_inputs:
-  - risk_invariant_only
-  - risk_disagreement_only
-  - risk_support_only
+# The v2 guard, and the same guard with the uncertainty signal in place of invariant. The second
+# needs no full-state signal, so it is also defined on BSM1. Exploratory in Stage A.
+event_guards:
+  event_guard:
+    - risk_invariant_only
+    - risk_disagreement_only
+    - risk_support_only
+  event_guard_no_invariant:
+    - risk_support_only
+    - risk_uncertainty_only
+    - risk_disagreement_only
 
 bootstrap_samples: 500
 bootstrap_seed: 2025
