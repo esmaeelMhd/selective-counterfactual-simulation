@@ -21,12 +21,14 @@ the plant state at its own minute of one continuous dry run.
 
 from __future__ import annotations
 
+from concurrent.futures import ProcessPoolExecutor
 import csv
 import json
 from pathlib import Path
 
 import numpy as np
 
+from scs.parallel import configure_worker_threads, resolve_workers
 from scs.systems.base import TrajectoryBatch
 
 MEASURED_NAMES = ("s_nh", "total_n", "cod", "tss", "bod5")
@@ -557,6 +559,73 @@ def open_loop_steady_state(days: int = 100) -> dict[str, np.ndarray]:
     return capture_plant(plant)
 
 
+_WORKER_TABLES: dict[str, np.ndarray] = {}
+_WORKER_START_STATES: dict[str, dict[int, dict[str, np.ndarray]]] = {}
+
+
+def _init_bsm1_worker(
+    tables: dict[str, np.ndarray],
+    start_states: dict[str, dict[int, dict[str, np.ndarray]]],
+) -> None:
+    global _WORKER_TABLES, _WORKER_START_STATES
+    configure_worker_threads()
+    _WORKER_TABLES = tables
+    _WORKER_START_STATES = start_states
+
+
+def _run_bsm1_window_task(
+    task: tuple[str, int, int, int, np.ndarray, str, str, float, float, bool],
+) -> TrajectoryBatch:
+    weather, start_minute, history, horizon, kla, split, scenario_type, flow_scale, load_scale, check_split = task
+    return _rollout_from_state(
+        dry=_WORKER_TABLES[weather],
+        start_minute=start_minute,
+        history=history,
+        horizon=horizon,
+        kla=kla,
+        initial_state=_WORKER_START_STATES[weather][start_minute],
+        split=split,
+        scenario_type=scenario_type,
+        flow_scale=flow_scale,
+        load_scale=load_scale,
+        check_split=check_split,
+    )
+
+
+def _execute_bsm1_window_tasks(
+    tasks: list[tuple[str, int, int, int, np.ndarray, str, str, float, float, bool]],
+    tables: dict[str, np.ndarray],
+    start_states: dict[str, dict[int, dict[str, np.ndarray]]],
+    workers: int,
+) -> list[TrajectoryBatch]:
+    effective_workers = resolve_workers(workers)
+    if effective_workers <= 1 or len(tasks) <= 1:
+        return [
+            _rollout_from_state(
+                dry=tables[weather],
+                start_minute=start_minute,
+                history=history,
+                horizon=horizon,
+                kla=kla,
+                initial_state=start_states[weather][start_minute],
+                split=split,
+                scenario_type=scenario_type,
+                flow_scale=flow_scale,
+                load_scale=load_scale,
+                check_split=check_split,
+            )
+            for weather, start_minute, history, horizon, kla, split, scenario_type, flow_scale, load_scale, check_split in tasks
+        ]
+    n_procs = min(effective_workers, len(tasks))
+    chunksize = max(1, len(tasks) // (n_procs * 4))
+    with ProcessPoolExecutor(
+        max_workers=n_procs,
+        initializer=_init_bsm1_worker,
+        initargs=(tables, start_states),
+    ) as pool:
+        return list(pool.map(_run_bsm1_window_task, tasks, chunksize=chunksize))
+
+
 def generate_bsm1_pretest_dataset(
     *,
     n_model_train: int = PRETEST_COUNTS["model_train"],
@@ -567,12 +636,14 @@ def generate_bsm1_pretest_dataset(
     seed: int = 0,
     steady_state: dict[str, np.ndarray] | None = None,
     start_states: dict[int, dict[str, np.ndarray]] | None = None,
+    workers: int = 1,
 ) -> tuple[dict[str, TrajectoryBatch], dict[str, object]]:
     """Train and calibration splits on dry weather. No rain, storm, or judge-test rows.
 
     Each window starts from the plant state at that dry-file minute of one
     continuous nominal run. ``start_states`` skips that run, for tests.
     """
+    effective_workers = resolve_workers(workers)
     specs = pretest_specs(
         n_model_train=n_model_train,
         n_calibration_id=n_calibration_id,
@@ -595,20 +666,29 @@ def generate_bsm1_pretest_dataset(
     missing = sorted(set(starts) - set(start_states))
     if missing:
         raise ValueError(f"no plant state for start minutes {missing[:5]}")
-    grouped: dict[str, list[TrajectoryBatch]] = {}
-    for spec in specs:
-        batch = _rollout_from_state(
-            dry=dry,
-            start_minute=int(spec["start_minute"]),
-            history=history,
-            horizon=horizon,
-            kla=np.asarray(spec["kla"], dtype=float),
-            initial_state=start_states[int(spec["start_minute"])],
-            split=str(spec["split"]),
-            scenario_type=str(spec["scenario_type"]),
-            flow_scale=float(spec["flow_scale"]),
-            load_scale=float(spec["load_scale"]),
+    tasks = [
+        (
+            "dry",
+            int(spec["start_minute"]),
+            history,
+            horizon,
+            np.asarray(spec["kla"], dtype=float),
+            str(spec["split"]),
+            str(spec["scenario_type"]),
+            float(spec["flow_scale"]),
+            float(spec["load_scale"]),
+            True,
         )
+        for spec in specs
+    ]
+    batches = _execute_bsm1_window_tasks(
+        tasks,
+        tables={"dry": dry},
+        start_states={"dry": start_states},
+        workers=effective_workers,
+    )
+    grouped: dict[str, list[TrajectoryBatch]] = {}
+    for spec, batch in zip(specs, batches):
         grouped.setdefault(str(spec["split"]), []).append(batch)
     dataset = {split: _concat_batches(pieces) for split, pieces in grouped.items()}
     try:
@@ -708,8 +788,11 @@ def _load_or_build_splits(
     return dataset
 
 
-def generate_bsm1_pretest_stage_dataset(config: dict[str, object], seed: int) -> dict[str, TrajectoryBatch]:
+def generate_bsm1_pretest_stage_dataset(
+    config: dict[str, object], seed: int, workers: int = 1
+) -> dict[str, TrajectoryBatch]:
     """Train and calibration BSM1 splits for one seed, without touching confirmatory days."""
+    effective_workers = resolve_workers(workers)
     data = config["data"]
     counts = dict(
         n_model_train=int(data["n_model_train"]),
@@ -733,15 +816,21 @@ def generate_bsm1_pretest_stage_dataset(config: dict[str, object], seed: int) ->
         dry = load_dry_influent()
         starts = [int(spec["start_minute"]) for spec in pretest_specs(seed=seed, **counts)]
         dataset, _manifest = generate_bsm1_pretest_dataset(
-            seed=seed, start_states=_cached_start_states(dry, starts), **counts
+            seed=seed,
+            start_states=_cached_start_states(dry, starts),
+            workers=effective_workers,
+            **counts,
         )
         return dataset
 
     return _load_or_build_splits(cache_dir, _build, expected_meta)
 
 
-def generate_bsm1_test_stage_dataset(config: dict[str, object], seed: int) -> dict[str, TrajectoryBatch]:
+def generate_bsm1_test_stage_dataset(
+    config: dict[str, object], seed: int, workers: int = 1
+) -> dict[str, TrajectoryBatch]:
     """Confirmatory or rehearsal BSM1 test splits for one seed."""
+    effective_workers = resolve_workers(workers)
     data = config["data"]
     stage = str(config.get("stage", "A"))
     if stage not in ("B", "B-rehearsal"):
@@ -779,12 +868,15 @@ def generate_bsm1_test_stage_dataset(config: dict[str, object], seed: int) -> di
             seed=seed,
             control_scale=scale,
             rehearsal=rehearsal,
+            workers=effective_workers,
         )
 
     return _load_or_build_splits(cache_dir, _build, expected_meta)
 
 
-def generate_bsm1_stage_dataset(config: dict[str, object], seed: int) -> dict[str, TrajectoryBatch]:
+def generate_bsm1_stage_dataset(
+    config: dict[str, object], seed: int, workers: int = 1
+) -> dict[str, TrajectoryBatch]:
     """The splits a v3 stage scores for BSM1, from a stage config.
 
     ``model_train``, ``judge_calibration_id`` and ``judge_calibration_control`` come from the
@@ -793,8 +885,8 @@ def generate_bsm1_stage_dataset(config: dict[str, object], seed: int) -> dict[st
     adds the same four splits cut from days that are not reserved, so every scoring step runs
     before the freeze. Those rows are not evidence.
     """
-    dataset = generate_bsm1_pretest_stage_dataset(config, seed)
-    dataset.update(generate_bsm1_test_stage_dataset(config, seed))
+    dataset = generate_bsm1_pretest_stage_dataset(config, seed, workers=workers)
+    dataset.update(generate_bsm1_test_stage_dataset(config, seed, workers=workers))
     return dataset
 
 
@@ -886,6 +978,7 @@ def generate_bsm1_confirmatory_dataset(
     seed: int = 0,
     control_scale: tuple[float, float] | list[float] | None = None,
     rehearsal: bool = False,
+    workers: int = 1,
 ) -> dict[str, TrajectoryBatch]:
     """The four confirmatory test splits: dry hold-out and rain, each at nominal and control-shifted aeration.
 
@@ -893,6 +986,7 @@ def generate_bsm1_confirmatory_dataset(
     otherwise. ``rehearsal`` cuts the same splits from days that are not reserved. Windows are
     spread evenly over the block, so they overlap each other, and the protocol says so.
     """
+    effective_workers = resolve_workers(workers)
     if n_per_split < 1:
         raise ValueError("n_per_split must be positive")
     scale = tuple(float(value) for value in (control_scale if control_scale is not None else CONTROL_SCALE))
@@ -926,30 +1020,33 @@ def generate_bsm1_confirmatory_dataset(
         "dry": _cached_start_states(dry, [int(window["start"]) for window in windows["dry"]]),
         "rain": _cached_rain_start_states(dry, rain, [int(window["start"]) for window in windows["rain"]]),
     }
-    dataset: dict[str, TrajectoryBatch] = {}
+    tasks: list[tuple[str, int, int, int, np.ndarray, str, str, float, float, bool]] = []
+    task_splits: list[str] = []
     for split, (weather, shifted) in CONFIRMATORY_SPLITS.items():
-        pieces = []
         for window_index, window in enumerate(windows[weather]):
             kla_rng = np.random.default_rng(
                 [int(seed), int(window_index), int(window["start"]), int(shifted), 1 if weather == "rain" else 0]
             )
-            pieces.append(
-                _rollout_from_state(
-                    dry=tables[weather],
-                    start_minute=int(window["start"]),
-                    history=history,
-                    horizon=horizon,
-                    kla=_scaled_kla(kla_rng, scale if shifted else NOMINAL_SCALE),
-                    initial_state=states[weather][int(window["start"])],
-                    split=split,
-                    scenario_type=f"{weather}_{'control_shift' if shifted else 'nominal'}",
-                    flow_scale=float(window["flow_scale"]),
-                    load_scale=float(window["load_scale"]),
-                    check_split=False,
+            tasks.append(
+                (
+                    weather,
+                    int(window["start"]),
+                    history,
+                    horizon,
+                    _scaled_kla(kla_rng, scale if shifted else NOMINAL_SCALE),
+                    split,
+                    f"{weather}_{'control_shift' if shifted else 'nominal'}",
+                    float(window["flow_scale"]),
+                    float(window["load_scale"]),
+                    False,
                 )
             )
-        dataset[split] = _concat_batches(pieces)
-    return dataset
+            task_splits.append(split)
+    batches = _execute_bsm1_window_tasks(tasks, tables=tables, start_states=states, workers=effective_workers)
+    grouped: dict[str, list[TrajectoryBatch]] = {split: [] for split in CONFIRMATORY_SPLITS}
+    for split, batch in zip(task_splits, batches):
+        grouped[split].append(batch)
+    return {split: _concat_batches(pieces) for split, pieces in grouped.items()}
 
 
 def _constant_series(n_steps: int) -> np.ndarray:

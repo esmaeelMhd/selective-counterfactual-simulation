@@ -7,9 +7,11 @@ stronger baselines.
 
 from __future__ import annotations
 
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import hashlib
 import math
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +23,7 @@ from sklearn.metrics import roc_auc_score
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
+from scs.data.schemas import load_batch, save_batch
 from scs.experiments.registry import make_system
 from scs.experiments.v2 import (
     SIGNAL_COLUMNS,
@@ -34,6 +37,7 @@ from scs.experiments.v2 import (
     trajectory_event_flags,
 )
 from scs.models.base import predict_rollouts_compat
+from scs.parallel import configure_worker_threads, resolve_workers
 from scs.signals import available_signals
 from scs.validators.invariants import invariant_residual_score
 from scs.validators.repair import repair_amount_score
@@ -1250,12 +1254,95 @@ def _recompute_disagreement_rows(
         row["disagreement_score"] = float(disagreement_by_split[split][scenario_index])
 
 
+_FIT_TRAIN_CACHE: tuple[str, Any] | None = None
+
+
+def _init_fit_worker() -> None:
+    global _FIT_TRAIN_CACHE
+    configure_worker_threads(configure_torch=True)
+    _FIT_TRAIN_CACHE = None
+
+
+def _fit_model_task(
+    task: tuple[int, str, int | None, Any, str],
+) -> tuple[int, str, int | None, Any]:
+    global _FIT_TRAIN_CACHE
+    seed_int, model_id, member_idx, estimator, train_path = task
+    if _FIT_TRAIN_CACHE is None or _FIT_TRAIN_CACHE[0] != train_path:
+        _FIT_TRAIN_CACHE = (train_path, load_batch(train_path))
+    estimator.fit(_FIT_TRAIN_CACHE[1])
+    return seed_int, model_id, member_idx, estimator
+
+
+def _model_fit_priority(model_id: str) -> int:
+    if model_id == "recurrent_world":
+        return 0
+    if model_id in {"ensemble_lstm", "lstm_world"}:
+        return 1
+    if model_id in {"gradient_boosted_narx", "ensemble_mlp", "mlp_state_space"}:
+        return 2
+    return 3
+
+
+def _finalize_ensemble_model(model: Any, state_dim: int) -> None:
+    members = getattr(model, "members", None)
+    if members and hasattr(model, "residual_std"):
+        stds = [member.residual_std for member in members if getattr(member, "residual_std", None) is not None]
+        model.residual_std = np.mean(np.vstack(stds), axis=0) if stds else np.full(state_dim, 1e-5)
+
+
+def _fit_models_across_seeds_parallel(
+    stage: str,
+    system_id: str,
+    models_by_seed: dict[int, dict[str, Any]],
+    train_paths: dict[int, str],
+    state_dims: dict[int, int],
+    workers: int,
+) -> None:
+    tasks: list[tuple[int, int, str, int | None, Any, str]] = []
+    for seed_int, models in models_by_seed.items():
+        train_path = train_paths[seed_int]
+        for model_id, model in models.items():
+            priority = _model_fit_priority(model_id)
+            members = getattr(model, "members", None)
+            if isinstance(members, list) and members:
+                for member_idx, member in enumerate(members):
+                    tasks.append((priority, seed_int, model_id, member_idx, member, train_path))
+            else:
+                tasks.append((priority, seed_int, model_id, None, model, train_path))
+    if not tasks:
+        return
+    # Longest-processing-time first so long RSSM/LSTM fits start immediately across all cores.
+    tasks.sort(key=lambda item: (item[0], item[1], item[2], -1 if item[3] is None else item[3]))
+    payloads = [(seed_int, model_id, member_idx, estimator, train_path) for _, seed_int, model_id, member_idx, estimator, train_path in tasks]
+    n_procs = min(workers, len(payloads))
+    completed = 0
+    total = len(payloads)
+    with ProcessPoolExecutor(max_workers=n_procs, initializer=_init_fit_worker) as pool:
+        futures = [pool.submit(_fit_model_task, payload) for payload in payloads]
+        for future in as_completed(futures):
+            seed_int, model_id, member_idx, fitted = future.result()
+            if member_idx is None:
+                models_by_seed[seed_int][model_id] = fitted
+                label = model_id
+            else:
+                models_by_seed[seed_int][model_id].members[member_idx] = fitted
+                label = f"{model_id}[{member_idx}]"
+            completed += 1
+            print(f"stage {stage} {system_id} fitted {completed}/{total}: seed {seed_int} {label}", flush=True)
+    for seed_int, models in models_by_seed.items():
+        for model in models.values():
+            _finalize_ensemble_model(model, state_dims[seed_int])
+
+
 def _run_system_two_phase(
     system_id: str,
     config: dict[str, Any],
     event_config: dict[str, Any],
+    workers: int = 1,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Fit models and validate calibration eligibility + threshold share BEFORE touching confirmatory test splits."""
+    effective_workers = resolve_workers(workers)
     stage = str(config.get("stage", "A"))
     n_uncertainty = int(config["data"].get("uncertainty_samples", 5))
     dt = float(config["data"]["dt"])
@@ -1268,59 +1355,148 @@ def _run_system_two_phase(
     seed_states: list[dict[str, Any]] = []
     cal_rows_all: list[dict[str, Any]] = []
 
-    for seed in config["seeds"]:
-        seed_int = int(seed)
-        print(f"stage {stage} {system_id} seed {seed_int}", flush=True)
-        if system_id == "bsm1":
-            from scs.systems.bsm1 import generate_bsm1_pretest_stage_dataset
+    if effective_workers <= 1:
+        for seed in config["seeds"]:
+            seed_int = int(seed)
+            print(f"stage {stage} {system_id} seed {seed_int}", flush=True)
+            if system_id == "bsm1":
+                from scs.systems.bsm1 import generate_bsm1_pretest_stage_dataset
 
-            pretest = generate_bsm1_pretest_stage_dataset(config, seed_int)
-            held_test: dict[str, Any] | None = None
-        else:
-            full = generate_v2_dataset(system_id, config, seed=seed_int)
-            pretest = {split: batch for split, batch in full.items() if _split_role(split) != "judge_test"}
-            held_test = {split: batch for split, batch in full.items() if _split_role(split) == "judge_test"}
-        models = {
-            model_id: _make_v2_model(model_id, seed_int, model_config, system_id=system_id)
-            for model_id in config["models"]
-        }
-        for model in models.values():
-            model.fit(pretest["model_train"])
-        support = SupportDistance()
-        support.fit(pretest["model_train"])
-        state_scale = fit_state_scale(pretest["model_train"].states) if use_standardized else None
-        cal_batches = {split: batch for split, batch in pretest.items() if _split_role(split) == "judge_calibration"}
-        seed_cal_rows: list[dict[str, Any]] = []
-        cal_preds: dict[str, dict[str, np.ndarray]] = {}
-        for split, batch in cal_batches.items():
-            rows, preds = _rollout_batch(
-                system_id,
-                seed_int,
-                split,
-                batch,
-                models,
-                support,
-                event_config,
-                dt,
-                n_uncertainty,
-                state_scale=state_scale,
-                keep_predictions=True,
-            )
-            seed_cal_rows.extend(rows)
-            cal_preds[split] = preds
-        cal_rows_all.extend(seed_cal_rows)
-        seed_states.append(
-            {
-                "seed": seed_int,
-                "models": models,
-                "support": support,
-                "state_scale": state_scale,
-                "cal_batches": cal_batches,
-                "cal_rows": seed_cal_rows,
-                "cal_preds": cal_preds,
-                "held_test": held_test,
+                pretest = generate_bsm1_pretest_stage_dataset(config, seed_int, workers=1)
+                held_test: dict[str, Any] | None = None
+            else:
+                full = generate_v2_dataset(system_id, config, seed=seed_int)
+                pretest = {split: batch for split, batch in full.items() if _split_role(split) != "judge_test"}
+                held_test = {split: batch for split, batch in full.items() if _split_role(split) == "judge_test"}
+            models = {
+                model_id: _make_v2_model(model_id, seed_int, model_config, system_id=system_id)
+                for model_id in config["models"]
             }
-        )
+            for model in models.values():
+                model.fit(pretest["model_train"])
+            support = SupportDistance()
+            support.fit(pretest["model_train"])
+            state_scale = fit_state_scale(pretest["model_train"].states) if use_standardized else None
+            cal_batches = {split: batch for split, batch in pretest.items() if _split_role(split) == "judge_calibration"}
+            seed_cal_rows: list[dict[str, Any]] = []
+            cal_preds: dict[str, dict[str, np.ndarray]] = {}
+            for split, batch in cal_batches.items():
+                rows, preds = _rollout_batch(
+                    system_id,
+                    seed_int,
+                    split,
+                    batch,
+                    models,
+                    support,
+                    event_config,
+                    dt,
+                    n_uncertainty,
+                    state_scale=state_scale,
+                    keep_predictions=True,
+                )
+                seed_cal_rows.extend(rows)
+                cal_preds[split] = preds
+            cal_rows_all.extend(seed_cal_rows)
+            seed_states.append(
+                {
+                    "seed": seed_int,
+                    "models": models,
+                    "support": support,
+                    "state_scale": state_scale,
+                    "cal_batches": cal_batches,
+                    "cal_rows": seed_cal_rows,
+                    "cal_preds": cal_preds,
+                    "held_test": held_test,
+                }
+            )
+    else:
+        cache_root = config.get("data", {}).get("cache_dir") if system_id == "bsm1" else None
+        prepared: list[dict[str, Any]] = []
+        models_by_seed: dict[int, dict[str, Any]] = {}
+        train_paths: dict[int, str] = {}
+        state_dims: dict[int, int] = {}
+        with tempfile.TemporaryDirectory(prefix=f"scs_v3_{system_id}_") as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            for seed in config["seeds"]:
+                seed_int = int(seed)
+                print(f"stage {stage} {system_id} pretest seed {seed_int} (workers={effective_workers})", flush=True)
+                if system_id == "bsm1":
+                    from scs.systems.bsm1 import generate_bsm1_pretest_stage_dataset
+
+                    pretest = generate_bsm1_pretest_stage_dataset(config, seed_int, workers=effective_workers)
+                    held_test = None
+                else:
+                    full = generate_v2_dataset(system_id, config, seed=seed_int)
+                    pretest = {split: batch for split, batch in full.items() if _split_role(split) != "judge_test"}
+                    held_test = {split: batch for split, batch in full.items() if _split_role(split) == "judge_test"}
+                train_batch = pretest["model_train"]
+                cached_train = Path(str(cache_root)) / f"seed_{seed_int}" / "pretest" / "model_train.npz" if cache_root else None
+                if cached_train is not None and cached_train.is_file():
+                    train_paths[seed_int] = str(cached_train)
+                else:
+                    out_train = tmp_path / f"seed_{seed_int}_model_train.npz"
+                    save_batch(train_batch, out_train)
+                    train_paths[seed_int] = str(out_train)
+                state_dims[seed_int] = int(train_batch.states.shape[-1])
+                support = SupportDistance()
+                support.fit(train_batch)
+                state_scale = fit_state_scale(train_batch.states) if use_standardized else None
+                cal_batches = {split: batch for split, batch in pretest.items() if _split_role(split) == "judge_calibration"}
+                models_by_seed[seed_int] = {
+                    model_id: _make_v2_model(model_id, seed_int, model_config, system_id=system_id)
+                    for model_id in config["models"]
+                }
+                prepared.append(
+                    {
+                        "seed": seed_int,
+                        "support": support,
+                        "state_scale": state_scale,
+                        "cal_batches": cal_batches,
+                        "held_test": held_test,
+                    }
+                )
+            _fit_models_across_seeds_parallel(
+                stage,
+                system_id,
+                models_by_seed,
+                train_paths,
+                state_dims,
+                workers=effective_workers,
+            )
+        for item in prepared:
+            seed_int = int(item["seed"])
+            models = models_by_seed[seed_int]
+            seed_cal_rows = []
+            cal_preds = {}
+            for split, batch in item["cal_batches"].items():
+                rows, preds = _rollout_batch(
+                    system_id,
+                    seed_int,
+                    split,
+                    batch,
+                    models,
+                    item["support"],
+                    event_config,
+                    dt,
+                    n_uncertainty,
+                    state_scale=item["state_scale"],
+                    keep_predictions=True,
+                )
+                seed_cal_rows.extend(rows)
+                cal_preds[split] = preds
+            cal_rows_all.extend(seed_cal_rows)
+            seed_states.append(
+                {
+                    "seed": seed_int,
+                    "models": models,
+                    "support": item["support"],
+                    "state_scale": item["state_scale"],
+                    "cal_batches": item["cal_batches"],
+                    "cal_rows": seed_cal_rows,
+                    "cal_preds": cal_preds,
+                    "held_test": item["held_test"],
+                }
+            )
 
     cal_frame = pd.DataFrame(cal_rows_all)
     sys_eligibility = eligibility_table(cal_frame, config)
@@ -1338,7 +1514,9 @@ def _run_system_two_phase(
         if system_id == "bsm1":
             from scs.systems.bsm1 import generate_bsm1_test_stage_dataset
 
-            test_batches = generate_bsm1_test_stage_dataset(config, seed_int)
+            if effective_workers > 1:
+                print(f"stage {stage} {system_id} test seed {seed_int} (workers={effective_workers})", flush=True)
+            test_batches = generate_bsm1_test_stage_dataset(config, seed_int, workers=effective_workers)
         else:
             test_batches = state["held_test"] or {}
         overlap = split_overlap_report({**state["cal_batches"], **test_batches})
@@ -1376,7 +1554,8 @@ def _run_system_two_phase(
     return pd.DataFrame(all_rows), sys_eligibility
 
 
-def run_v3_stage(config_path: str | Path, output: str | Path) -> dict[str, Any]:
+def run_v3_stage(config_path: str | Path, output: str | Path, workers: int = 1) -> dict[str, Any]:
+    effective_workers = resolve_workers(workers)
     config = load_v3_config(config_path)
     stage = str(config.get("stage", "A"))
     if stage == "B":
@@ -1389,7 +1568,9 @@ def run_v3_stage(config_path: str | Path, output: str | Path) -> dict[str, Any]:
     frames = []
     eligibilities = []
     for system_id in config["systems"]:
-        sys_frame, sys_eligibility = _run_system_two_phase(str(system_id), config, event_config)
+        sys_frame, sys_eligibility = _run_system_two_phase(
+            str(system_id), config, event_config, workers=effective_workers
+        )
         frames.append(sys_frame)
         eligibilities.append(sys_eligibility)
     scored = pd.concat(frames, ignore_index=True)

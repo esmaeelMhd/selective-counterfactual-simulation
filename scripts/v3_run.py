@@ -9,8 +9,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run a v3 stage and write one results table and one report.")
     parser.add_argument("--config", default="configs/v3/stage_a.yaml")
     parser.add_argument("--output", default="results/v3/stage_a")
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=0,
+        help="CPU worker processes for BSM1 simulation and model training (0 = all CPU cores, 1 = sequential).",
+    )
     args = parser.parse_args()
-    result = run_v3_stage(args.config, args.output)
+    result = run_v3_stage(args.config, args.output, workers=args.workers)
     print(
         f"eligible_systems={result['eligible_systems']} precision_pass={result['precision_pass']} "
         f"degenerate_rows={result['degenerate_rows']} "

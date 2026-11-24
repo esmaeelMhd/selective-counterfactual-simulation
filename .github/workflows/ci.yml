@@ -55,4 +55,4 @@ jobs:
         run: pip install -e ".[dev,bsm1,learned]"
 
       - name: Run the v3 tests and show what is skipped
-        run: pytest -q -rs tests/test_v3_bsm1_interface.py tests/test_v3_stage_a.py tests/test_v3_stage_b.py tests/test_v3_torch_models.py
+        run: pytest -q -rs tests/test_v3_bsm1_interface.py tests/test_v3_stage_a.py tests/test_v3_stage_b.py tests/test_v3_torch_models.py tests/test_v3_parallel.py
