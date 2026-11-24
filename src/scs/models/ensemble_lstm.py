@@ -29,7 +29,7 @@ class EnsembleLSTMModel:
             raise ValueError("ensemble_lstm needs at least 2 members")
         self.members = [
             LSTMWorldModel(
-                random_state=random_state + 101 * index,
+                random_state=random_state + 101 * (index + 1),
                 hidden_dim=hidden_dim,
                 num_layers=num_layers,
                 epochs=epochs,

@@ -432,3 +432,23 @@ def test_pyproject_pins_timesim_to_a_commit_sha() -> None:
     timesim_specs = [dep for dep in learned if dep.startswith("timesim")]
     assert len(timesim_specs) == 1
     assert re.search(r"@[0-9a-f]{40}$", timesim_specs[0]), timesim_specs[0]
+
+
+def test_check_rain_repairs_refuses_boundary_malformed_row() -> None:
+    from scs.systems.bsm1 import RAIN_FLOW_COLUMN, _check_rain_repairs
+
+    table = np.ones((4, 22), dtype=float)
+    with pytest.raises(RuntimeError, match="boundary"):
+        _check_rain_repairs(table, [{"row": 0, "column": RAIN_FLOW_COLUMN, "raw": "1.0.0", "value": 1.0}])
+
+
+def test_event_mismatch_per_limit_marks_nonfinite_prediction_as_bad() -> None:
+    import yaml
+
+    from scs.experiments.v3 import event_mismatch_per_limit
+    from scs.systems.bsm1 import STATE_DIM
+
+    config = yaml.safe_load(open("configs/v3/bsm1_events.yaml", encoding="utf-8"))
+    truth = np.zeros((3, STATE_DIM))
+    diverged = np.full((3, STATE_DIM), np.nan)
+    assert event_mismatch_per_limit(truth, diverged, config) is True

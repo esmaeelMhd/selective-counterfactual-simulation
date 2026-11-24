@@ -12,13 +12,14 @@ class EnsembleMLPModel:
 
     model_id = "ensemble_mlp"
 
-    def __init__(self, random_state: int = 0, n_members: int = 2, max_iter: int = 120) -> None:
+    def __init__(self, random_state: int = 0, n_members: int = 2, max_iter: int = 120, seed_offset: int = 0) -> None:
         self.random_state = random_state
         self.n_members = int(n_members)
         self.max_iter = int(max_iter)
+        self.seed_offset = int(seed_offset)
         self.members = [
             MLPStateSpaceModel(
-                random_state=random_state + 101 * idx,
+                random_state=random_state + self.seed_offset + 101 * idx,
                 hidden_layer_sizes=(32,),
                 max_iter=max_iter,
             )

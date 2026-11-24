@@ -330,7 +330,7 @@ def generate_v2_dataset(system_id: str, config: dict[str, Any], seed: int) -> di
     raise ValueError(f"unknown v2 system_id: {system_id}")
 
 
-def _learned_budget(config: dict[str, Any]) -> dict[str, Any]:
+def _learned_budget(config: dict[str, Any], system_id: str | None = None) -> dict[str, Any]:
     """Early-stopping settings from the config. Absent on the ODE stage, so those models are unchanged."""
     runtime = config.get("model_runtime", {})
     if not runtime.get("early_stopping"):
@@ -342,16 +342,18 @@ def _learned_budget(config: dict[str, Any]) -> dict[str, Any]:
         "check_every": int(runtime.get("check_every", 5)),
         "patience": int(runtime.get("patience", 3)),
     }
-    if "bsm1" in config.get("systems", []):
+    systems = config.get("systems", [])
+    is_bsm1 = system_id == "bsm1" or (system_id is None and list(systems) == ["bsm1"])
+    if is_bsm1:
         from scs.systems.bsm1 import hydraulic_projection
 
         options["projection_factory"] = hydraulic_projection
     return options
 
 
-def _make_v2_model(model_id: str, seed: int, config: dict[str, Any]):
+def _make_v2_model(model_id: str, seed: int, config: dict[str, Any], system_id: str | None = None):
     runtime = config.get("model_runtime", {})
-    budget = _learned_budget(config)
+    budget = _learned_budget(config, system_id=system_id)
     if model_id == "hold_last":
         return HoldLastModel()
     if model_id == "linear_narx":
@@ -367,6 +369,7 @@ def _make_v2_model(model_id: str, seed: int, config: dict[str, Any]):
             random_state=seed,
             n_members=int(runtime.get("ensemble_members", 2)),
             max_iter=int(runtime.get("ensemble_mlp_max_iter", 70)),
+            seed_offset=int(runtime.get("ensemble_seed_offset", 0)),
         )
     if model_id == "gradient_boosted_narx":
         return GradientBoostedNARXModel(

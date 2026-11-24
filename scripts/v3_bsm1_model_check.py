@@ -14,20 +14,13 @@ from pathlib import Path
 import numpy as np
 
 from scs.data.schemas import load_dataset
-from scs.experiments.v3 import fit_state_scale, scaled_scenario_rmse
+from scs.experiments.v2 import _make_v2_model
+from scs.experiments.v3 import fit_state_scale, load_v3_config, scaled_scenario_rmse
 from scs.metrics.trajectory import rmse
-from scs.models.ensemble_lstm import EnsembleLSTMModel
-from scs.models.hold_last import HoldLastModel
-from scs.models.linear_narx import LinearNARXModel
-from scs.models.lstm_world import LSTMWorldModel
-from scs.models.mlp_state_space import MLPStateSpaceModel
-from scs.models.recurrent_world import RecurrentWorldModel
 from scs.systems.base import TrajectoryBatch
 from scs.systems.bsm1 import (
     REACTOR_WIDTH,
     effluent_measurements,
-    hydraulic_projection,
-    pretest_overlap_gap,
     rollout_with_known_hydraulics,
 )
 
@@ -66,27 +59,14 @@ def _score(model, batch: TrajectoryBatch, state_scale: tuple[np.ndarray, np.ndar
 
 
 SEEDS = (0, 1, 2)
-# Training budget rule for the recurrent adapters, fixed before looking at any calibration row.
-# The last 15% of the model_train windows are held out, less a gap of 18 windows that keeps them
-# apart in time from the rest. Every 5 epochs the free-running rollout error on them is scored,
-# with the BSM1 flow assignment, the best weights are kept, and training stops after 3 checks
-# without improvement, or at 120 epochs. Neither calibration split is read. The delta MLP keeps
-# the 80 iterations it had before this work.
-STOPPING_RULE = dict(
-    early_stopping=True,
-    validation_fraction=0.15,
-    validation_gap=pretest_overlap_gap(),
-    check_every=5,
-    patience=3,
-    projection_factory=hydraulic_projection,
-)
-MODELS = [
-    ("hold_last", lambda seed: HoldLastModel(), (0,)),
-    ("linear_narx", lambda seed: LinearNARXModel(), (0,)),
-    ("mlp_state_space", lambda seed: MLPStateSpaceModel(random_state=seed, max_iter=80), SEEDS),
-    ("lstm_world", lambda seed: LSTMWorldModel(random_state=seed, epochs=120, **STOPPING_RULE), SEEDS),
-    ("ensemble_lstm", lambda seed: EnsembleLSTMModel(random_state=seed, n_members=5, epochs=120, **STOPPING_RULE), SEEDS),
-    ("recurrent_world", lambda seed: RecurrentWorldModel(random_state=seed, epochs=120, **STOPPING_RULE), (0,)),
+STAGE_B_CONFIG_PATH = Path("configs/v3/stage_b.yaml")
+MODEL_SEEDS = [
+    ("hold_last", (0,)),
+    ("linear_narx", (0,)),
+    ("mlp_state_space", SEEDS),
+    ("lstm_world", SEEDS),
+    ("ensemble_lstm", SEEDS),
+    ("recurrent_world", (0,)),
 ]
 
 
@@ -99,16 +79,17 @@ def _selected_epochs(model) -> float:
 
 
 def main() -> None:
+    config = load_v3_config(STAGE_B_CONFIG_PATH)
     data = load_dataset("results/v3/bsm1_pretest")
     train = data["model_train"]
     calibration = data["judge_calibration_id"]
     control = data["judge_calibration_control"]
     state_scale = fit_state_scale(train.states)
     rows = []
-    for name, factory, seeds in MODELS:
+    for name, seeds in MODEL_SEEDS:
         scored, shifted, seconds, losses, epochs = [], [], [], [], []
         for seed in seeds:
-            model = factory(seed)
+            model = _make_v2_model(name, seed, config, system_id="bsm1")
             started = time.perf_counter()
             model.fit(train)
             seconds.append(time.perf_counter() - started)

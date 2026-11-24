@@ -7,13 +7,13 @@ Reactor and effluent flow are set from the influent with the open-loop recycle a
 The LSTM and recurrent adapters predict the change in state over one step. The calibration split holds 2 independent daily influent shapes, so these numbers are noisy.
 The LSTM, its ensemble and the recurrent model train under a stopping rule fixed before any calibration row was read: the last 15% of the `model_train` windows are held out, less a gap of 18 windows, the free-running rollout error on them is checked every 5 epochs, the best weights are kept, and training stops after 3 checks without improvement or at 120 epochs. Neither calibration split decides a budget. The delta MLP keeps its earlier 80 iterations.
 
-Calibration-derived standardized `bad_rmse` threshold: **0.5069** (3x the 99th percentile 0.1690 of `ensemble_lstm` on `judge_calibration_id`; max eligible ID scenario 0.3957; marks 44.1% of eligible calibration scenarios as bad).
+Calibration-derived standardized `bad_rmse` threshold: **0.4691** (3x the 99th percentile 0.1564 of `ensemble_lstm` on `judge_calibration_id`; max eligible ID scenario 0.3957; marks 46.6% of eligible calibration scenarios as bad).
 
 | model | seeds | fit seconds | std scenario RMSE | seeds below bar | eligible | std control RMSE | control below bar | raw scenario RMSE | one-step RMSE | settler | concentration | effluent RMSE | epochs used |
 |---|---:|---:|---:|---:|:---:|---:|:---:|---:|---:|---:|---:|---:|---:|
 | hold_last | 1 | 0.0 | 0.8636 | n/a | n/a | 1.151 | n/a | 96.49 | 1.048 | 351.6 | 45.72 | 1.885 | nan |
 | linear_narx | 1 | 0.2 | 0.2426 | n/a | n/a | 0.5544 | n/a | 23.14 | 0.389 | 96.61 | 7.587 | 0.2903 | nan |
-| mlp_state_space | 3 | 11.4 | 1.344 | 0/3 | False | 2.54 | False | 96.96 | 0.3278 | 433 | 27.18 | 1.252 | nan |
-| lstm_world | 3 | 44.0 | 0.1538 | 3/3 | True | 0.8338 | False | 15.16 | 0.696 | 57.82 | 5.513 | 0.5883 | 50 |
-| ensemble_lstm | 3 | 228.3 | 0.1015 | 3/3 | True | 0.6401 | False | 9.998 | 0.6664 | 38.51 | 3.621 | 0.5264 | 52.67 |
-| recurrent_world | 1 | 169.5 | 0.3143 | 0/1 | False | 0.8437 | False | 28.52 | 0.7879 | 105 | 10.96 | 0.8315 | 20 |
+| mlp_state_space | 3 | 8.6 | 2.84 | 0/3 | False | 3.789 | False | 174.1 | 0.3312 | 715.2 | 41.42 | 3.241 | nan |
+| lstm_world | 3 | 38.7 | 0.1538 | 3/3 | True | 0.8338 | False | 15.16 | 0.696 | 57.82 | 5.513 | 0.5883 | 50 |
+| ensemble_lstm | 3 | 176.2 | 0.101 | 3/3 | True | 0.5999 | False | 9.946 | 0.6765 | 38.9 | 3.477 | 0.5165 | 50.33 |
+| recurrent_world | 1 | 121.3 | 0.3143 | 0/1 | False | 0.8437 | False | 28.52 | 0.7879 | 105 | 10.96 | 0.8315 | 20 |

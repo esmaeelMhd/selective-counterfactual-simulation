@@ -321,3 +321,31 @@ def test_early_stopping_restores_the_best_weights_and_reads_only_the_training_ba
     plain = LSTMWorldModel(random_state=0, hidden_dim=8, num_layers=1, epochs=4, batch_trajectories=4, chunk_length=3)
     plain.fit(train)
     assert plain.selected_epochs == 4 and len(plain.train_losses) == 4
+
+
+def test_ensemble_member_zero_has_distinct_seed_from_single_model_and_epochs_validated() -> None:
+    pytest.importorskip("torch")
+    pytest.importorskip("timesim")
+    from scs.models.ensemble_lstm import EnsembleLSTMModel
+    from scs.models.ensemble_mlp import EnsembleMLPModel
+    from scs.models.lstm_world import LSTMWorldModel
+    from scs.models.recurrent_world import RecurrentWorldModel
+
+    ens_lstm = EnsembleLSTMModel(random_state=0, n_members=3, hidden_dim=4, num_layers=1, epochs=1)
+    assert ens_lstm.members[0].random_state != 0
+    assert len({member.random_state for member in ens_lstm.members}) == 3
+
+    # EnsembleMLPModel preserves default v2 seed_offset=0, and supports non-zero offset for v3.
+    ens_mlp_v2 = EnsembleMLPModel(random_state=0, n_members=2, max_iter=5)
+    ens_mlp_v3 = EnsembleMLPModel(random_state=0, n_members=2, max_iter=5, seed_offset=101)
+    assert ens_mlp_v2.members[0].random_state == 0
+    assert ens_mlp_v3.members[0].random_state != 0
+
+    with pytest.raises(ValueError, match="epochs"):
+        LSTMWorldModel(epochs=0)
+    with pytest.raises(ValueError, match="epochs"):
+        RecurrentWorldModel(epochs=0)
+    # patience=0 is harmless when early_stopping is disabled.
+    no_es = LSTMWorldModel(random_state=0, hidden_dim=4, num_layers=1, epochs=1, early_stopping=False, patience=0)
+    no_es.fit(_linear_batch())
+    assert no_es.selected_epochs == 1

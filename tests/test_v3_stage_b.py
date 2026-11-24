@@ -15,11 +15,14 @@ def test_protocol_draft_is_not_frozen() -> None:
     assert protocol_is_frozen() is False
 
 
-def test_only_the_freeze_itself_blocks_stage_b_once_the_decisions_are_drafted() -> None:
+def test_only_the_freeze_itself_blocks_stage_b_once_the_decisions_are_drafted(monkeypatch) -> None:
+    from scs.experiments import v3
+
+    monkeypatch.setattr(v3, "_tracked_working_tree_dirty", lambda: False)
     config = load_v3_config("configs/v3/stage_b.yaml")
     blockers = stage_b_blockers(config)
     assert config["rmse_metric"] == "standardized_state"
-    assert config["rmse_threshold"]["bsm1"] == pytest.approx(0.5069)
+    assert config["rmse_threshold"]["bsm1"] == pytest.approx(0.4691)
     assert config["check_threshold_share"] is True
     assert config["coverage_rule"] == "both"
     assert config["event_guard_on_bsm1"] == "event_guard_no_invariant"
@@ -310,3 +313,67 @@ def test_stage_run_writes_git_commit_and_protocol_hash_into_results_and_report(
     assert str(table["protocol_sha256"].iloc[0]) in report
     assert (tmp_path / "cache" / "seed_0" / "pretest" / "model_train.npz").is_file()
     assert (tmp_path / "cache" / "seed_0" / "test" / "judge_test_dry_holdout.npz").is_file()
+
+
+def test_stage_b_refuses_dirty_tracked_working_tree_even_when_frozen(monkeypatch) -> None:
+    from scs.experiments import v3
+
+    config = {**load_v3_config("configs/v3/stage_b.yaml"), "protocol_frozen": True}
+    monkeypatch.setattr(v3, "protocol_is_frozen", lambda *args, **kwargs: True)
+    monkeypatch.setattr(v3, "_tracked_working_tree_dirty", lambda: True)
+    dirty_blockers = v3.stage_b_blockers(config)
+    assert any("uncommitted" in item.lower() for item in dirty_blockers)
+    monkeypatch.setattr(v3, "_tracked_working_tree_dirty", lambda: False)
+    assert v3.stage_b_blockers(config) == []
+
+
+def test_stage_b_blockers_validates_decision_values_and_test_scenario_count(monkeypatch) -> None:
+    from scs.experiments import v3
+
+    config = {**load_v3_config("configs/v3/stage_b.yaml"), "protocol_frozen": True}
+    monkeypatch.setattr(v3, "protocol_is_frozen", lambda *args, **kwargs: True)
+    monkeypatch.setattr(v3, "_tracked_working_tree_dirty", lambda: False)
+    assert any("coverage_rule" in item for item in v3.stage_b_blockers({**config, "coverage_rule": "bogus"}))
+    assert any("control_split_influent" in item for item in v3.stage_b_blockers({**config, "control_split_influent": "other"}))
+    assert any("overlapping" in item.lower() for item in v3.stage_b_blockers({**config, "overlapping_test_windows": False}))
+    small_test = {**config, "data": {**config["data"], "n_test_per_split": 100}}
+    assert any("2000" in item for item in v3.stage_b_blockers(small_test))
+
+
+def test_bsm1_cache_checks_freeze_before_reading_and_invalidates_on_config_change(
+    fast_start_states, tmp_path: Path
+) -> None:
+    bsm1 = fast_start_states
+    cache_root = str(tmp_path / "cache")
+    rehearsal_cfg = {
+        "stage": "B-rehearsal",
+        "data": {
+            "horizon": 4,
+            "history_minutes": 2,
+            "n_model_train": 3,
+            "n_calibration_id": 2,
+            "n_calibration_ood": 2,
+            "n_test_per_split": 2,
+            "cache_dir": cache_root,
+        },
+    }
+    first = bsm1.generate_bsm1_test_stage_dataset(rehearsal_cfg, seed=0)
+    assert first["judge_test_dry_holdout"].states.shape[1] == 5
+
+    # Reusing the same cache_dir with stage="B" while unfrozen MUST refuse before reading cache.
+    stage_b_cfg = {**rehearsal_cfg, "stage": "B"}
+    with pytest.raises(RuntimeError, match="only after the freeze"):
+        bsm1.generate_bsm1_test_stage_dataset(stage_b_cfg, seed=0)
+
+    # Changing horizon on the same cache_dir MUST invalidate stale cache and rebuild.
+    longer_cfg = {**rehearsal_cfg, "data": {**rehearsal_cfg["data"], "horizon": 6}}
+    rebuilt = bsm1.generate_bsm1_test_stage_dataset(longer_cfg, seed=0)
+    assert rebuilt["judge_test_dry_holdout"].states.shape[1] == 7
+
+
+def test_mixed_system_config_does_not_attach_bsm1_projection_to_ode_models() -> None:
+    config = {"systems": ["two_tank", "bsm1"], "model_runtime": {"early_stopping": True}}
+    ode_model = _make_v2_model("lstm_world", 0, config, system_id="two_tank")
+    bsm1_model = _make_v2_model("lstm_world", 0, config, system_id="bsm1")
+    assert ode_model.projection_factory is None
+    assert bsm1_model.projection_factory is not None

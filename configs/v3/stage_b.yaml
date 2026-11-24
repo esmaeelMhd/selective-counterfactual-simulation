@@ -1,6 +1,5 @@
 # Draft Stage B settings. Not the confirmatory freeze.
-# The runner refuses to generate or score confirmatory rows while the blockers in
-# stage_b_blockers are open. Null rows are decisions this file does not make.
+# The runner refuses to generate or score confirmatory rows while stage_b_blockers are open.
 stage: B
 label: confirmatory
 protocol_frozen: false
@@ -45,13 +44,13 @@ badness_targets:
   - bad_event
 
 # Working value, not frozen. Standardized non-constant state RMSE (z-scored per active channel using
-# model_train std only, avoiding raw settler-solids dominance). 3 times the 99th percentile (0.1690)
+# model_train std only, avoiding raw settler-solids dominance). 3 times the 99th percentile (0.1564)
 # of ensemble_lstm per-scenario standardized RMSE on judge_calibration_id, seeds 0-2 (240 scenarios).
 # 3 is the smallest whole multiple that no eligible model's in-distribution calibration scenario
-# exceeds (largest 0.3957, LSTM). Marks 44.1% of eligible calibration scenarios as bad. Calibration only.
+# exceeds (largest 0.3957, LSTM). Marks 46.6% of eligible calibration scenarios as bad. Calibration only.
 rmse_metric: standardized_state
 rmse_threshold:
-  bsm1: 0.5069
+  bsm1: 0.4691
 
 # Refuse a threshold that marks under 1% or over 99% of eligible calibration scenarios as bad.
 check_threshold_share: true

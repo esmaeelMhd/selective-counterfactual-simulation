@@ -59,8 +59,8 @@ class LSTMWorldModel:
         patience: int = 3,
         projection_factory=None,
     ) -> None:
-        if batch_trajectories < 1 or chunk_length < 1 or check_every < 1:
-            raise ValueError("batch_trajectories, chunk_length, and check_every must be positive")
+        if batch_trajectories < 1 or chunk_length < 1 or check_every < 1 or epochs < 1:
+            raise ValueError("epochs, batch_trajectories, chunk_length, and check_every must be positive")
         self.early_stopping = bool(early_stopping)
         self.validation_fraction = float(validation_fraction)
         self.validation_gap = int(validation_gap)
@@ -96,11 +96,12 @@ class LSTMWorldModel:
         torch, timesim_lstm = _require_lstm()
         torch.manual_seed(self.random_state)
         validation = None
+        stopper = None
         if self.early_stopping:
             fit_rows, validation_rows = time_blocked_split(train.n_trajectories, self.validation_fraction, self.validation_gap)
             validation = subset_batch(train, validation_rows)
             train = subset_batch(train, fit_rows)
-        stopper = EarlyStopping(self.patience)
+            stopper = EarlyStopping(self.patience)
         features, targets = _sequence_tensors(train)
         self.x_mean = features.mean(axis=(0, 1))
         self.x_std = np.maximum(features.std(axis=(0, 1)), 1e-6)

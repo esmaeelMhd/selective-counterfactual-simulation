@@ -22,6 +22,7 @@ the plant state at its own minute of one continuous dry run.
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 
 import numpy as np
@@ -195,6 +196,8 @@ def _check_rain_repairs(table: np.ndarray, repairs: list[dict[str, object]]) -> 
             before -= 1
         while after in rows:
             after += 1
+        if before < 0 or after >= len(flow):
+            raise RuntimeError(f"repaired rain flow at row {run[0]} lies on a file boundary without readable neighbours")
         for row in run:
             line = flow[before] + (flow[after] - flow[before]) * (row - before) / (after - before)
             if abs(flow[row] - line) > 0.05 * max(abs(flow[before] - flow[after]), 1e-9) + 0.02:
@@ -608,9 +611,16 @@ def generate_bsm1_pretest_dataset(
         )
         grouped.setdefault(str(spec["split"]), []).append(batch)
     dataset = {split: _concat_batches(pieces) for split, pieces in grouped.items()}
+    try:
+        import bsm2_python
+
+        bsm2_version = str(getattr(bsm2_python, "__version__", "unknown"))
+    except ImportError:
+        bsm2_version = "missing"
     manifest = {
         "protocol_frozen": False,
         "confirmatory_test_generated": False,
+        "bsm2_python_version": bsm2_version,
         "weather": influent_file_status(),
         "splits": sorted(dataset),
         "horizon": horizon,
@@ -659,16 +669,42 @@ def _cached_start_states(dry: np.ndarray, starts: list[int]) -> dict[int, dict[s
     return _START_STATES[key]
 
 
-def _load_or_build_splits(cache_dir: Path | None, build) -> dict[str, TrajectoryBatch]:
-    if cache_dir is not None and cache_dir.is_dir() and list(cache_dir.glob("*.npz")):
-        from scs.data.schemas import load_dataset
+def _load_or_build_splits(
+    cache_dir: Path | None,
+    build,
+    expected_meta: dict[str, object],
+) -> dict[str, TrajectoryBatch]:
+    if cache_dir is not None and cache_dir.is_dir():
+        meta_path = cache_dir / "cache_meta.json"
+        if meta_path.is_file():
+            try:
+                saved = json.loads(meta_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                saved = None
+            splits = saved.get("splits") if isinstance(saved, dict) else None
+            if (
+                isinstance(saved, dict)
+                and saved.get("params") == expected_meta
+                and isinstance(splits, list)
+                and splits
+                and all((cache_dir / f"{split}.npz").is_file() for split in splits)
+            ):
+                from scs.data.schemas import load_dataset
 
-        return load_dataset(cache_dir)
+                return load_dataset(cache_dir)
     dataset = build()
     if cache_dir is not None:
         from scs.data.schemas import save_dataset
 
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        for stale in cache_dir.glob("*.npz"):
+            stale.unlink()
+        meta_path = cache_dir / "cache_meta.json"
+        if meta_path.exists():
+            meta_path.unlink()
         save_dataset(dataset, cache_dir)
+        payload = {"params": expected_meta, "splits": sorted(dataset)}
+        meta_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return dataset
 
 
@@ -684,6 +720,14 @@ def generate_bsm1_pretest_stage_dataset(config: dict[str, object], seed: int) ->
     )
     cache_root = data.get("cache_dir")
     cache_dir = Path(str(cache_root)) / f"seed_{int(seed)}" / "pretest" if cache_root else None
+    expected_meta: dict[str, object] = {
+        "kind": "pretest",
+        "seed": int(seed),
+        **counts,
+        "nominal_scale": list(NOMINAL_SCALE),
+        "control_scale": list(CONTROL_SCALE),
+        "influent_scale": list(INFLUENT_SCALE),
+    }
 
     def _build() -> dict[str, TrajectoryBatch]:
         dry = load_dry_influent()
@@ -693,7 +737,7 @@ def generate_bsm1_pretest_stage_dataset(config: dict[str, object], seed: int) ->
         )
         return dataset
 
-    return _load_or_build_splits(cache_dir, _build)
+    return _load_or_build_splits(cache_dir, _build, expected_meta)
 
 
 def generate_bsm1_test_stage_dataset(config: dict[str, object], seed: int) -> dict[str, TrajectoryBatch]:
@@ -702,8 +746,30 @@ def generate_bsm1_test_stage_dataset(config: dict[str, object], seed: int) -> di
     stage = str(config.get("stage", "A"))
     if stage not in ("B", "B-rehearsal"):
         return {}
+    rehearsal = stage == "B-rehearsal"
+    if not rehearsal:
+        from scs.experiments.v3 import protocol_is_frozen
+
+        if not protocol_is_frozen():
+            raise RuntimeError(
+                "the confirmatory dry and rain windows are generated only after the freeze, "
+                "and docs/v3/protocol.md is still a draft"
+            )
+    scale = [float(value) for value in (data.get("test_control_scale") or CONTROL_SCALE)]
     cache_root = data.get("cache_dir")
     cache_dir = Path(str(cache_root)) / f"seed_{int(seed)}" / "test" if cache_root else None
+    expected_meta: dict[str, object] = {
+        "kind": "test",
+        "stage": stage,
+        "rehearsal": rehearsal,
+        "seed": int(seed),
+        "n_per_split": int(data["n_test_per_split"]),
+        "horizon": int(data["horizon"]),
+        "history": int(data.get("history_minutes", HISTORY_MINUTES)),
+        "control_scale": scale,
+        "nominal_scale": list(NOMINAL_SCALE),
+        "influent_scale": list(INFLUENT_SCALE),
+    }
 
     def _build() -> dict[str, TrajectoryBatch]:
         return generate_bsm1_confirmatory_dataset(
@@ -711,11 +777,11 @@ def generate_bsm1_test_stage_dataset(config: dict[str, object], seed: int) -> di
             horizon=int(data["horizon"]),
             history=int(data.get("history_minutes", HISTORY_MINUTES)),
             seed=seed,
-            control_scale=data.get("test_control_scale"),
-            rehearsal=stage == "B-rehearsal",
+            control_scale=scale,
+            rehearsal=rehearsal,
         )
 
-    return _load_or_build_splits(cache_dir, _build)
+    return _load_or_build_splits(cache_dir, _build, expected_meta)
 
 
 def generate_bsm1_stage_dataset(config: dict[str, object], seed: int) -> dict[str, TrajectoryBatch]:
@@ -863,8 +929,10 @@ def generate_bsm1_confirmatory_dataset(
     dataset: dict[str, TrajectoryBatch] = {}
     for split, (weather, shifted) in CONFIRMATORY_SPLITS.items():
         pieces = []
-        for window in windows[weather]:
-            kla_rng = np.random.default_rng([int(seed), int(window["start"]), int(shifted), 1 if weather == "rain" else 0])
+        for window_index, window in enumerate(windows[weather]):
+            kla_rng = np.random.default_rng(
+                [int(seed), int(window_index), int(window["start"]), int(shifted), 1 if weather == "rain" else 0]
+            )
             pieces.append(
                 _rollout_from_state(
                     dry=tables[weather],

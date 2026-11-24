@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 from typing import Protocol
 
 import numpy as np
@@ -152,6 +153,45 @@ def time_blocked_split(n_rows: int, fraction: float, gap: int) -> tuple[slice, s
     return slice(0, stop), slice(n_rows - n_validation, n_rows)
 
 
+def predict_rollouts_compat(
+    model,
+    initial_states: np.ndarray,
+    actions: np.ndarray,
+    disturbances: np.ndarray,
+    history: np.ndarray | None = None,
+    project=None,
+) -> np.ndarray:
+    """Batch rollout that falls back to per-scenario ``predict_rollout`` for custom adapters."""
+    if hasattr(model, "predict_rollouts"):
+        sig = inspect.signature(model.predict_rollouts)
+        kwargs: dict[str, object] = {}
+        if "history" in sig.parameters:
+            kwargs["history"] = history
+        if "project" in sig.parameters:
+            kwargs["project"] = project
+        return np.asarray(model.predict_rollouts(initial_states, actions, disturbances, **kwargs), dtype=float)
+    initial_states, actions, disturbances = validate_rollout_batch(initial_states, actions, disturbances)
+    validate_history(history, initial_states.shape[0])
+    sig = inspect.signature(model.predict_rollout)
+    accepts_history = "history" in sig.parameters or any(
+        param.kind == inspect.Parameter.VAR_KEYWORD for param in sig.parameters.values()
+    )
+    rolled = []
+    for index in range(initial_states.shape[0]):
+        if accepts_history and history is not None:
+            pred = model.predict_rollout(
+                initial_states[index], actions[index], disturbances[index], history=history[index]
+            )
+        else:
+            pred = model.predict_rollout(initial_states[index], actions[index], disturbances[index])
+        rolled.append(np.asarray(pred, dtype=float))
+    stacked = np.stack(rolled, axis=0)
+    if project is not None:
+        for step in range(actions.shape[1]):
+            stacked[:, step + 1, :] = np.asarray(project(step, stacked[:, step + 1, :]), dtype=float)
+    return stacked
+
+
 def validation_rmse(model, batch: TrajectoryBatch, projection_factory=None) -> float:
     """Mean per-scenario RMSE of free-running rollouts on ``batch``.
 
@@ -159,7 +199,14 @@ def validation_rmse(model, batch: TrajectoryBatch, projection_factory=None) -> f
     disturbances, such as the BSM1 flow assignment. Without it nothing is projected.
     """
     project = None if projection_factory is None else projection_factory(batch.disturbances)
-    predicted = model.predict_rollouts(batch.states[:, 0, :], batch.actions, batch.disturbances, project=project)
+    predicted = predict_rollouts_compat(
+        model,
+        batch.states[:, 0, :],
+        batch.actions,
+        batch.disturbances,
+        history=batch.measured_history,
+        project=project,
+    )
     return float(np.sqrt(np.mean((predicted - batch.states) ** 2, axis=(1, 2))).mean())
 
 

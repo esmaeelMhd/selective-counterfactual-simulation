@@ -641,3 +641,195 @@ def test_descriptive_bad_share_weights_each_eligible_model_equally() -> None:
     ]
     text = _descriptive_lines(pd.DataFrame(rows))
     assert "| 0.5000 |" in text
+
+
+def test_test_risk_curve_is_tie_aware_and_permutation_invariant() -> None:
+    from scs.experiments.v3 import eligibility_table, result_rows_for_frame
+
+    # Split-ordered rows: 10 good ID rows followed by 10 bad OOD rows (bad_share = 0.5).
+    # repair_amount is identically 0.0 everywhere, and support_distance is tied across blocks.
+    def make_frame(reverse_test: bool) -> pd.DataFrame:
+        rows = []
+        for role in ("judge_calibration", "judge_test"):
+            split = "judge_calibration_id" if role == "judge_calibration" else "judge_test_id"
+            order = list(range(20))[::-1] if (role == "judge_test" and reverse_test) else list(range(20))
+            for idx in order:
+                bad = idx >= 10
+                rows.append(
+                    {
+                        "system_id": "two_tank",
+                        "seed": 0,
+                        "split": split,
+                        "role": role,
+                        "model_id": "good_model",
+                        "rmse": 2.0 if bad else 0.01,
+                        "event_mismatch": bad,
+                        "support_distance": 1.0 if idx < 15 else 2.0,
+                        "uncertainty_score": np.nan,
+                        "disagreement_score": 0.1 if idx < 12 else 0.9,
+                        "invariant_residual": 0.2 if idx < 14 else 0.8,
+                        "repair_amount": 0.0,
+                    }
+                )
+        return pd.DataFrame(rows)
+
+    config = {
+        "learned_models": ["good_model"],
+        "eligibility_baselines": ["good_model"],
+        "primary_coverages": [0.10, 0.25],
+        "badness_targets": ["bad_rmse"],
+        "rmse_threshold": 0.5,
+        "event_guards": {"event_guard": ["risk_invariant_only", "risk_disagreement_only", "risk_support_only"]},
+    }
+    fwd = make_frame(reverse_test=False)
+    rev = make_frame(reverse_test=True)
+    res_fwd = result_rows_for_frame(fwd, config, eligibility_table(fwd, config))
+    res_rev = result_rows_for_frame(rev, config, eligibility_table(rev, config))
+
+    # Constant all-zero repair_only must get expected FAR == bad_share (0.5), never 0.0 from row order.
+    rep_fwd = res_fwd[(res_fwd["judge_id"] == "repair_only") & np.isclose(res_fwd["coverage"], 0.10)]
+    assert float(rep_fwd["false_accept_rate"].iloc[0]) == pytest.approx(0.5)
+
+    # Permuting test rows must leave every non-random judge FAR identical.
+    for judge_id in ("repair_only", "support_only", "disagreement_only", "invariant_only", "event_guard", "calibration_selected_candidate_ranker"):
+        f_vals = res_fwd[res_fwd["judge_id"] == judge_id].sort_values("coverage")["false_accept_rate"].to_numpy()
+        r_vals = res_rev[res_rev["judge_id"] == judge_id].sort_values("coverage")["false_accept_rate"].to_numpy()
+        assert f_vals == pytest.approx(r_vals)
+
+
+def test_calibration_selection_does_not_peek_at_test_and_nan_rmse_is_bad() -> None:
+    from scs.experiments.v3 import eligibility_table, result_rows_for_frame
+
+    rows = []
+    for role in ("judge_calibration", "judge_test"):
+        split = "judge_calibration_id" if role == "judge_calibration" else "judge_test_id"
+        for idx in range(20):
+            bad = idx >= 10
+            # On one test row, rmse and support_distance diverge to NaN.
+            diverged = role == "judge_test" and idx == 19
+            rows.append(
+                {
+                    "system_id": "bsm1",
+                    "seed": 0,
+                    "split": split,
+                    "role": role,
+                    "model_id": "good_model",
+                    "rmse": np.nan if diverged else (2.0 if bad else 0.1),
+                    "event_mismatch": bad,
+                    "support_distance": np.nan if diverged else float(idx),
+                    "uncertainty_score": np.nan,
+                    "disagreement_score": float(20 - idx),
+                    "invariant_residual": np.nan,
+                    "repair_amount": np.nan,
+                }
+            )
+    frame = pd.DataFrame(rows)
+    config = {
+        "learned_models": ["good_model"],
+        "eligibility_baselines": ["good_model"],
+        "primary_coverages": [0.20],
+        "badness_targets": ["bad_rmse"],
+        "rmse_threshold": 1.0,
+        "event_guards": {"event_guard_no_invariant": ["risk_support_only", "risk_uncertainty_only", "risk_disagreement_only"]},
+    }
+    results = result_rows_for_frame(frame, config, eligibility_table(frame, config))
+    # All 10 rows idx=10..19 (including the NaN rmse row) are bad -> bad_share == 0.50.
+    assert float(results["bad_share"].iloc[0]) == pytest.approx(0.50)
+    # support_only must NOT be dropped just because one test row has NaN support_distance;
+    # the NaN test row is ranked last (+inf) so low-coverage acceptance still gets 0.0 FAR.
+    sup = results[results["judge_id"] == "support_only"]
+    assert not sup.empty and float(sup["false_accept_rate"].iloc[0]) == pytest.approx(0.0)
+    primary = results[results["judge_id"] == "calibration_selected_candidate_ranker"]
+    assert float(primary["false_accept_rate"].iloc[0]) == pytest.approx(0.0)
+
+
+def test_interval_table_uses_ratio_of_means_for_relative_margin() -> None:
+    from scs.experiments.v3 import interval_table
+
+    # Seed 0: random_far=0.10, margin=0.05 (ratio 0.50); Seed 1: random_far=0.30, margin=0.30 (ratio 1.00).
+    # Ratio of means = (0.05 + 0.30) / (0.10 + 0.30) = 0.875 (NOT mean of ratios 0.75).
+    rows = [
+        {"system_id": "cstr", "badness_target": "bad_rmse", "coverage": 0.05, "coverage_role": "primary", "seed": 0, "model_id": "m", "judge_id": "calibration_selected_candidate_ranker", "eligible": True, "absolute_margin": 0.05, "random_far": 0.10, "relative_margin": 0.50, "bad_share": 0.10},
+        {"system_id": "cstr", "badness_target": "bad_rmse", "coverage": 0.05, "coverage_role": "primary", "seed": 1, "model_id": "m", "judge_id": "calibration_selected_candidate_ranker", "eligible": True, "absolute_margin": 0.30, "random_far": 0.30, "relative_margin": 1.00, "bad_share": 0.30},
+    ]
+    table = interval_table(pd.DataFrame(rows), {"bootstrap_seed": 1, "bootstrap_samples": 20, "interval_width_limit": 0.10})
+    assert float(table["mean_relative_margin"].iloc[0]) == pytest.approx(0.875)
+
+
+def test_rollout_supports_three_arg_custom_model_without_predict_rollouts() -> None:
+    from scs.experiments.v3 import _rollout_and_uncertainty
+    from scs.models.user_model import UserSimulatorModel
+
+    class ThreeArgUserModel(UserSimulatorModel):
+        model_id = "custom_3arg"
+
+        def fit(self, train: TrajectoryBatch) -> None:
+            return None
+
+        def predict_rollout(self, initial_state: np.ndarray, actions: np.ndarray, disturbances: np.ndarray) -> np.ndarray:
+            states = np.empty((len(actions) + 1, initial_state.shape[0]), dtype=float)
+            states[0] = initial_state
+            for step in range(len(actions)):
+                states[step + 1] = states[step] + 0.5
+            return states
+
+    model = ThreeArgUserModel()
+    initial = np.zeros((3, 2))
+    actions = np.zeros((3, 4, 1))
+    disturbances = np.zeros((3, 4, 1))
+    pred, unc = _rollout_and_uncertainty(model, initial, actions, disturbances, n_samples=5)
+    assert pred.shape == (3, 5, 2)
+    assert pred[:, -1, :] == pytest.approx(2.0)
+    assert np.isnan(unc).all()
+
+
+def test_guard_lines_reports_configured_guard_undefined_on_all_systems_and_dynamic_baselines(tmp_path: Path) -> None:
+    from scs.experiments.v3 import _guard_lines, _write_report
+
+    results = pd.DataFrame(
+        [
+            {
+                "system_id": "bsm1",
+                "seed": 0,
+                "model_id": "m",
+                "eligible": True,
+                "badness_target": "bad_event",
+                "coverage": 0.05,
+                "coverage_role": "primary",
+                "judge_id": "calibration_selected_candidate_ranker",
+                "false_accept_rate": 0.1,
+                "random_far": 0.4,
+                "absolute_margin": 0.3,
+                "relative_margin": 0.75,
+                "primary_far": 0.1,
+                "calibration_simple_far": 0.2,
+                "bad_share": 0.4,
+            }
+        ]
+    )
+    config = {
+        "stage": "A",
+        "label": "exploratory",
+        "systems": ["bsm1"],
+        "learned_models": ["m"],
+        "eligibility_baselines": ["hold_last"],
+        "primary_coverages": [0.05],
+        "rmse_threshold": {"bsm1": 0.5},
+        "seeds": [0],
+        "min_test_scenarios": 1,
+        "bootstrap_samples": 10,
+        "bootstrap_seed": 1,
+        "interval_width_limit": 0.10,
+        "data": {"horizon": 4},
+        "model_runtime": {"ensemble_members": 5},
+        "event_guards": {"custom_full_state_guard": ["risk_invariant_only"]},
+    }
+    text = _guard_lines(results, config=config)
+    assert "`custom_full_state_guard` is not defined on: bsm1" in text
+
+    eligibility = pd.DataFrame(
+        [{"system_id": "bsm1", "model_id": "m", "id_rmse": 0.1, "baseline_hold_last_id_rmse": 0.9, "eligible": True}]
+    )
+    report_path = tmp_path / "custom_baseline_report.md"
+    _write_report(report_path, eligibility, pd.DataFrame(), results, config)
+    assert "baseline_hold_last_id_rmse" in report_path.read_text(encoding="utf-8")
