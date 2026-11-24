@@ -382,3 +382,53 @@ def test_bsm1_event_target_compares_each_limit() -> None:
     assert event_mismatch_per_limit(ammonia, nitrogen, config) is True
     assert event_mismatch_per_limit(ammonia, ammonia.copy(), config) is False
     assert event_mismatch_per_limit(quiet, quiet.copy(), config) is False
+
+
+def test_control_shift_starts_after_measured_history_window() -> None:
+    pytest.importorskip("bsm2_python")
+    from scs.systems.bsm1 import NOMINAL_KLA, _rollout_from_state, load_dry_influent
+
+    dry = load_dry_influent()
+    initial = _state_after_short_rollout()
+    nominal = _rollout_from_state(
+        dry=dry,
+        start_minute=100,
+        history=3,
+        horizon=4,
+        kla=NOMINAL_KLA.copy(),
+        initial_state=initial,
+        split="judge_calibration_id",
+        scenario_type="dry_nominal",
+        flow_scale=1.0,
+        load_scale=1.0,
+    )
+    shifted_kla = NOMINAL_KLA.copy()
+    shifted_kla[2:] *= 2.0
+    shifted = _rollout_from_state(
+        dry=dry,
+        start_minute=100,
+        history=3,
+        horizon=4,
+        kla=shifted_kla,
+        initial_state=initial,
+        split="judge_calibration_control",
+        scenario_type="dry_control_shift",
+        flow_scale=1.0,
+        load_scale=1.0,
+    )
+    # Pre-intervention history and t=0 initial state must not leak the counterfactual aeration shift.
+    assert nominal.measured_history == pytest.approx(shifted.measured_history)
+    assert nominal.states[:, 0, :] == pytest.approx(shifted.states[:, 0, :])
+    assert not np.allclose(nominal.states[:, 1:, :], shifted.states[:, 1:, :])
+
+
+def test_pyproject_pins_timesim_to_a_commit_sha() -> None:
+    import re
+    import tomllib
+    from pathlib import Path
+
+    data = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+    learned = data["project"]["optional-dependencies"]["learned"]
+    timesim_specs = [dep for dep in learned if dep.startswith("timesim")]
+    assert len(timesim_specs) == 1
+    assert re.search(r"@[0-9a-f]{40}$", timesim_specs[0]), timesim_specs[0]

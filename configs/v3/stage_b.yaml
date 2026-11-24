@@ -44,13 +44,14 @@ badness_targets:
   - bad_rmse
   - bad_event
 
-# Working value, not frozen. 3 times the 99th percentile (20.5869) of ensemble_lstm per-scenario
-# RMSE on judge_calibration_id, seeds 0-2 (240 scenarios). 3 is the smallest whole multiple that no
-# eligible model's in-distribution calibration scenario exceeds (the largest is 41.6, LSTM). The
-# multiple of 10 used on the ODE systems gives 205.869 here, which marks no scenario bad for any
-# eligible model on either calibration split. Only calibration rows were read.
+# Working value, not frozen. Standardized non-constant state RMSE (z-scored per active channel using
+# model_train std only, avoiding raw settler-solids dominance). 3 times the 99th percentile (0.1690)
+# of ensemble_lstm per-scenario standardized RMSE on judge_calibration_id, seeds 0-2 (240 scenarios).
+# 3 is the smallest whole multiple that no eligible model's in-distribution calibration scenario
+# exceeds (largest 0.3957, LSTM). Marks 44.1% of eligible calibration scenarios as bad. Calibration only.
+rmse_metric: standardized_state
 rmse_threshold:
-  bsm1: 61.761
+  bsm1: 0.5069
 
 # Refuse a threshold that marks under 1% or over 99% of eligible calibration scenarios as bad.
 check_threshold_share: true

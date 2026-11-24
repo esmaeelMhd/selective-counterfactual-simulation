@@ -1,26 +1,30 @@
-"""Stage A runner for the v3 refusal benchmark.
+"""Stage runner for the v3 refusal benchmark.
 
-The run is exploratory. It does not answer Q1–Q3. Margins are against a
-seeded random ranking. They are not the v2 margin, which picks the lowest
-test-set false-accept rate among simple and stronger baselines.
+Margins for Q1 and Q2 are against a seeded random ranking. They are not the v2
+margin, which picks the lowest test-set false-accept rate among simple and
+stronger baselines.
 """
 
 from __future__ import annotations
 
+import hashlib
 import math
+import subprocess
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import yaml
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import roc_auc_score
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 from scs.experiments.registry import make_system
 from scs.experiments.v2 import (
     SIGNAL_COLUMNS,
     SIMPLE_RISK_COLUMN,
-    _fit_v2_calibrated_scores,
-    _low_coverage_far,
     _make_v2_model,
     _risk_curve_from_labels,
     _split_role,
@@ -102,13 +106,48 @@ def rmse_threshold_for(config: dict[str, Any], system_id: str) -> float:
     return float(value[system_id]) if isinstance(value, dict) else float(value)
 
 
-def _batch_disagreement(predictions: list[np.ndarray]) -> np.ndarray:
+def rmse_metric_for(config: dict[str, Any], system_id: str) -> str:
+    """Whether RMSE is computed in raw state units or standardized over active ``model_train`` channels."""
+    metric = config.get("rmse_metric", "raw")
+    value = str(metric[system_id]) if isinstance(metric, dict) else str(metric)
+    if value not in {"raw", "standardized_state"}:
+        raise ValueError(f"unsupported rmse_metric for {system_id}: {value}")
+    return value
+
+
+def fit_state_scale(states: np.ndarray, floor: float = 1e-6) -> tuple[np.ndarray, np.ndarray]:
+    """Non-constant state mask and per-channel training standard deviation from ``model_train`` only."""
+    values = np.asarray(states, dtype=float)
+    std = values.reshape(-1, values.shape[-1]).std(axis=0)
+    active = std >= float(floor)
+    if not np.any(active):
+        raise RuntimeError("all state channels are constant on model_train")
+    return active, std[active]
+
+
+def scaled_scenario_rmse(
+    predicted: np.ndarray,
+    true: np.ndarray,
+    state_scale: tuple[np.ndarray, np.ndarray] | None = None,
+) -> np.ndarray:
+    """Per-scenario trajectory RMSE, optionally standardized across active channels."""
+    diff = np.asarray(predicted, dtype=float) - np.asarray(true, dtype=float)
+    if state_scale is not None:
+        active, std = state_scale
+        diff = diff[..., active] / std
+    return np.sqrt(np.mean(diff**2, axis=(1, 2)))
+
+
+def _batch_disagreement(
+    predictions: list[np.ndarray],
+    state_scale: tuple[np.ndarray, np.ndarray] | None = None,
+) -> np.ndarray:
     if len(predictions) < 2:
         return np.zeros(predictions[0].shape[0], dtype=float)
     distances = []
     for left_index, left in enumerate(predictions):
         for right in predictions[left_index + 1 :]:
-            distances.append(np.sqrt(np.mean((left - right) ** 2, axis=(1, 2))))
+            distances.append(scaled_scenario_rmse(left, right, state_scale))
     return np.mean(np.stack(distances, axis=0), axis=0)
 
 
@@ -120,6 +159,57 @@ def _support_scores(support: SupportDistance, actions: np.ndarray, disturbances:
     return np.mean(np.linalg.norm(scaled, axis=-1), axis=1)
 
 
+def _rollout_and_uncertainty(
+    model: Any,
+    initial_states: np.ndarray,
+    actions: np.ndarray,
+    disturbances: np.ndarray,
+    n_samples: int,
+    rng: np.random.Generator | None = None,
+    history: np.ndarray | None = None,
+    project=None,
+    state_scale: tuple[np.ndarray, np.ndarray] | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Mean rollout and epistemic uncertainty spread without running ensemble members twice.
+
+    Deep ensembles roll out each member once and reuse those predictions for both the
+    mean trajectory and the spread. Deterministic single models without native epistemic
+    sampling return NaN for uncertainty so judges treat it as a missing signal rather
+    than injecting homoscedastic training-residual noise.
+    """
+    del rng
+    n_rows = initial_states.shape[0]
+    members = getattr(model, "members", None)
+    if members:
+        member_preds = [
+            member.predict_rollouts(initial_states, actions, disturbances, history=history, project=project)
+            for member in members
+        ]
+        prediction = np.mean(np.stack(member_preds, axis=0), axis=0)
+        if n_samples <= 0:
+            return prediction, np.full(n_rows, np.nan, dtype=float)
+        selected = [member_preds[index % len(member_preds)] for index in range(n_samples)]
+        stacked = np.stack(selected, axis=0)
+        if state_scale is not None:
+            active, std = state_scale
+            stacked = stacked[..., active] / std
+        return prediction, np.mean(np.std(stacked, axis=0), axis=(1, 2))
+    prediction = model.predict_rollouts(initial_states, actions, disturbances, history=history, project=project)
+    if getattr(model, "supports_epistemic_sampling", False) and n_samples > 0:
+        samples = np.stack(
+            [
+                model.predict_rollout_samples(initial_states[index], actions[index], disturbances[index], n_samples)
+                for index in range(n_rows)
+            ],
+            axis=1,
+        )
+        if state_scale is not None:
+            active, std = state_scale
+            samples = samples[..., active] / std
+        return prediction, np.mean(np.std(samples, axis=0), axis=(1, 2))
+    return prediction, np.full(n_rows, np.nan, dtype=float)
+
+
 def _uncertainty_scores(
     model: Any,
     initial_states: np.ndarray,
@@ -129,34 +219,21 @@ def _uncertainty_scores(
     rng: np.random.Generator,
     history: np.ndarray | None = None,
     project=None,
+    state_scale: tuple[np.ndarray, np.ndarray] | None = None,
 ) -> np.ndarray:
-    """Spread of sampled rollouts, or NaN when the model has no way to sample.
-
-    Ensembles use their members. Other models add noise with their fitted
-    residual spread. A model with neither returns NaN, which the judges treat
-    as a missing signal. A model that predicts no change has no spread and
-    returns zeros.
-    """
-    n_rows, horizon, _action_dim = actions.shape
-    if model.model_id == "hold_last" or n_samples <= 0:
-        return np.zeros(n_rows, dtype=float)
-    samples = []
-    members = getattr(model, "members", None)
-    if members:
-        for sample_index in range(n_samples):
-            member = members[sample_index % len(members)]
-            samples.append(member.predict_rollouts(initial_states, actions, disturbances, history=history, project=project))
-    else:
-        residual_std = getattr(model, "residual_std", None)
-        if residual_std is None:
-            return np.full(n_rows, np.nan, dtype=float)
-        for _sample_index in range(n_samples):
-            noise = rng.normal(0.0, residual_std, size=(n_rows, horizon, initial_states.shape[1]))
-            samples.append(
-                model.predict_rollouts(initial_states, actions, disturbances, history=history, noise=noise, project=project)
-            )
-    stacked = np.stack(samples, axis=0)
-    return np.mean(np.std(stacked, axis=0), axis=(1, 2))
+    """Spread of epistemic sampled rollouts, or NaN when the model has no epistemic uncertainty."""
+    _pred, uncertainty = _rollout_and_uncertainty(
+        model,
+        initial_states,
+        actions,
+        disturbances,
+        n_samples,
+        rng=rng,
+        history=history,
+        project=project,
+        state_scale=state_scale,
+    )
+    return uncertainty
 
 
 def event_mismatch_per_limit(true_states: np.ndarray, predicted_states: np.ndarray, event_config: dict[str, Any]) -> bool:
@@ -171,7 +248,30 @@ def event_mismatch_per_limit(true_states: np.ndarray, predicted_states: np.ndarr
     return any(true_flags[name] != predicted_flags[name] for name in true_flags)
 
 
-def _score_batch(
+def disagreement_cohort(system_id: str, eligibility: pd.DataFrame, config: dict[str, Any]) -> list[str]:
+    """Models that contribute to ``disagreement_score``, selected strictly from calibration eligibility.
+
+    Uses calibration-eligible learned models when at least two exist; otherwise falls back to
+    configured learned models (or non-``hold_last`` models), excluding ``hold_last`` and
+    diverging ineligible models wherever possible.
+    """
+    eligible = [
+        str(row.model_id)
+        for row in eligibility.itertuples(index=False)
+        if str(row.system_id) == str(system_id) and bool(row.eligible)
+    ]
+    if len(eligible) >= 2:
+        return eligible
+    learned = [str(model_id) for model_id in config.get("learned_models", [])]
+    if len(learned) >= 2:
+        return learned
+    non_trivial = [str(model_id) for model_id in config.get("models", []) if str(model_id) != "hold_last"]
+    if len(non_trivial) >= 2:
+        return non_trivial
+    return [str(model_id) for model_id in config.get("models", [])]
+
+
+def _rollout_batch(
     system_id: str,
     seed: int,
     split: str,
@@ -181,7 +281,9 @@ def _score_batch(
     event_config: dict[str, Any],
     dt: float,
     n_uncertainty: int,
-) -> list[dict[str, Any]]:
+    state_scale: tuple[np.ndarray, np.ndarray] | None = None,
+    disagreement_models: list[str] | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, np.ndarray]]:
     system = make_system(system_id)
     initial = batch.states[:, 0, :]
     project = None
@@ -189,30 +291,36 @@ def _score_batch(
         from scs.systems.bsm1 import hydraulic_projection
 
         project = hydraulic_projection(batch.disturbances)
-    predictions = {
-        model_id: model.predict_rollouts(
-            initial, batch.actions, batch.disturbances, history=batch.measured_history, project=project
-        )
-        for model_id, model in models.items()
-    }
-    disagreement = _batch_disagreement([predictions[model_id] for model_id in models])
-    support_scores = _support_scores(support, batch.actions, batch.disturbances)
-    uncertainty = {
-        model_id: _uncertainty_scores(
+    predictions: dict[str, np.ndarray] = {}
+    uncertainty: dict[str, np.ndarray] = {}
+    for model_id, model in models.items():
+        rng = np.random.default_rng(10_000 + seed * 100 + sum(ord(char) for char in model_id))
+        pred, unc = _rollout_and_uncertainty(
             model,
             initial,
             batch.actions,
             batch.disturbances,
             n_uncertainty,
-            np.random.default_rng(10_000 + seed * 100 + sum(ord(char) for char in model_id)),
+            rng=rng,
             history=batch.measured_history,
             project=project,
+            state_scale=state_scale,
         )
-        for model_id, model in models.items()
-    }
+        predictions[model_id] = pred
+        uncertainty[model_id] = unc
+    cohort = [model_id for model_id in (disagreement_models or list(models)) if model_id in predictions]
+    if len(cohort) < 2:
+        cohort = list(models)
+    disagreement = _batch_disagreement([predictions[model_id] for model_id in cohort], state_scale=state_scale)
+    support_scores = _support_scores(support, batch.actions, batch.disturbances)
     true_events = [
         trajectory_bad_event(system_id, batch.states[index], event_config) for index in range(batch.n_trajectories)
     ]
+    rmses = {
+        model_id: scaled_scenario_rmse(predicted, batch.states, state_scale=state_scale)
+        for model_id, predicted in predictions.items()
+    }
+    signals_here = available_signals(system_id)
     rows: list[dict[str, Any]] = []
     role = _split_role(split)
     for index in range(batch.n_trajectories):
@@ -220,8 +328,6 @@ def _score_batch(
         for model_id, predicted in predictions.items():
             pred = predicted[index]
             pred_event = trajectory_bad_event(system_id, pred, event_config)
-            diff = pred - true_states
-            signals_here = available_signals(system_id)
             rows.append(
                 {
                     "system_id": system_id,
@@ -231,7 +337,7 @@ def _score_batch(
                     "scenario_type": batch.scenario_type[index],
                     "scenario_id": f"{system_id}_seed{seed}_{split}_{index:04d}",
                     "model_id": model_id,
-                    "rmse": float(np.sqrt(np.mean(diff**2))),
+                    "rmse": float(rmses[model_id][index]),
                     "true_event": bool(true_events[index]),
                     "pred_event": bool(pred_event),
                     "event_mismatch": (
@@ -252,6 +358,35 @@ def _score_batch(
                     ),
                 }
             )
+    return rows, predictions
+
+
+def _score_batch(
+    system_id: str,
+    seed: int,
+    split: str,
+    batch: Any,
+    models: dict[str, Any],
+    support: SupportDistance,
+    event_config: dict[str, Any],
+    dt: float,
+    n_uncertainty: int,
+    state_scale: tuple[np.ndarray, np.ndarray] | None = None,
+    disagreement_models: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    rows, _preds = _rollout_batch(
+        system_id,
+        seed,
+        split,
+        batch,
+        models,
+        support,
+        event_config,
+        dt,
+        n_uncertainty,
+        state_scale=state_scale,
+        disagreement_models=disagreement_models,
+    )
     return rows
 
 
@@ -274,13 +409,22 @@ def _prediction_frame(system_id: str, seed: int, config: dict[str, Any], event_c
         model.fit(dataset["model_train"])
     support = SupportDistance()
     support.fit(dataset["model_train"])
+    state_scale = (
+        fit_state_scale(dataset["model_train"].states)
+        if rmse_metric_for(config, system_id) == "standardized_state"
+        else None
+    )
     rows: list[dict[str, Any]] = []
-    n_uncertainty = int(config["data"].get("uncertainty_samples", 2))
+    n_uncertainty = int(config["data"].get("uncertainty_samples", 5))
     dt = float(config["data"]["dt"])
     for split, batch in dataset.items():
         if _split_role(split) not in {"judge_calibration", "judge_test"}:
             continue
-        rows.extend(_score_batch(system_id, seed, split, batch, models, support, event_config, dt, n_uncertainty))
+        rows.extend(
+            _score_batch(
+                system_id, seed, split, batch, models, support, event_config, dt, n_uncertainty, state_scale=state_scale
+            )
+        )
     frame = pd.DataFrame(rows)
     test_counts = frame.loc[frame["role"] == "judge_test"].groupby("model_id").size()
     minimum = int(config["min_test_scenarios"])
@@ -374,37 +518,174 @@ def _finite_signal_names(frame: pd.DataFrame) -> list[str]:
     return names
 
 
-def _rank_mean_available(calibration: pd.DataFrame, test: pd.DataFrame) -> np.ndarray:
-    """Calibration-percentile mean over the signals that are actually present."""
+def _signal_orientation_for(calibration: pd.DataFrame, column: str) -> int:
     labels = calibration["bad_label"].to_numpy(dtype=bool)
+    values = calibration[column].to_numpy(dtype=float)
+    if labels.sum() == 0 or labels.sum() == len(labels):
+        return 1
+    return 1 if float(values[labels].mean()) >= float(values[~labels].mean()) else -1
+
+
+def _rank_mean_columns(
+    calibration: pd.DataFrame,
+    table: pd.DataFrame,
+    columns: list[str],
+    orientations: dict[str, int],
+) -> np.ndarray:
     parts = []
-    for column in SIGNAL_COLUMNS:
-        cal_values = calibration[column].to_numpy(dtype=float)
-        test_values = test[column].to_numpy(dtype=float)
-        if not np.isfinite(cal_values).all() or not np.isfinite(test_values).all():
-            continue
-        orientation = 1
-        if 0 < int(labels.sum()) < len(labels):
-            orientation = 1 if float(cal_values[labels].mean()) >= float(cal_values[~labels].mean()) else -1
-        reference = np.sort(orientation * cal_values)
-        score = orientation * test_values
+    for column in columns:
+        reference = np.sort(orientations[column] * calibration[column].to_numpy(dtype=float))
+        score = orientations[column] * table[column].to_numpy(dtype=float)
         parts.append(np.searchsorted(reference, score, side="right") / max(len(reference), 1))
-    if not parts:
-        raise RuntimeError("no finite refusal signal")
     return np.mean(np.vstack(parts), axis=0)
 
 
-def _best_simple_baseline(calibration: pd.DataFrame, coverages: list[float]) -> str:
+def _natural_sum_columns(
+    calibration: pd.DataFrame,
+    table: pd.DataFrame,
+    columns: list[str],
+    orientations: dict[str, int],
+) -> np.ndarray:
+    parts = []
+    for column in columns:
+        cal_vals = orientations[column] * calibration[column].to_numpy(dtype=float)
+        tab_vals = orientations[column] * table[column].to_numpy(dtype=float)
+        lo = float(np.min(cal_vals))
+        denom = max(float(np.max(cal_vals) - lo), 1e-12)
+        parts.append((tab_vals - lo) / denom)
+    return np.mean(np.vstack(parts), axis=0)
+
+
+def _tie_aware_low_coverage_far(labels: np.ndarray, score: np.ndarray, coverages: list[float]) -> float:
+    """Expected low-coverage FAR under random tie-breaking at the acceptance cutoff.
+
+    Prevents near-constant signals (such as mostly-zero ``repair_amount``) from
+    appearing artificially perfect simply because ID rows precede OOD rows in
+    calibration dataframe order.
+    """
+    labels = np.asarray(labels, dtype=bool)
+    score = np.asarray(score, dtype=float)
+    n = len(labels)
+    sorted_scores = np.sort(score)
+    fars = []
+    for coverage in coverages:
+        count = min(max(int(math.ceil(float(coverage) * n)), 1), n)
+        cutoff = sorted_scores[count - 1]
+        below = score < cutoff
+        equal = score == cutoff
+        n_below = int(np.sum(below))
+        bad_below = float(np.sum(labels[below]))
+        remaining = count - n_below
+        n_equal = int(np.sum(equal))
+        bad_equal = float(np.sum(labels[equal]))
+        expected_bad = bad_below + (remaining * (bad_equal / n_equal) if n_equal > 0 and remaining > 0 else 0.0)
+        fars.append(expected_bad / count)
+    return float(np.mean(fars))
+
+
+def _calibration_auc(labels: np.ndarray, score: np.ndarray) -> float:
+    labels = np.asarray(labels, dtype=bool)
+    if labels.sum() == 0 or labels.sum() == len(labels):
+        return 0.5
+    return float(roc_auc_score(labels.astype(int), np.asarray(score, dtype=float)))
+
+
+def _fit_calibrated_ranker(
+    calibration: pd.DataFrame,
+    test: pd.DataFrame,
+    primary_coverages: list[float],
+) -> np.ndarray:
+    """Calibration-selected candidate ranker fit per model over the signals that are finite.
+
+    Selects among the four v2 candidates (``best_signal``, ``rank_mean``, ``natural_sum``,
+    ``logistic``) using calibration rows only, so systems with missing signals such as BSM1
+    run the exact same selection procedure as fully observed systems.
+    """
+    available = [
+        column
+        for column in SIGNAL_COLUMNS
+        if np.isfinite(calibration[column].to_numpy(dtype=float)).all()
+        and np.isfinite(test[column].to_numpy(dtype=float)).all()
+    ]
+    if not available:
+        raise RuntimeError("no finite refusal signal")
+    labels = calibration["bad_label"].to_numpy(dtype=bool)
+    orientations = {column: _signal_orientation_for(calibration, column) for column in available}
+    single_candidates = []
+    for column in available:
+        cal_score = orientations[column] * calibration[column].to_numpy(dtype=float)
+        single_candidates.append(
+            (
+                _tie_aware_low_coverage_far(labels, cal_score, primary_coverages),
+                -_calibration_auc(labels, cal_score),
+                column,
+            )
+        )
+    best_column = sorted(single_candidates)[0][2]
+    cal_best = orientations[best_column] * calibration[best_column].to_numpy(dtype=float)
+    test_best = orientations[best_column] * test[best_column].to_numpy(dtype=float)
+    cal_rank_mean = _rank_mean_columns(calibration, calibration, available, orientations)
+    test_rank_mean = _rank_mean_columns(calibration, test, available, orientations)
+    cal_natural = _natural_sum_columns(calibration, calibration, available, orientations)
+    test_natural = _natural_sum_columns(calibration, test, available, orientations)
+    if 0 < int(labels.sum()) < len(labels):
+        logistic = make_pipeline(StandardScaler(), LogisticRegression(max_iter=300, class_weight="balanced"))
+        logistic.fit(calibration[available], labels.astype(int))
+        cal_logistic = logistic.predict_proba(calibration[available])[:, 1]
+        test_logistic = logistic.predict_proba(test[available])[:, 1]
+    else:
+        cal_logistic = cal_rank_mean
+        test_logistic = test_rank_mean
+    cal_candidates = {
+        "best_signal": cal_best,
+        "rank_mean": cal_rank_mean,
+        "natural_sum": cal_natural,
+        "logistic": cal_logistic,
+    }
+    test_candidates = {
+        "best_signal": test_best,
+        "rank_mean": test_rank_mean,
+        "natural_sum": test_natural,
+        "logistic": test_logistic,
+    }
+    selected = min(
+        cal_candidates,
+        key=lambda name: (
+            _tie_aware_low_coverage_far(labels, cal_candidates[name], primary_coverages),
+            -_calibration_auc(labels, cal_candidates[name]),
+            name,
+        ),
+    )
+    return test_candidates[selected]
+
+
+def _rank_mean_available(calibration: pd.DataFrame, test: pd.DataFrame) -> np.ndarray:
+    """Calibration-percentile mean over the signals that are actually present."""
+    available = [
+        column
+        for column in SIGNAL_COLUMNS
+        if np.isfinite(calibration[column].to_numpy(dtype=float)).all()
+        and np.isfinite(test[column].to_numpy(dtype=float)).all()
+    ]
+    if not available:
+        raise RuntimeError("no finite refusal signal")
+    orientations = {column: _signal_orientation_for(calibration, column) for column in available}
+    return _rank_mean_columns(calibration, test, available, orientations)
+
+
+def _best_simple_baseline(calibration: pd.DataFrame, test: pd.DataFrame, coverages: list[float]) -> str:
     labels = calibration["bad_label"].to_numpy(dtype=bool)
     best_name = ""
-    best_key: tuple[float, str] | None = None
-    finite_names = _finite_signal_names(calibration)
+    best_key: tuple[float, float, str] | None = None
+    test_finite = set(_finite_signal_names(test))
+    finite_names = [name for name in _finite_signal_names(calibration) if name in test_finite]
     if not finite_names:
         raise RuntimeError("no finite simple baseline")
     for name in finite_names:
         column = SIMPLE_RISK_COLUMN[name]
-        far = _low_coverage_far(labels, calibration[column].to_numpy(dtype=float), coverages)
-        key = (far, name)
+        values = calibration[column].to_numpy(dtype=float)
+        far = _tie_aware_low_coverage_far(labels, values, coverages)
+        key = (far, -_calibration_auc(labels, values), name)
         if best_key is None or key < best_key:
             best_key = key
             best_name = name
@@ -446,23 +727,20 @@ def result_rows_for_frame(frame: pd.DataFrame, config: dict[str, Any], eligibili
             calibration = labelled[labelled["role"] == "judge_calibration"].copy()
             test = labelled[labelled["role"] == "judge_test"].copy()
             test["risk_random_baseline"] = _assign_random(test, int(seed))
-            if all(np.isfinite(labelled[column].to_numpy(dtype=float)).all() for column in SIGNAL_COLUMNS):
-                calibrated = _fit_v2_calibrated_scores(calibration, test, coverages)
-                primary_scores = calibrated[PRIMARY_JUDGE]
-            else:
-                primary_scores = _rank_mean_available(calibration, test)
-            test["risk_calibration_selected_candidate_ranker"] = primary_scores
             for model_id, model_test in test.groupby("model_id", sort=True):
                 model_calibration = calibration[calibration["model_id"] == model_id]
-                simple_name = _best_simple_baseline(model_calibration, coverages)
+                simple_name = _best_simple_baseline(model_calibration, model_test, coverages)
+                primary_scores = _fit_calibrated_ranker(model_calibration, model_test, coverages)
+                test_finite = set(_finite_signal_names(model_test))
                 judge_scores = {
                     name: model_test[f"risk_{name}"].to_numpy(dtype=float)
-                    for name in _finite_signal_names(model_test)
+                    for name in _finite_signal_names(model_calibration)
+                    if name in test_finite
                 }
                 judge_scores[RANDOM_JUDGE] = model_test["risk_random_baseline"].to_numpy(dtype=float)
-                judge_scores[PRIMARY_JUDGE] = model_test["risk_calibration_selected_candidate_ranker"].to_numpy(dtype=float)
+                judge_scores[PRIMARY_JUDGE] = primary_scores
                 # A guard is defined by all of its inputs. When one is missing it is not computed on
-                # a smaller set, because that would be a different guard. The system then has none.
+                # a smaller set, because that would be a different guard. The system or model then has none.
                 for guard_id, inputs in event_guard_definitions(config).items():
                     ready = all(
                         np.isfinite(model_calibration[column].to_numpy(dtype=float)).all()
@@ -520,7 +798,7 @@ def bootstrap_interval(values: np.ndarray, rng: np.random.Generator, n_samples: 
 
 
 def interval_table(results: pd.DataFrame, config: dict[str, Any]) -> pd.DataFrame:
-    """Bootstrap the seed-level mean margin of eligible models, separately at each coverage.
+    """Bootstrap the seed-level mean margin of eligible models, separately at each primary coverage.
 
     A row is degenerate when almost none or almost all test scenarios are bad. The
     margin is then fixed near zero by the labels, so a narrow interval says nothing.
@@ -532,9 +810,13 @@ def interval_table(results: pd.DataFrame, config: dict[str, Any]) -> pd.DataFram
     rows = []
     if primary.empty:
         return pd.DataFrame(rows)
-    grouped = primary.groupby(["system_id", "badness_target", "coverage", "seed"], as_index=False).agg(
-        absolute_margin=("absolute_margin", "mean"), bad_share=("bad_share", "mean")
-    )
+    agg_spec: dict[str, tuple[str, str]] = {
+        "absolute_margin": ("absolute_margin", "mean"),
+        "bad_share": ("bad_share", "mean"),
+    }
+    if "relative_margin" in primary.columns:
+        agg_spec["relative_margin"] = ("relative_margin", "mean")
+    grouped = primary.groupby(["system_id", "badness_target", "coverage", "seed"], as_index=False).agg(**agg_spec)
     limit = float(config["interval_width_limit"])
     n_samples = int(config["bootstrap_samples"])
     edge = float(config.get("degenerate_share", DEFAULT_DEGENERATE_SHARE))
@@ -556,6 +838,12 @@ def interval_table(results: pd.DataFrame, config: dict[str, Any]) -> pd.DataFram
             ]
             n_models = int(len(models))
             thin_models = int(((models["bad_share"] < edge) | (models["bad_share"] > 1.0 - edge)).sum())
+        rel_mean = float("nan")
+        if "relative_margin" in group.columns:
+            rel_vals = group["relative_margin"].to_numpy(dtype=float)
+            finite_rel = rel_vals[np.isfinite(rel_vals)]
+            if len(finite_rel):
+                rel_mean = float(np.mean(finite_rel))
         rows.append(
             {
                 "system_id": system_id,
@@ -567,6 +855,7 @@ def interval_table(results: pd.DataFrame, config: dict[str, Any]) -> pd.DataFram
                 "n_models": n_models,
                 "thin_models": thin_models,
                 "mean_margin": float(group["absolute_margin"].mean()),
+                "mean_relative_margin": rel_mean,
                 "bootstrap_low": low,
                 "bootstrap_high": high,
                 "interval_width": width,
@@ -609,22 +898,25 @@ def _markdown_table(frame: pd.DataFrame, columns: list[str]) -> str:
     return "\n".join([header, rule, *body])
 
 
-def _guard_lines(results: pd.DataFrame) -> str:
+def _guard_lines(results: pd.DataFrame, config: dict[str, Any] | None = None) -> str:
     """Each event guard against the primary ranker and the calibration-chosen simple baseline.
 
-    Only eligible models enter, so a model that is worse than the baselines does not move the
-    averages. Systems with no rows for a guard, or with no eligible model, are named.
+    Reports every primary coverage (both 5% and 10% when present), relative reductions,
+    and seed-level bootstrap CIs for Q3. Only eligible models enter the averages.
     """
     systems = sorted(results["system_id"].unique())
-    at_five = results[np.isclose(results["coverage"], 0.05)]
-    guard_ids = sorted({str(name) for name in at_five["judge_id"].unique() if str(name).startswith("event_guard")})
+    primary_rows = results[results["coverage_role"] == "primary"] if "coverage_role" in results.columns else results
+    guard_ids = sorted({str(name) for name in primary_rows["judge_id"].unique() if str(name).startswith("event_guard")})
     if not guard_ids:
         return "_none_"
-    eligible_rows = at_five[at_five["eligible"]]
+    eligible_rows = primary_rows[primary_rows["eligible"]]
+    n_samples = int(config["bootstrap_samples"]) if config and "bootstrap_samples" in config else 500
+    seed_val = int(config["bootstrap_seed"]) if config and "bootstrap_seed" in config else 2025
+    rng = np.random.default_rng(seed_val + 17)
     tables, notes = [], []
     for guard_id in guard_ids:
         guard = eligible_rows[eligible_rows["judge_id"] == guard_id].copy()
-        has_rows = set(at_five.loc[at_five["judge_id"] == guard_id, "system_id"])
+        has_rows = set(primary_rows.loc[primary_rows["judge_id"] == guard_id, "system_id"])
         no_guard = [name for name in systems if name not in has_rows]
         if no_guard:
             notes.append(f"`{guard_id}` is not defined on: {', '.join(no_guard)}. A required input is missing there.")
@@ -635,22 +927,52 @@ def _guard_lines(results: pd.DataFrame) -> str:
             continue
         guard["margin_vs_primary"] = guard["primary_far"] - guard["false_accept_rate"]
         guard["margin_vs_calibration_simple"] = guard["calibration_simple_far"] - guard["false_accept_rate"]
-        summary = (
-            guard.groupby(["system_id", "badness_target"], as_index=False)
-            .agg(
-                n_models=("model_id", "nunique"),
-                event_guard_far=("false_accept_rate", "mean"),
-                primary_far=("primary_far", "mean"),
-                calibration_simple_far=("calibration_simple_far", "mean"),
-                margin_vs_primary=("margin_vs_primary", "mean"),
-                margin_vs_calibration_simple=("margin_vs_calibration_simple", "mean"),
+        summary_rows = []
+        for (system_id, target, coverage), group in guard.groupby(
+            ["system_id", "badness_target", "coverage"], sort=True
+        ):
+            guard_far = float(group["false_accept_rate"].mean())
+            primary_far = float(group["primary_far"].mean())
+            simple_far = float(group["calibration_simple_far"].mean())
+            margin_primary = float(group["margin_vs_primary"].mean())
+            margin_simple = float(group["margin_vs_calibration_simple"].mean())
+            ci_low_p = ci_high_p = ci_low_s = ci_high_s = float("nan")
+            if "seed" in group.columns and int(group["seed"].nunique()) >= 2:
+                by_seed = group.groupby("seed", as_index=False).agg(
+                    margin_vs_primary=("margin_vs_primary", "mean"),
+                    margin_vs_calibration_simple=("margin_vs_calibration_simple", "mean"),
+                )
+                ci_low_p, ci_high_p = bootstrap_interval(
+                    by_seed["margin_vs_primary"].to_numpy(dtype=float), rng, n_samples
+                )
+                ci_low_s, ci_high_s = bootstrap_interval(
+                    by_seed["margin_vs_calibration_simple"].to_numpy(dtype=float), rng, n_samples
+                )
+            summary_rows.append(
+                {
+                    "guard": guard_id,
+                    "system_id": system_id,
+                    "badness_target": target,
+                    "coverage": float(coverage),
+                    "n_models": int(group["model_id"].nunique()),
+                    "event_guard_far": guard_far,
+                    "primary_far": primary_far,
+                    "calibration_simple_far": simple_far,
+                    "margin_vs_primary": margin_primary,
+                    "rel_vs_primary": _relative_margin(margin_primary, primary_far),
+                    "ci_low_vs_primary": ci_low_p,
+                    "ci_high_vs_primary": ci_high_p,
+                    "margin_vs_calibration_simple": margin_simple,
+                    "rel_vs_simple": _relative_margin(margin_simple, simple_far),
+                    "ci_low_vs_simple": ci_low_s,
+                    "ci_high_vs_simple": ci_high_s,
+                    "room_for_q3": bool(
+                        primary_far >= PRACTICAL_ABSOLUTE_REDUCTION
+                        and simple_far >= PRACTICAL_ABSOLUTE_REDUCTION
+                    ),
+                }
             )
-        )
-        summary["room_for_q3"] = (summary["primary_far"] >= PRACTICAL_ABSOLUTE_REDUCTION) & (
-            summary["calibration_simple_far"] >= PRACTICAL_ABSOLUTE_REDUCTION
-        )
-        summary.insert(0, "guard", guard_id)
-        tables.append(summary)
+        tables.append(pd.DataFrame(summary_rows))
     if not tables:
         return "\n\n".join(["_none_", *notes])
     table = _markdown_table(
@@ -659,12 +981,19 @@ def _guard_lines(results: pd.DataFrame) -> str:
             "guard",
             "system_id",
             "badness_target",
+            "coverage",
             "n_models",
             "event_guard_far",
             "primary_far",
             "calibration_simple_far",
             "margin_vs_primary",
+            "rel_vs_primary",
+            "ci_low_vs_primary",
+            "ci_high_vs_primary",
             "margin_vs_calibration_simple",
+            "rel_vs_simple",
+            "ci_low_vs_simple",
+            "ci_high_vs_simple",
             "room_for_q3",
         ],
     )
@@ -687,9 +1016,10 @@ def _descriptive_lines(results: pd.DataFrame) -> str:
     wide = rows.pivot_table(
         index=["system_id", "badness_target", "coverage"], columns="judge_id", values="false_accept_rate", aggfunc="mean"
     )
-    simple = rows[rows["judge_id"] == PRIMARY_JUDGE].groupby(["system_id", "badness_target", "coverage"])["calibration_simple_far"].mean()
+    primary_rows = rows[rows["judge_id"] == PRIMARY_JUDGE]
+    simple = primary_rows.groupby(["system_id", "badness_target", "coverage"])["calibration_simple_far"].mean()
     wide["best_simple_on_calibration"] = simple
-    wide["bad_share"] = rows.groupby(["system_id", "badness_target", "coverage"])["bad_share"].mean()
+    wide["bad_share"] = primary_rows.groupby(["system_id", "badness_target", "coverage"])["bad_share"].mean()
     order = [
         "random_baseline",
         PRIMARY_JUDGE,
@@ -707,72 +1037,6 @@ def _descriptive_lines(results: pd.DataFrame) -> str:
     return _markdown_table(wide, list(wide.columns))
 
 
-def _write_report(
-    path: Path,
-    eligibility: pd.DataFrame,
-    intervals: pd.DataFrame,
-    results: pd.DataFrame,
-    config: dict[str, Any],
-) -> None:
-    learned = eligibility[eligibility["model_id"].isin(config["learned_models"])]
-    systems_passed = sorted(learned.loc[learned["eligible"], "system_id"].unique())
-    at_five = intervals[np.isclose(intervals["coverage"], 0.05)] if not intervals.empty else intervals
-    precision_ok, degenerate_rows = precision_check(intervals)
-    runtime_text = ", ".join(
-        f"{key} {value}" for key, value in sorted(config["model_runtime"].items()) if key != "ensemble_members"
-    )
-    thresholds = ", ".join(f"{name} {rmse_threshold_for(config, str(name)):g}" for name in config["systems"])
-    stage = str(config.get("stage", "A"))
-    label = str(config.get("label", "exploratory"))
-    reading = (
-        "This report lists the numbers the decision rules use. The reading of Q1, Q2, and Q3 is written by hand."
-        if stage == "B"
-        else "This report does not answer Q1, Q2, or Q3."
-    )
-    text = f"""# v3 Stage {stage} report
-
-Label: {label}. {reading}
-
-The margin is the random false-accept rate minus the judge false-accept rate. A positive margin means the judge accepts fewer bad scenarios than that random ranking. This is not the v2 `absolute_margin`, which selects the lowest test-set false-accept rate among simple and stronger baselines.
-
-## Eligibility
-
-Working rule for this run: mean RMSE on `{eligibility_split(config)}` is strictly below both `hold_last` and `linear_narx` on that system. Eligibility does not read judge-test rows. Learned models passing: {len(systems_passed)} system(s) ({", ".join(systems_passed) if len(systems_passed) else "none"}). The plan's Stage A check wants at least two systems.
-
-{_markdown_table(eligibility, ["system_id", "model_id", "id_rmse", "baseline_hold_last_id_rmse", "baseline_linear_narx_id_rmse", "eligible"])}
-
-## Interval at 5% coverage
-
-Bootstrap of the seed-level mean margin of eligible models, for `{PRIMARY_JUDGE}` only. One seed cannot make an interval. The width limit is {float(config["interval_width_limit"]):.2f}. A row is degenerate when under {float(config.get("degenerate_share", DEFAULT_DEGENERATE_SHARE)):.0%} or over {1 - float(config.get("degenerate_share", DEFAULT_DEGENERATE_SHARE)):.0%} of scenarios are bad. Its margin is fixed by the labels, so it does not count toward the check. `thin_models` counts the eligible models whose own bad share is under or over the same limits. Their margins are fixed by the labels and pull the average toward zero. Degenerate 5% rows: {degenerate_rows}. All informative 5% rows narrower than the limit, with one on every system: {precision_ok}.
-
-{_markdown_table(at_five, ["system_id", "badness_target", "n_seeds", "bad_share", "degenerate", "n_models", "thin_models", "mean_margin", "bootstrap_low", "bootstrap_high", "interval_width", "narrower_than_limit"])}
-
-## Settings used
-
-These numbers are the working settings in the config. A freeze is a later commit.
-
-- horizon: {config["data"]["horizon"]}
-- ensemble members: {config["model_runtime"]["ensemble_members"]}
-- training settings: {runtime_text}
-- `bad_rmse` threshold per system: {thresholds}
-- seeds: {", ".join(str(seed) for seed in config["seeds"])}
-- minimum judge-test scenarios: {config["min_test_scenarios"]}
-
-## Descriptive coverages
-
-Descriptive only. These coverages are not part of any decision rule, and nothing was selected or tuned on them. They show how the judges compare where fewer in-distribution scenarios are left to accept. Mean false-accept rate over eligible models and seeds.
-
-{_descriptive_lines(results)}
-
-## Event guard at 5% coverage
-
-Exploratory only. `event_guard` is the v2 candidate: the maximum calibration-percentile rank of invariant, disagreement, and support. `event_guard_no_invariant` replaces invariant with uncertainty, so it needs no full-state signal. `margin_vs_primary` and `margin_vs_calibration_simple` use the simple baseline chosen on calibration rows. They are not a Q3 answer. Only eligible models enter the averages. A guard is not computed when one of its inputs is missing.
-
-{_guard_lines(results)}
-"""
-    path.write_text(text, encoding="utf-8")
-
-
 PROTOCOL_PATH = Path("docs/v3/protocol.md")
 
 
@@ -785,6 +1049,120 @@ def protocol_is_frozen(path: str | Path = PROTOCOL_PATH) -> bool:
         if line.startswith("Status:"):
             return line.startswith("Status: frozen") and "not frozen" not in line.lower()
     return False
+
+
+def run_metadata(protocol_path: str | Path = PROTOCOL_PATH) -> dict[str, Any]:
+    """Commit hash and protocol digest written into stage results and reports."""
+    try:
+        commit = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    except Exception:
+        commit = "unknown"
+    proto = Path(protocol_path)
+    digest = hashlib.sha256(proto.read_bytes()).hexdigest() if proto.is_file() else ""
+    return {
+        "git_commit": commit,
+        "protocol_sha256": digest,
+        "protocol_frozen": protocol_is_frozen(proto) if proto.is_file() else False,
+    }
+
+
+def _write_report(
+    path: Path,
+    eligibility: pd.DataFrame,
+    intervals: pd.DataFrame,
+    results: pd.DataFrame,
+    config: dict[str, Any],
+    metadata: dict[str, Any] | None = None,
+) -> None:
+    meta = metadata or run_metadata()
+    learned = eligibility[eligibility["model_id"].isin(config["learned_models"])]
+    systems_passed = sorted(learned.loc[learned["eligible"], "system_id"].unique())
+    precision_ok, degenerate_rows = precision_check(intervals)
+    runtime_text = ", ".join(
+        f"{key} {value}" for key, value in sorted(config["model_runtime"].items()) if key != "ensemble_members"
+    )
+    thresholds = ", ".join(f"{name} {rmse_threshold_for(config, str(name)):g}" for name in config["systems"])
+    metrics = ", ".join(f"{name} {rmse_metric_for(config, str(name))}" for name in config["systems"])
+    stage = str(config.get("stage", "A"))
+    label = str(config.get("label", "exploratory"))
+    is_confirmatory = stage == "B"
+    reading = (
+        "This report lists the numbers the decision rules use. The reading of Q1, Q2, and Q3 is written by hand."
+        if is_confirmatory
+        else "This report does not answer Q1, Q2, or Q3."
+    )
+    eligibility_note = (
+        f"Working rule for this run: mean RMSE on `{eligibility_split(config)}` is strictly below both `hold_last` "
+        f"and `linear_narx` on that system. Eligibility does not read judge-test rows. "
+        f"Learned models passing: {len(systems_passed)} system(s) ({', '.join(systems_passed) if len(systems_passed) else 'none'})."
+    )
+    if stage == "A":
+        eligibility_note += " The plan's Stage A check wants at least two systems."
+    settings_note = (
+        "Frozen confirmatory settings from the stage config."
+        if is_confirmatory
+        else "These numbers are the working settings in the config. A freeze is a later commit."
+    )
+    guard_intro = (
+        "Confirmatory Q3 numbers across all primary coverages. "
+        if is_confirmatory
+        else "Exploratory only. "
+    )
+    guard_intro += (
+        "`event_guard` is the v2 candidate: the maximum calibration-percentile rank of invariant, disagreement, and support. "
+        "`event_guard_no_invariant` replaces invariant with uncertainty, so it needs no full-state signal. "
+        "`margin_vs_primary` and `margin_vs_calibration_simple` use the simple baseline chosen on calibration rows. "
+        "Only eligible models enter the averages. A guard is not computed when one of its inputs is missing."
+    )
+    text = f"""# v3 Stage {stage} report
+
+Label: {label}. {reading}
+
+The margin is the random false-accept rate minus the judge false-accept rate. A positive margin means the judge accepts fewer bad scenarios than that random ranking. This is not the v2 `absolute_margin`, which selects the lowest test-set false-accept rate among simple and stronger baselines.
+
+## Provenance
+
+- git_commit: `{meta.get("git_commit", "unknown")}`
+- protocol_sha256: `{meta.get("protocol_sha256", "")}`
+- rmse_metric: {metrics}
+
+## Eligibility
+
+{eligibility_note}
+
+{_markdown_table(eligibility, ["system_id", "model_id", "id_rmse", "baseline_hold_last_id_rmse", "baseline_linear_narx_id_rmse", "eligible"])}
+
+## Primary coverages (Q1 and Q2)
+
+Bootstrap of the seed-level mean margin of eligible models, for `{PRIMARY_JUDGE}` only, separately at every primary coverage. One seed cannot make an interval. The width limit at 5% is {float(config["interval_width_limit"]):.2f}. A row is degenerate when under {float(config.get("degenerate_share", DEFAULT_DEGENERATE_SHARE)):.0%} or over {1 - float(config.get("degenerate_share", DEFAULT_DEGENERATE_SHARE)):.0%} of scenarios are bad. Its margin is fixed by the labels, so it does not count toward the check. `thin_models` counts the eligible models whose own bad share is under or over the same limits. Their margins are fixed by the labels and pull the average toward zero. Degenerate 5% rows: {degenerate_rows}. All informative 5% rows narrower than the limit, with one on every system: {precision_ok}.
+
+{_markdown_table(intervals, ["system_id", "badness_target", "coverage", "n_seeds", "bad_share", "degenerate", "n_models", "thin_models", "mean_margin", "mean_relative_margin", "bootstrap_low", "bootstrap_high", "interval_width", "narrower_than_limit"])}
+
+## Settings used
+
+{settings_note}
+
+- horizon: {config["data"]["horizon"]}
+- ensemble members: {config["model_runtime"]["ensemble_members"]}
+- training settings: {runtime_text}
+- `bad_rmse` threshold per system: {thresholds}
+- `rmse_metric` per system: {metrics}
+- seeds: {", ".join(str(seed) for seed in config["seeds"])}
+- minimum judge-test scenarios: {config["min_test_scenarios"]}
+
+## Descriptive coverages
+
+Descriptive only. These coverages are not part of any decision rule, and nothing was selected or tuned on them. They show how the judges compare where fewer in-distribution scenarios are left to accept. Each column averages over eligible models for which that judge is defined (for example, `uncertainty_only` and `event_guard_no_invariant` cover models with native epistemic uncertainty only).
+
+{_descriptive_lines(results)}
+
+## Event guard at primary coverages (Q3)
+
+{guard_intro}
+
+{_guard_lines(results, config=config)}
+"""
+    path.write_text(text, encoding="utf-8")
 
 
 def stage_b_blockers(config: dict[str, Any]) -> list[str]:
@@ -818,7 +1196,7 @@ def stage_b_blockers(config: dict[str, Any]) -> list[str]:
         blockers.append(
             "The BSM1 bad_rmse threshold is unset. The written rule is the smallest whole multiple of the "
             "99th percentile of the best model's per-scenario RMSE on judge_calibration_id, over seeds 0-2, "
-            "that no eligible model's in-distribution calibration scenario exceeds. It gives 61.761."
+            "that no eligible model's in-distribution calibration scenario exceeds."
         )
     if config.get("overlapping_test_windows") is None:
         capacity = confirmatory_window_capacity()
@@ -839,6 +1217,139 @@ def stage_b_blockers(config: dict[str, Any]) -> list[str]:
     return blockers
 
 
+def _recompute_disagreement_rows(
+    rows: list[dict[str, Any]],
+    predictions_by_split: dict[str, dict[str, np.ndarray]],
+    cohort: list[str],
+    state_scale: tuple[np.ndarray, np.ndarray] | None,
+) -> None:
+    """Update ``disagreement_score`` on scored calibration rows using the calibration-selected cohort."""
+    disagreement_by_split: dict[str, np.ndarray] = {}
+    for split, predictions in predictions_by_split.items():
+        active = [model_id for model_id in cohort if model_id in predictions]
+        if len(active) < 2:
+            active = list(predictions)
+        disagreement_by_split[split] = _batch_disagreement([predictions[m] for m in active], state_scale=state_scale)
+    for row in rows:
+        split = str(row["split"])
+        scenario_index = int(str(row["scenario_id"]).rsplit("_", 1)[-1])
+        row["disagreement_score"] = float(disagreement_by_split[split][scenario_index])
+
+
+def _run_system_two_phase(
+    system_id: str,
+    config: dict[str, Any],
+    event_config: dict[str, Any],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Fit models and validate calibration eligibility + threshold share BEFORE touching confirmatory test splits."""
+    stage = str(config.get("stage", "A"))
+    n_uncertainty = int(config["data"].get("uncertainty_samples", 5))
+    dt = float(config["data"]["dt"])
+    use_standardized = rmse_metric_for(config, system_id) == "standardized_state"
+    seed_states: list[dict[str, Any]] = []
+    cal_rows_all: list[dict[str, Any]] = []
+
+    for seed in config["seeds"]:
+        seed_int = int(seed)
+        print(f"stage {stage} {system_id} seed {seed_int}", flush=True)
+        if system_id == "bsm1":
+            from scs.systems.bsm1 import generate_bsm1_pretest_stage_dataset
+
+            pretest = generate_bsm1_pretest_stage_dataset(config, seed_int)
+            held_test: dict[str, Any] | None = None
+        else:
+            full = generate_v2_dataset(system_id, config, seed=seed_int)
+            pretest = {split: batch for split, batch in full.items() if _split_role(split) != "judge_test"}
+            held_test = {split: batch for split, batch in full.items() if _split_role(split) == "judge_test"}
+        models = {model_id: _make_v2_model(model_id, seed_int, config) for model_id in config["models"]}
+        for model in models.values():
+            model.fit(pretest["model_train"])
+        support = SupportDistance()
+        support.fit(pretest["model_train"])
+        state_scale = fit_state_scale(pretest["model_train"].states) if use_standardized else None
+        cal_batches = {split: batch for split, batch in pretest.items() if _split_role(split) == "judge_calibration"}
+        seed_cal_rows: list[dict[str, Any]] = []
+        cal_preds: dict[str, dict[str, np.ndarray]] = {}
+        for split, batch in cal_batches.items():
+            rows, preds = _rollout_batch(
+                system_id,
+                seed_int,
+                split,
+                batch,
+                models,
+                support,
+                event_config,
+                dt,
+                n_uncertainty,
+                state_scale=state_scale,
+            )
+            seed_cal_rows.extend(rows)
+            cal_preds[split] = preds
+        cal_rows_all.extend(seed_cal_rows)
+        seed_states.append(
+            {
+                "seed": seed_int,
+                "models": models,
+                "support": support,
+                "state_scale": state_scale,
+                "cal_batches": cal_batches,
+                "cal_rows": seed_cal_rows,
+                "cal_preds": cal_preds,
+                "held_test": held_test,
+            }
+        )
+
+    cal_frame = pd.DataFrame(cal_rows_all)
+    sys_eligibility = eligibility_table(cal_frame, config)
+    if config.get("check_threshold_share"):
+        threshold_share_check(cal_frame, sys_eligibility, {**config, "systems": [system_id]})
+
+    cohort = disagreement_cohort(system_id, sys_eligibility, config)
+    all_rows: list[dict[str, Any]] = []
+    minimum = int(config["min_test_scenarios"])
+    for state in seed_states:
+        seed_int = int(state["seed"])
+        _recompute_disagreement_rows(state["cal_rows"], state["cal_preds"], cohort, state["state_scale"])
+        all_rows.extend(state["cal_rows"])
+        if system_id == "bsm1":
+            from scs.systems.bsm1 import generate_bsm1_test_stage_dataset
+
+            test_batches = generate_bsm1_test_stage_dataset(config, seed_int)
+        else:
+            test_batches = state["held_test"] or {}
+        overlap = split_overlap_report({**state["cal_batches"], **test_batches})
+        if overlap["overlap_count"] > 0:
+            raise RuntimeError(f"calibration/test overlap for {system_id} seed {seed_int}")
+        seed_test_rows: list[dict[str, Any]] = []
+        for split, batch in test_batches.items():
+            if _split_role(split) != "judge_test":
+                continue
+            rows, _preds = _rollout_batch(
+                system_id,
+                seed_int,
+                split,
+                batch,
+                state["models"],
+                state["support"],
+                event_config,
+                dt,
+                n_uncertainty,
+                state_scale=state["state_scale"],
+                disagreement_models=cohort,
+            )
+            seed_test_rows.extend(rows)
+        test_frame = pd.DataFrame(seed_test_rows)
+        if test_frame.empty:
+            raise RuntimeError(f"{system_id} seed {seed_int} has fewer than {minimum} judge-test scenarios: {{}}")
+        test_counts = test_frame.groupby("model_id").size()
+        short = {model_id: int(count) for model_id, count in test_counts.items() if int(count) < minimum}
+        if short:
+            raise RuntimeError(f"{system_id} seed {seed_int} has fewer than {minimum} judge-test scenarios: {short}")
+        all_rows.extend(seed_test_rows)
+
+    return pd.DataFrame(all_rows), sys_eligibility
+
+
 def run_v3_stage(config_path: str | Path, output: str | Path) -> dict[str, Any]:
     config = load_v3_config(config_path)
     stage = str(config.get("stage", "A"))
@@ -848,24 +1359,26 @@ def run_v3_stage(config_path: str | Path, output: str | Path) -> dict[str, Any]:
             joined = "\n- ".join(blockers)
             raise RuntimeError(f"Stage B is not run before the freeze:\n- {joined}")
     event_config = load_event_config(config["event_config"])
+    metadata = run_metadata()
+    frames = []
+    eligibilities = []
+    for system_id in config["systems"]:
+        sys_frame, sys_eligibility = _run_system_two_phase(str(system_id), config, event_config)
+        frames.append(sys_frame)
+        eligibilities.append(sys_eligibility)
+    scored = pd.concat(frames, ignore_index=True)
+    eligibility = pd.concat(eligibilities, ignore_index=True)
+    results = result_rows_for_frame(scored, config, eligibility)
+    results["git_commit"] = metadata["git_commit"]
+    results["protocol_sha256"] = metadata["protocol_sha256"]
+    intervals = interval_table(results, config)
     out_dir = Path(output)
     out_dir.mkdir(parents=True, exist_ok=True)
-    frames = []
-    for system_id in config["systems"]:
-        for seed in config["seeds"]:
-            print(f"stage {stage} {system_id} seed {seed}", flush=True)
-            frames.append(_prediction_frame(str(system_id), int(seed), config, event_config))
-    scored = pd.concat(frames, ignore_index=True)
-    eligibility = eligibility_table(scored, config)
-    if config.get("check_threshold_share"):
-        threshold_share_check(scored, eligibility, config)
-    results = result_rows_for_frame(scored, config, eligibility)
-    intervals = interval_table(results, config)
     stem = f"stage_{stage.lower().replace('-', '_')}"
     results_path = out_dir / f"{stem}_results.csv"
     report_path = out_dir / f"{stem}_report.md"
     results.to_csv(results_path, index=False)
-    _write_report(report_path, eligibility, intervals, results, config)
+    _write_report(report_path, eligibility, intervals, results, config, metadata=metadata)
     learned = eligibility[eligibility["model_id"].isin(config["learned_models"])]
     systems_passed = int(learned.loc[learned["eligible"], "system_id"].nunique())
     precision_pass, degenerate_rows = precision_check(intervals)
@@ -876,4 +1389,6 @@ def run_v3_stage(config_path: str | Path, output: str | Path) -> dict[str, Any]:
         "precision_pass": precision_pass,
         "degenerate_rows": degenerate_rows,
         "rows": int(len(results)),
+        "git_commit": metadata["git_commit"],
+        "protocol_sha256": metadata["protocol_sha256"],
     }

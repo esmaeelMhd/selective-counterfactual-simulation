@@ -343,7 +343,8 @@ def rollout_scenario(
     states = np.empty((total + 1, STATE_DIM), dtype=float)
     states[0] = _pack_state(plant)
     for index in range(total):
-        plant.step(index, klas=aeration)
+        step_kla = NOMINAL_KLA if index < history else aeration
+        plant.step(index, klas=step_kla)
         states[index + 1] = _pack_state(plant)
         measured[index] = _measured(plant.performance, plant.ys_eff)
     predicted = states[history : history + horizon + 1]
@@ -658,6 +659,65 @@ def _cached_start_states(dry: np.ndarray, starts: list[int]) -> dict[int, dict[s
     return _START_STATES[key]
 
 
+def _load_or_build_splits(cache_dir: Path | None, build) -> dict[str, TrajectoryBatch]:
+    if cache_dir is not None and cache_dir.is_dir() and list(cache_dir.glob("*.npz")):
+        from scs.data.schemas import load_dataset
+
+        return load_dataset(cache_dir)
+    dataset = build()
+    if cache_dir is not None:
+        from scs.data.schemas import save_dataset
+
+        save_dataset(dataset, cache_dir)
+    return dataset
+
+
+def generate_bsm1_pretest_stage_dataset(config: dict[str, object], seed: int) -> dict[str, TrajectoryBatch]:
+    """Train and calibration BSM1 splits for one seed, without touching confirmatory days."""
+    data = config["data"]
+    counts = dict(
+        n_model_train=int(data["n_model_train"]),
+        n_calibration_id=int(data["n_calibration_id"]),
+        n_calibration_control=int(data["n_calibration_ood"]),
+        horizon=int(data["horizon"]),
+        history=int(data.get("history_minutes", HISTORY_MINUTES)),
+    )
+    cache_root = data.get("cache_dir")
+    cache_dir = Path(str(cache_root)) / f"seed_{int(seed)}" / "pretest" if cache_root else None
+
+    def _build() -> dict[str, TrajectoryBatch]:
+        dry = load_dry_influent()
+        starts = [int(spec["start_minute"]) for spec in pretest_specs(seed=seed, **counts)]
+        dataset, _manifest = generate_bsm1_pretest_dataset(
+            seed=seed, start_states=_cached_start_states(dry, starts), **counts
+        )
+        return dataset
+
+    return _load_or_build_splits(cache_dir, _build)
+
+
+def generate_bsm1_test_stage_dataset(config: dict[str, object], seed: int) -> dict[str, TrajectoryBatch]:
+    """Confirmatory or rehearsal BSM1 test splits for one seed."""
+    data = config["data"]
+    stage = str(config.get("stage", "A"))
+    if stage not in ("B", "B-rehearsal"):
+        return {}
+    cache_root = data.get("cache_dir")
+    cache_dir = Path(str(cache_root)) / f"seed_{int(seed)}" / "test" if cache_root else None
+
+    def _build() -> dict[str, TrajectoryBatch]:
+        return generate_bsm1_confirmatory_dataset(
+            n_per_split=int(data["n_test_per_split"]),
+            horizon=int(data["horizon"]),
+            history=int(data.get("history_minutes", HISTORY_MINUTES)),
+            seed=seed,
+            control_scale=data.get("test_control_scale"),
+            rehearsal=stage == "B-rehearsal",
+        )
+
+    return _load_or_build_splits(cache_dir, _build)
+
+
 def generate_bsm1_stage_dataset(config: dict[str, object], seed: int) -> dict[str, TrajectoryBatch]:
     """The splits a v3 stage scores for BSM1, from a stage config.
 
@@ -667,29 +727,8 @@ def generate_bsm1_stage_dataset(config: dict[str, object], seed: int) -> dict[st
     adds the same four splits cut from days that are not reserved, so every scoring step runs
     before the freeze. Those rows are not evidence.
     """
-    data = config["data"]
-    stage = str(config.get("stage", "A"))
-    counts = dict(
-        n_model_train=int(data["n_model_train"]),
-        n_calibration_id=int(data["n_calibration_id"]),
-        n_calibration_control=int(data["n_calibration_ood"]),
-        horizon=int(data["horizon"]),
-        history=int(data.get("history_minutes", HISTORY_MINUTES)),
-    )
-    dry = load_dry_influent()
-    starts = [int(spec["start_minute"]) for spec in pretest_specs(seed=seed, **counts)]
-    dataset, _manifest = generate_bsm1_pretest_dataset(seed=seed, start_states=_cached_start_states(dry, starts), **counts)
-    if stage in ("B", "B-rehearsal"):
-        dataset.update(
-            generate_bsm1_confirmatory_dataset(
-                n_per_split=int(data["n_test_per_split"]),
-                horizon=counts["horizon"],
-                history=counts["history"],
-                seed=seed,
-                control_scale=data.get("test_control_scale"),
-                rehearsal=stage == "B-rehearsal",
-            )
-        )
+    dataset = generate_bsm1_pretest_stage_dataset(config, seed)
+    dataset.update(generate_bsm1_test_stage_dataset(config, seed))
     return dataset
 
 
@@ -896,13 +935,15 @@ def _rollout_from_state(
     if check_split:
         assert_split_allowed(split)
     total = history + horizon
-    plant = _new_plant(_dry_series(dry, start_minute, total, flow_scale, load_scale), kla)
+    plant = _new_plant(_dry_series(dry, start_minute, total, flow_scale, load_scale), NOMINAL_KLA)
     apply_plant(plant, initial_state)
     measured = np.empty((total, len(MEASURED_NAMES)), dtype=float)
     states = np.empty((total + 1, STATE_DIM), dtype=float)
     states[0] = _pack_state(plant)
     for index in range(total):
-        plant.step(index, klas=kla)
+        # The measured-history window precedes the counterfactual intervention at t=0.
+        step_kla = NOMINAL_KLA if index < history else kla
+        plant.step(index, klas=step_kla)
         states[index + 1] = _pack_state(plant)
         measured[index] = _measured(plant.performance, plant.ys_eff)
     disturbances = plant.y_in[history:total]

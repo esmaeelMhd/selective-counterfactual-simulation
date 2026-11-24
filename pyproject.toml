@@ -31,7 +31,7 @@ bsm1 = [
 ]
 learned = [
   "torch",
-  "timesim @ git+https://github.com/esmaeelMhd/time-series-simulator.git",
+  "timesim @ git+https://github.com/esmaeelMhd/time-series-simulator.git@18dba19139aec334fc587d2aee1f308aad313772",
 ]
 
 [tool.setuptools.packages.find]

@@ -16,10 +16,12 @@ models:
   - linear_narx
   - mlp_state_space
   - lstm_world
+  - ensemble_lstm
 
 learned_models:
   - mlp_state_space
   - lstm_world
+  - ensemble_lstm
 
 eligibility_split: judge_calibration_id
 
@@ -42,8 +44,9 @@ badness_targets:
   - bad_rmse
   - bad_event
 
+rmse_metric: standardized_state
 rmse_threshold:
-  bsm1: 5.0
+  bsm1: 0.25
 
 event_guards:
   event_guard_no_invariant:

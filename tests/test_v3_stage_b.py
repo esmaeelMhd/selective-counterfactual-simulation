@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from scs.experiments.registry import make_system
@@ -17,7 +18,8 @@ def test_protocol_draft_is_not_frozen() -> None:
 def test_only_the_freeze_itself_blocks_stage_b_once_the_decisions_are_drafted() -> None:
     config = load_v3_config("configs/v3/stage_b.yaml")
     blockers = stage_b_blockers(config)
-    assert config["rmse_threshold"]["bsm1"] == pytest.approx(61.761)
+    assert config["rmse_metric"] == "standardized_state"
+    assert config["rmse_threshold"]["bsm1"] == pytest.approx(0.5069)
     assert config["check_threshold_share"] is True
     assert config["coverage_rule"] == "both"
     assert config["event_guard_on_bsm1"] == "event_guard_no_invariant"
@@ -128,7 +130,9 @@ def test_control_windows_pair_with_the_nominal_windows_and_differ_in_aeration_on
     tests = bsm1.generate_bsm1_confirmatory_dataset(n_per_split=3, horizon=4, history=2, seed=2, rehearsal=True)
     nominal, shifted = tests["judge_test_dry_holdout"], tests["judge_test_dry_control"]
     assert nominal.disturbances == pytest.approx(shifted.disturbances)
-    assert nominal.measured_history.shape == shifted.measured_history.shape
+    assert nominal.measured_history == pytest.approx(shifted.measured_history)
+    assert nominal.states[:, 0, :] == pytest.approx(shifted.states[:, 0, :])
+    assert not np.allclose(nominal.states[:, 1:, :], shifted.states[:, 1:, :])
     assert (shifted.actions[:, 0, 2] > nominal.actions[:, 0, 2].max()).all()
     low, high = bsm1.CONTROL_SCALE
     ratio = shifted.actions[:, 0, 2] / bsm1.NOMINAL_KLA[2]
@@ -190,3 +194,119 @@ def test_bsm1_guard_must_be_defined_and_free_of_full_state_signals() -> None:
     assert any("not one of the guards" in item for item in stage_b_blockers(unknown))
     full_state = {**config, "event_guards": {"v2": ["risk_invariant_only", "risk_support_only"]}, "event_guard_on_bsm1": "v2"}
     assert any("does not have" in item for item in stage_b_blockers(full_state))
+
+
+def test_threshold_share_check_runs_before_generating_confirmatory_test_splits(
+    fast_start_states, tmp_path: Path, monkeypatch
+) -> None:
+    import yaml
+
+    bsm1 = fast_start_states
+    called = {"confirmatory": False}
+
+    def fail_if_called(**kwargs):
+        called["confirmatory"] = True
+        raise AssertionError("confirmatory generator should not run before threshold_share_check")
+
+    monkeypatch.setattr(bsm1, "generate_bsm1_confirmatory_dataset", fail_if_called)
+    config = {
+        "stage": "B-rehearsal",
+        "label": "rehearsal",
+        "protocol_frozen": False,
+        "event_config": "configs/v3/bsm1_events.yaml",
+        "check_threshold_share": True,
+        "systems": ["bsm1"],
+        "models": ["hold_last", "linear_narx", "mlp_state_space"],
+        "learned_models": ["mlp_state_space"],
+        "eligibility_split": "judge_calibration_id",
+        "eligibility_baselines": ["hold_last", "linear_narx"],
+        "primary_coverages": [0.05, 0.10],
+        "badness_targets": ["bad_rmse"],
+        "rmse_threshold": {"bsm1": 1e9},
+        "rmse_metric": "standardized_state",
+        "event_guards": {"event_guard_no_invariant": ["risk_support_only", "risk_uncertainty_only", "risk_disagreement_only"]},
+        "seeds": [0],
+        "bootstrap_samples": 10,
+        "bootstrap_seed": 1,
+        "interval_width_limit": 0.10,
+        "min_test_scenarios": 4,
+        "degenerate_share": 0.01,
+        "data": {
+            "horizon": 4,
+            "history_minutes": 2,
+            "dt": 1.0 / 1440.0,
+            "n_model_train": 6,
+            "n_calibration_id": 3,
+            "n_calibration_ood": 3,
+            "n_test_per_split": 2,
+            "uncertainty_samples": 5,
+        },
+        "model_runtime": {"ensemble_members": 5, "mlp_max_iter": 10},
+    }
+    # Force mlp_state_space eligible so threshold_share_check checks it.
+    from scs.experiments import v3
+
+    monkeypatch.setattr(
+        v3,
+        "eligibility_table",
+        lambda frame, cfg: __import__("pandas").DataFrame(
+            [{"system_id": "bsm1", "model_id": "mlp_state_space", "id_rmse": 0.1, "baseline_hold_last_id_rmse": 1.0, "baseline_linear_narx_id_rmse": 0.5, "eligible": True}]
+        ),
+    )
+    cfg_path = tmp_path / "rehearsal_bad_thresh.yaml"
+    cfg_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    with pytest.raises(RuntimeError, match="marks 0.0% of bsm1"):
+        run_v3_stage(cfg_path, tmp_path / "out")
+    assert called["confirmatory"] is False
+
+
+def test_stage_run_writes_git_commit_and_protocol_hash_into_results_and_report(
+    fast_start_states, tmp_path: Path
+) -> None:
+    import pandas as pd
+    import yaml
+
+    config = {
+        "stage": "B-rehearsal",
+        "label": "rehearsal",
+        "protocol_frozen": False,
+        "event_config": "configs/v3/bsm1_events.yaml",
+        "check_threshold_share": False,
+        "systems": ["bsm1"],
+        "models": ["hold_last", "linear_narx"],
+        "learned_models": [],
+        "eligibility_split": "judge_calibration_id",
+        "eligibility_baselines": ["hold_last", "linear_narx"],
+        "primary_coverages": [0.05, 0.10],
+        "badness_targets": ["bad_rmse"],
+        "rmse_threshold": {"bsm1": 0.5},
+        "rmse_metric": "standardized_state",
+        "event_guards": {"event_guard_no_invariant": ["risk_support_only", "risk_uncertainty_only", "risk_disagreement_only"]},
+        "seeds": [0],
+        "bootstrap_samples": 10,
+        "bootstrap_seed": 1,
+        "interval_width_limit": 0.10,
+        "min_test_scenarios": 4,
+        "data": {
+            "horizon": 4,
+            "history_minutes": 2,
+            "dt": 1.0 / 1440.0,
+            "n_model_train": 4,
+            "n_calibration_id": 2,
+            "n_calibration_ood": 2,
+            "n_test_per_split": 2,
+            "uncertainty_samples": 5,
+            "cache_dir": str(tmp_path / "cache"),
+        },
+        "model_runtime": {"ensemble_members": 5},
+    }
+    cfg_path = tmp_path / "rehearsal.yaml"
+    cfg_path.write_text(yaml.safe_dump(config), encoding="utf-8")
+    out_dir = tmp_path / "out"
+    run_v3_stage(cfg_path, out_dir)
+    table = pd.read_csv(out_dir / "stage_b_rehearsal_results.csv")
+    report = (out_dir / "stage_b_rehearsal_report.md").read_text(encoding="utf-8")
+    assert "git_commit" in table.columns and "protocol_sha256" in table.columns
+    assert str(table["protocol_sha256"].iloc[0]) in report
+    assert (tmp_path / "cache" / "seed_0" / "pretest" / "model_train.npz").is_file()
+    assert (tmp_path / "cache" / "seed_0" / "test" / "judge_test_dry_holdout.npz").is_file()

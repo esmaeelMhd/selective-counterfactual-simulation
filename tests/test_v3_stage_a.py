@@ -239,7 +239,8 @@ def test_guard_table_counts_only_eligible_models_and_names_missing_guards() -> N
         ]
     )
     text = _guard_lines(results)
-    assert "| event_guard | two_tank | bad_event | 1 | 0.1000 | 0.2000 | 0.3000 | 0.1000 | 0.2000 |" in text
+    assert "| event_guard | two_tank | bad_event | 0.0500 | 1 | 0.1000 | 0.2000 | 0.3000 | 0.1000 |" in text
+    assert "| 0.2000 |" in text
     assert "`event_guard` is not defined on: bsm1" in text
     assert "`event_guard` has no eligible model, so no row, on: cstr" in text
 
@@ -366,3 +367,277 @@ def test_the_interval_table_reads_primary_coverages_only() -> None:
         row["coverage_role"] = "primary" if row["coverage"] == 0.05 else "descriptive"
     table = interval_table(pd.DataFrame(rows), {"bootstrap_seed": 1, "bootstrap_samples": 20, "interval_width_limit": 0.10})
     assert list(table["coverage"]) == [0.05]
+
+
+def test_primary_ranker_selects_per_model_over_finite_signals_without_pooling_ineligible_models() -> None:
+    from scs.experiments.v3 import eligibility_table, result_rows_for_frame
+
+    rows = []
+    # Two models on a BSM1-like system where invariant_residual and repair_amount are NaN.
+    # On good_model: support_distance perfectly separates bad from good, while disagreement_score
+    # is anti-informative noise. On hold_last: almost always bad with inverted support_distance and
+    # zero uncertainty. Pooling across models or skipping candidate selection breaks good_model.
+    for role in ("judge_calibration", "judge_test"):
+        split = "judge_calibration_id" if role == "judge_calibration" else "judge_test_dry_holdout"
+        for idx in range(20):
+            good_bad = idx >= 10
+            # On good_model, low support_distance (< 10) is always good; disagreement is reversed for
+            # the lowest-support rows so an unselected rank-mean picks bad rows at 20% coverage.
+            rows.append(
+                {
+                    "system_id": "bsm1",
+                    "seed": 0,
+                    "split": split,
+                    "role": role,
+                    "model_id": "good_model",
+                    "rmse": 2.0 if good_bad else 0.1,
+                    "event_mismatch": good_bad,
+                    "support_distance": float(idx),
+                    "uncertainty_score": np.nan,
+                    "disagreement_score": float(20 - idx if idx < 10 else idx - 10),
+                    "invariant_residual": np.nan,
+                    "repair_amount": np.nan,
+                }
+            )
+            # Poisoned hold_last rows with huge negative-correlated support_distance.
+            rows.append(
+                {
+                    "system_id": "bsm1",
+                    "seed": 0,
+                    "split": split,
+                    "role": role,
+                    "model_id": "hold_last",
+                    "rmse": 100.0 if idx < 18 else 0.05,
+                    "event_mismatch": idx < 18,
+                    "support_distance": float(100 - idx if idx < 18 else 500 + idx),
+                    "uncertainty_score": np.nan,
+                    "disagreement_score": float(idx),
+                    "invariant_residual": np.nan,
+                    "repair_amount": np.nan,
+                }
+            )
+    frame = pd.DataFrame(rows)
+    config = {
+        "learned_models": ["good_model"],
+        "eligibility_baselines": ["hold_last"],
+        "primary_coverages": [0.20],
+        "badness_targets": ["bad_rmse"],
+        "rmse_threshold": 1.0,
+        "event_guards": {"event_guard_no_invariant": ["risk_support_only", "risk_uncertainty_only", "risk_disagreement_only"]},
+    }
+    results = result_rows_for_frame(frame, config, eligibility_table(frame, config))
+    good_primary = results[(results["model_id"] == "good_model") & (results["judge_id"] == "calibration_selected_candidate_ranker")]
+    assert float(good_primary["false_accept_rate"].iloc[0]) == pytest.approx(0.0)
+
+
+def test_deterministic_model_returns_nan_uncertainty_and_ensemble_reuses_member_rollouts() -> None:
+    from scs.experiments.v3 import _rollout_and_uncertainty
+    from scs.models.ensemble_mlp import EnsembleMLPModel
+    from scs.models.linear_narx import LinearNARXModel
+
+    rng = np.random.default_rng(0)
+    batch = TrajectoryBatch(
+        states=rng.normal(size=(8, 5, 2)),
+        actions=rng.normal(size=(8, 4, 1)),
+        disturbances=rng.normal(size=(8, 4, 2)),
+        scenario_type=["id"] * 8,
+        split="model_train",
+        system_id="two_tank",
+    )
+    linear = LinearNARXModel(random_state=0)
+    linear.fit(batch)
+    ensemble = EnsembleMLPModel(random_state=0, n_members=5, max_iter=10)
+    ensemble.fit(batch)
+
+    calls = [0] * len(ensemble.members)
+    for idx, member in enumerate(ensemble.members):
+        original = member.predict_rollouts
+
+        def wrapped(*args, _orig=original, _idx=idx, **kwargs):
+            calls[_idx] += 1
+            return _orig(*args, **kwargs)
+
+        member.predict_rollouts = wrapped  # type: ignore[method-assign]
+
+    lin_pred, lin_unc = _rollout_and_uncertainty(
+        linear, batch.states[:, 0], batch.actions, batch.disturbances, n_samples=5
+    )
+    ens_pred, ens_unc = _rollout_and_uncertainty(
+        ensemble, batch.states[:, 0], batch.actions, batch.disturbances, n_samples=5
+    )
+    assert lin_pred.shape == batch.states.shape
+    assert np.isnan(lin_unc).all()
+    assert ens_pred.shape == batch.states.shape
+    assert np.isfinite(ens_unc).all() and (ens_unc >= 0.0).all()
+    # Every ensemble member runs exactly once (prediction mean and uncertainty share the rollouts).
+    assert calls == [1, 1, 1, 1, 1]
+
+
+def test_disagreement_cohort_excludes_hold_last_and_ineligible_models() -> None:
+    from scs.experiments.v3 import disagreement_cohort
+
+    eligibility = pd.DataFrame(
+        [
+            {"system_id": "bsm1", "model_id": "hold_last", "eligible": False},
+            {"system_id": "bsm1", "model_id": "linear_narx", "eligible": False},
+            {"system_id": "bsm1", "model_id": "mlp_state_space", "eligible": False},
+            {"system_id": "bsm1", "model_id": "lstm_world", "eligible": True},
+            {"system_id": "bsm1", "model_id": "ensemble_lstm", "eligible": True},
+        ]
+    )
+    config = {
+        "models": ["hold_last", "linear_narx", "mlp_state_space", "lstm_world", "ensemble_lstm"],
+        "learned_models": ["mlp_state_space", "lstm_world", "ensemble_lstm"],
+    }
+    assert disagreement_cohort("bsm1", eligibility, config) == ["lstm_world", "ensemble_lstm"]
+    # When fewer than 2 learned models are eligible, fall back to learned models (never hold_last).
+    none_eligible = eligibility.assign(eligible=False)
+    cohort = disagreement_cohort("bsm1", none_eligible, config)
+    assert "hold_last" not in cohort and set(cohort) == {"mlp_state_space", "lstm_world", "ensemble_lstm"}
+
+
+def test_standardized_state_rmse_balances_channel_scales_and_skips_constant_channels() -> None:
+    from scs.experiments.v3 import fit_state_scale, scaled_scenario_rmse
+
+    rng = np.random.default_rng(7)
+    train_states = np.zeros((10, 6, 3), dtype=float)
+    train_states[:, :, 0] = 15.0  # constant channel (like BSM1 temperature/dummies)
+    train_states[:, :, 1] = rng.normal(0.0, 1.0, size=(10, 6))
+    train_states[:, :, 2] = rng.normal(0.0, 1000.0, size=(10, 6))
+    active, std = fit_state_scale(train_states)
+    assert list(active) == [False, True, True]
+    true_states = np.zeros((2, 6, 3), dtype=float)
+    pred_states = true_states.copy()
+    pred_states[:, :, 0] = 999.0  # constant channel ignored
+    pred_states[:, :, 1] = std[0]  # +1 std error
+    pred_states[:, :, 2] = std[1]  # +1 std error
+    scores = scaled_scenario_rmse(pred_states, true_states, (active, std))
+    assert scores == pytest.approx([1.0, 1.0])
+
+
+def test_stage_b_report_includes_both_coverages_relative_margins_q3_cis_and_freeze_metadata(tmp_path: Path) -> None:
+    from scs.experiments.v3 import _guard_lines, _write_report, interval_table
+
+    rows = []
+    for coverage in (0.05, 0.10):
+        for seed in range(5):
+            for judge_id, far in (
+                ("random_baseline", 0.40),
+                ("calibration_selected_candidate_ranker", 0.20 - 0.01 * seed),
+                ("event_guard_no_invariant", 0.05 + 0.005 * seed),
+            ):
+                abs_margin = 0.40 - far
+                rows.append(
+                    {
+                        "system_id": "bsm1",
+                        "seed": seed,
+                        "model_id": "ensemble_lstm",
+                        "eligible": True,
+                        "badness_target": "bad_event",
+                        "coverage": coverage,
+                        "coverage_role": "primary",
+                        "judge_id": judge_id,
+                        "false_accept_rate": far,
+                        "random_far": 0.40,
+                        "absolute_margin": abs_margin,
+                        "relative_margin": abs_margin / 0.40,
+                        "primary_far": 0.20 - 0.01 * seed,
+                        "calibration_simple_far": 0.25 - 0.01 * seed,
+                        "bad_share": 0.40,
+                        "accepted_count": int(coverage * 2000),
+                        "n_scenarios": 2000,
+                        "calibration_simple_baseline": "support_only",
+                        "rmse_threshold": 1.5,
+                    }
+                )
+    results = pd.DataFrame(rows)
+    config = {
+        "stage": "B",
+        "label": "confirmatory",
+        "systems": ["bsm1"],
+        "learned_models": ["ensemble_lstm"],
+        "primary_coverages": [0.05, 0.10],
+        "rmse_threshold": {"bsm1": 1.5},
+        "rmse_metric": "standardized_state",
+        "seeds": [0, 1, 2, 3, 4],
+        "min_test_scenarios": 2000,
+        "bootstrap_samples": 100,
+        "bootstrap_seed": 2025,
+        "interval_width_limit": 0.10,
+        "data": {"horizon": 480},
+        "model_runtime": {"ensemble_members": 5, "lstm_epochs": 120},
+    }
+    eligibility = pd.DataFrame(
+        [
+            {
+                "system_id": "bsm1",
+                "model_id": "ensemble_lstm",
+                "id_rmse": 0.12,
+                "baseline_hold_last_id_rmse": 0.86,
+                "baseline_linear_narx_id_rmse": 0.21,
+                "eligible": True,
+            }
+        ]
+    )
+    intervals = interval_table(results, config)
+    assert sorted(intervals["coverage"].tolist()) == [0.05, 0.10]
+    assert "mean_relative_margin" in intervals.columns
+    assert intervals["mean_relative_margin"].iloc[0] == pytest.approx(0.55, abs=0.01)
+
+    guard_text = _guard_lines(results, config=config)
+    assert "0.0500" in guard_text and "0.1000" in guard_text
+    assert "ci_low_vs_primary" in guard_text and "ci_low_vs_simple" in guard_text
+    assert "rel_vs_primary" in guard_text and "rel_vs_simple" in guard_text
+
+    report_path = tmp_path / "stage_b_report.md"
+    metadata = {"git_commit": "abc1234", "protocol_sha256": "deadbeef" * 8}
+    _write_report(report_path, eligibility, intervals, results, config, metadata=metadata)
+    report = report_path.read_text(encoding="utf-8")
+    assert "0.0500" in report and "0.1000" in report
+    assert "abc1234" in report and ("deadbeef" * 8) in report
+    assert "Exploratory only." not in report
+    assert "A freeze is a later commit." not in report
+    assert "Stage A check" not in report
+
+
+def test_primary_ranker_breaks_zero_far_ties_using_calibration_discrimination_not_raw_mean() -> None:
+    from scs.experiments.v3 import _fit_calibrated_ranker
+
+    # On calibration rows, both support_distance and repair_amount achieve 0.0 FAR at 10% coverage,
+    # because the bottom 10% of both are good. However, repair_amount is mostly zero (tiny raw mean)
+    # and fails above 20% coverage, whereas support_distance cleanly ranks all bad rows highest.
+    n = 40
+    idx = np.arange(n, dtype=float)
+    bad = idx >= 20
+    cal = pd.DataFrame(
+        {
+            "bad_label": bad,
+            "support_distance": 10.0 + idx,
+            "uncertainty_score": np.nan,
+            "disagreement_score": np.nan,
+            "invariant_residual": np.nan,
+            "repair_amount": np.where(idx < 38, 0.0, 1.0),
+        }
+    )
+    # Same distribution on test, evaluated at 50% coverage where support_distance gets 0.0 FAR
+    # and nearly-constant repair_amount gets poor FAR (0.5 on tied zeros / order-dependent).
+    test = cal.iloc[::-1].reset_index(drop=True)
+    scores = _fit_calibrated_ranker(cal, test, primary_coverages=[0.10])
+    accepted = np.argsort(scores, kind="mergesort")[:20]
+    far_at_50 = float(np.mean(test["bad_label"].to_numpy(dtype=bool)[accepted]))
+    assert far_at_50 == pytest.approx(0.0)
+
+
+def test_descriptive_bad_share_weights_each_eligible_model_equally() -> None:
+    from scs.experiments.v3 import _descriptive_lines
+
+    # Model A has 3 judges (bad_share=0.10); Model B has 1 judge (bad_share=0.90).
+    # Equal model weighting must give bad_share = 0.5000, not (3*0.10 + 1*0.90)/4 = 0.3000.
+    rows = [
+        {"system_id": "cstr", "badness_target": "bad_rmse", "coverage": 0.25, "coverage_role": "descriptive", "eligible": True, "model_id": "A", "judge_id": "calibration_selected_candidate_ranker", "false_accept_rate": 0.1, "calibration_simple_far": 0.1, "bad_share": 0.1},
+        {"system_id": "cstr", "badness_target": "bad_rmse", "coverage": 0.25, "coverage_role": "descriptive", "eligible": True, "model_id": "A", "judge_id": "uncertainty_only", "false_accept_rate": 0.1, "calibration_simple_far": 0.1, "bad_share": 0.1},
+        {"system_id": "cstr", "badness_target": "bad_rmse", "coverage": 0.25, "coverage_role": "descriptive", "eligible": True, "model_id": "A", "judge_id": "event_guard_no_invariant", "false_accept_rate": 0.1, "calibration_simple_far": 0.1, "bad_share": 0.1},
+        {"system_id": "cstr", "badness_target": "bad_rmse", "coverage": 0.25, "coverage_role": "descriptive", "eligible": True, "model_id": "B", "judge_id": "calibration_selected_candidate_ranker", "false_accept_rate": 0.2, "calibration_simple_far": 0.2, "bad_share": 0.9},
+    ]
+    text = _descriptive_lines(pd.DataFrame(rows))
+    assert "| 0.5000 |" in text
