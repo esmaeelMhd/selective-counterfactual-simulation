@@ -2,11 +2,29 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ProcessPoolExecutor
+
 import numpy as np
 
 from scs.models.base import validate_rollout_batch, validate_rollout_inputs
 from scs.models.lstm_world import LSTMWorldModel
+from scs.parallel import configure_worker_threads, resolve_workers
 from scs.systems.base import TrajectoryBatch
+
+_WORKER_TRAIN: TrajectoryBatch | None = None
+
+
+def _init_ensemble_lstm_worker(train: TrajectoryBatch) -> None:
+    global _WORKER_TRAIN
+    configure_worker_threads(configure_torch=True)
+    _WORKER_TRAIN = train
+
+
+def _fit_lstm_member(member: LSTMWorldModel) -> LSTMWorldModel:
+    if _WORKER_TRAIN is None:
+        raise RuntimeError("ensemble LSTM worker was not initialized with training data")
+    member.fit(_WORKER_TRAIN)
+    return member
 
 
 class EnsembleLSTMModel:
@@ -20,11 +38,13 @@ class EnsembleLSTMModel:
         num_layers: int = 2,
         epochs: int = 30,
         learning_rate: float = 1e-3,
+        workers: int = 1,
         **member_options,
     ) -> None:
         """``member_options`` go to every ``LSTMWorldModel``, such as the early-stopping settings."""
         self.random_state = int(random_state)
         self.n_members = int(n_members)
+        self.workers = resolve_workers(workers)
         if self.n_members < 2:
             raise ValueError("ensemble_lstm needs at least 2 members")
         self.members = [
@@ -39,9 +59,19 @@ class EnsembleLSTMModel:
             for index in range(self.n_members)
         ]
 
-    def fit(self, train: TrajectoryBatch) -> None:
-        for member in self.members:
-            member.fit(train)
+    def fit(self, train: TrajectoryBatch, workers: int | None = None) -> None:
+        effective_workers = self.workers if workers is None else resolve_workers(workers)
+        if effective_workers <= 1 or len(self.members) <= 1:
+            for member in self.members:
+                member.fit(train)
+            return
+        n_procs = min(effective_workers, len(self.members))
+        with ProcessPoolExecutor(
+            max_workers=n_procs,
+            initializer=_init_ensemble_lstm_worker,
+            initargs=(train,),
+        ) as pool:
+            self.members = list(pool.map(_fit_lstm_member, self.members))
 
     def predict_rollout(
         self,
