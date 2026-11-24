@@ -49,3 +49,4 @@ reports/smoke_report.md
 reports/full_v0_report.md
 # Regenerate with scripts/v3_bsm1_dataset.py; published as a release asset, not tracked.
 results/v3/bsm1_pretest/*.npz
+results/v3/bsm1_stage_b_cache/
