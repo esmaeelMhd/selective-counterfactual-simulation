@@ -11,16 +11,19 @@ from scs.experiments.v3 import load_v3_config, protocol_is_frozen, run_v3_stage,
 from scs.systems.bsm1 import confirmatory_window_capacity
 
 
-def test_protocol_draft_is_not_frozen() -> None:
-    assert protocol_is_frozen() is False
+def test_protocol_is_frozen_and_draft_file_is_refused(tmp_path: Path) -> None:
+    assert protocol_is_frozen() is True
+    draft = tmp_path / "draft_protocol.md"
+    draft.write_text("# v3 protocol\n\nStatus: draft, not frozen.\n", encoding="utf-8")
+    assert protocol_is_frozen(draft) is False
 
 
-def test_only_the_freeze_itself_blocks_stage_b_once_the_decisions_are_drafted(monkeypatch) -> None:
+def test_frozen_stage_b_config_has_no_blockers_on_clean_tree_and_refuses_draft(monkeypatch) -> None:
     from scs.experiments import v3
 
     monkeypatch.setattr(v3, "_tracked_working_tree_dirty", lambda: False)
     config = load_v3_config("configs/v3/stage_b.yaml")
-    blockers = stage_b_blockers(config)
+    assert config["protocol_frozen"] is True
     assert config["rmse_metric"] == "standardized_state"
     assert config["rmse_threshold"]["bsm1"] == pytest.approx(0.4691)
     assert config["check_threshold_share"] is True
@@ -29,8 +32,12 @@ def test_only_the_freeze_itself_blocks_stage_b_once_the_decisions_are_drafted(mo
     assert config["overlapping_test_windows"] is True
     assert config["data"]["n_test_per_split"] * 4 >= config["min_test_scenarios"]
     assert len(config["seeds"]) == 10
-    assert len(blockers) == 2
-    text = "\n".join(blockers)
+    assert stage_b_blockers(config) == []
+
+    monkeypatch.setattr(v3, "protocol_is_frozen", lambda *args, **kwargs: False)
+    draft_blockers = stage_b_blockers({**config, "protocol_frozen": False})
+    assert len(draft_blockers) == 2
+    text = "\n".join(draft_blockers)
     assert "is still a draft" in text
     assert "protocol_frozen" in text
 
@@ -47,9 +54,17 @@ def test_each_missing_decision_blocks_stage_b_again() -> None:
     assert "overlapping" in "\n".join(stage_b_blockers({**config, "overlapping_test_windows": None}))
 
 
-def test_stage_b_run_stops_before_writing(tmp_path: Path) -> None:
+def test_stage_b_run_stops_before_writing_when_unfrozen(tmp_path: Path, monkeypatch) -> None:
+    import yaml
+
+    from scs.experiments import v3
+
+    monkeypatch.setattr(v3, "protocol_is_frozen", lambda *args, **kwargs: False)
+    draft_cfg = {**load_v3_config("configs/v3/stage_b.yaml"), "protocol_frozen": False}
+    cfg_path = tmp_path / "draft_stage_b.yaml"
+    cfg_path.write_text(yaml.safe_dump(draft_cfg), encoding="utf-8")
     with pytest.raises(RuntimeError, match="not run before the freeze"):
-        run_v3_stage("configs/v3/stage_b.yaml", tmp_path / "stage_b")
+        run_v3_stage(cfg_path, tmp_path / "stage_b")
     assert not (tmp_path / "stage_b").exists()
 
 
@@ -148,6 +163,7 @@ def test_control_windows_pair_with_the_nominal_windows_and_differ_in_aeration_on
 
 def test_the_real_confirmatory_blocks_are_refused_until_the_protocol_is_frozen(fast_start_states, monkeypatch) -> None:
     bsm1 = fast_start_states
+    monkeypatch.setattr("scs.experiments.v3.protocol_is_frozen", lambda *args, **kwargs: False)
     with pytest.raises(RuntimeError, match="only after the freeze"):
         bsm1.generate_bsm1_stage_dataset(_tiny_bsm1_config("B"), seed=0)
     monkeypatch.setattr("scs.experiments.v3.protocol_is_frozen", lambda *args, **kwargs: True)
@@ -341,7 +357,7 @@ def test_stage_b_blockers_validates_decision_values_and_test_scenario_count(monk
 
 
 def test_bsm1_cache_checks_freeze_before_reading_and_invalidates_on_config_change(
-    fast_start_states, tmp_path: Path
+    fast_start_states, tmp_path: Path, monkeypatch
 ) -> None:
     bsm1 = fast_start_states
     cache_root = str(tmp_path / "cache")
@@ -361,6 +377,7 @@ def test_bsm1_cache_checks_freeze_before_reading_and_invalidates_on_config_chang
     assert first["judge_test_dry_holdout"].states.shape[1] == 5
 
     # Reusing the same cache_dir with stage="B" while unfrozen MUST refuse before reading cache.
+    monkeypatch.setattr("scs.experiments.v3.protocol_is_frozen", lambda *args, **kwargs: False)
     stage_b_cfg = {**rehearsal_cfg, "stage": "B"}
     with pytest.raises(RuntimeError, match="only after the freeze"):
         bsm1.generate_bsm1_test_stage_dataset(stage_b_cfg, seed=0)
