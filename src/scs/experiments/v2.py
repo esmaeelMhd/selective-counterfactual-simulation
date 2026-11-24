@@ -330,8 +330,30 @@ def generate_v2_dataset(system_id: str, config: dict[str, Any], seed: int) -> di
     raise ValueError(f"unknown v2 system_id: {system_id}")
 
 
-def _make_v2_model(model_id: str, seed: int, config: dict[str, Any]):
+def _learned_budget(config: dict[str, Any], system_id: str | None = None) -> dict[str, Any]:
+    """Early-stopping settings from the config. Absent on the ODE stage, so those models are unchanged."""
     runtime = config.get("model_runtime", {})
+    if not runtime.get("early_stopping"):
+        return {}
+    options: dict[str, Any] = {
+        "early_stopping": True,
+        "validation_fraction": float(runtime.get("validation_fraction", 0.15)),
+        "validation_gap": int(runtime.get("validation_gap", 0)),
+        "check_every": int(runtime.get("check_every", 5)),
+        "patience": int(runtime.get("patience", 3)),
+    }
+    systems = config.get("systems", [])
+    is_bsm1 = system_id == "bsm1" or (system_id is None and list(systems) == ["bsm1"])
+    if is_bsm1:
+        from scs.systems.bsm1 import hydraulic_projection
+
+        options["projection_factory"] = hydraulic_projection
+    return options
+
+
+def _make_v2_model(model_id: str, seed: int, config: dict[str, Any], system_id: str | None = None):
+    runtime = config.get("model_runtime", {})
+    budget = _learned_budget(config, system_id=system_id)
     if model_id == "hold_last":
         return HoldLastModel()
     if model_id == "linear_narx":
@@ -347,11 +369,43 @@ def _make_v2_model(model_id: str, seed: int, config: dict[str, Any]):
             random_state=seed,
             n_members=int(runtime.get("ensemble_members", 2)),
             max_iter=int(runtime.get("ensemble_mlp_max_iter", 70)),
+            seed_offset=int(runtime.get("ensemble_seed_offset", 0)),
         )
     if model_id == "gradient_boosted_narx":
         return GradientBoostedNARXModel(
             random_state=seed,
             max_iter=int(runtime.get("gradient_boosting_max_iter", 60)),
+        )
+    if model_id == "lstm_world":
+        from scs.models.lstm_world import LSTMWorldModel
+
+        return LSTMWorldModel(
+            random_state=seed,
+            hidden_dim=int(runtime.get("lstm_hidden", 64)),
+            num_layers=int(runtime.get("lstm_layers", 2)),
+            epochs=int(runtime.get("lstm_epochs", 30)),
+            **budget,
+        )
+    if model_id == "ensemble_lstm":
+        from scs.models.ensemble_lstm import EnsembleLSTMModel
+
+        return EnsembleLSTMModel(
+            random_state=seed,
+            n_members=int(runtime.get("ensemble_members", 5)),
+            hidden_dim=int(runtime.get("lstm_hidden", 64)),
+            num_layers=int(runtime.get("lstm_layers", 2)),
+            epochs=int(runtime.get("lstm_epochs", 30)),
+            **budget,
+        )
+    if model_id == "recurrent_world":
+        from scs.models.recurrent_world import RecurrentWorldModel
+
+        return RecurrentWorldModel(
+            random_state=seed,
+            hidden_dim=int(runtime.get("rssm_hidden", 32)),
+            latent_dim=int(runtime.get("rssm_latent", 8)),
+            epochs=int(runtime.get("rssm_epochs", 20)),
+            **budget,
         )
     raise ValueError(f"unknown v2 model_id: {model_id}")
 
@@ -424,6 +478,10 @@ def trajectory_event_flags(system_id: str, states: np.ndarray, event_config: dic
             "outlet_temperature_below_limit": bool(np.any(hot_out < low)),
             "large_temperature_tracking_error": bool(np.any(np.abs(hot_out - target) > tracking)),
         }
+    if system_id == "bsm1":
+        from scs.systems.bsm1 import effluent_limit_flags
+
+        return effluent_limit_flags(states, thresholds)
     raise ValueError(f"unknown system_id for events: {system_id}")
 
 

@@ -11,7 +11,8 @@ Copied files:
 - none
 
 Adapted logic:
-- none
+- imports `timesim.models.lstm.LSTMWorldModel` from `src/scs/models/lstm_world.py`
+- `LatentSSMWorldModel` posterior filter and one-step prior in `src/scs/models/recurrent_world.py`
 
 ## digital-twin-engine
 

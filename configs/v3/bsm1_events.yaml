@@ -1,0 +1,14 @@
+# Working BSM1 event definition. Not frozen. The working refusal guard is drafted in configs/v3/stage_b.yaml.
+bsm1:
+  events:
+    - s_nh_above_limit
+    - total_n_above_limit
+    - cod_above_limit
+    - tss_above_limit
+    - bod5_above_limit
+  thresholds:
+    s_nh: 4.0
+    total_n: 18.0
+    cod: 100.0
+    tss: 30.0
+    bod5: 10.0

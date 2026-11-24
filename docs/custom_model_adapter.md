@@ -14,7 +14,9 @@ def predict_rollout(self, initial_state, actions, disturbances):
     ...
 ```
 
-`predict_rollout` must return a finite array with shape `(horizon + 1, state_dim)`.
+`predict_rollout` must return a finite array with shape `(horizon + 1, state_dim)`. An optional fourth argument, `history`, is a window of measured variables. Omitting it keeps the previous call working.
+
+The v3 runner prefers an optional batch method `predict_rollouts(initial_states, actions, disturbances, history=None, project=None)` with shapes `(batch, state_dim)`, `(batch, horizon, action_dim)`, and `(batch, horizon, disturbance_dim)`, and falls back to looping over `predict_rollout` when `predict_rollouts` is not defined. `history` has shape `(batch, window, n_measured)` when a system supplies measured variables. `project(step, states)` may overwrite channels of a predicted state, such as BSM1 flows that the plant sets from the influent, and the changed state is what the next step sees. A recurrent model must keep its hidden state inside `predict_rollouts`; calling `predict_rollout` one step at a time restarts the model at every step.
 
 ## Example
 

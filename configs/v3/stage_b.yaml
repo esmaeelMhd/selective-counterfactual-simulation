@@ -1,0 +1,119 @@
+# Draft Stage B settings. Not the confirmatory freeze.
+# The runner refuses to generate or score confirmatory rows while stage_b_blockers are open.
+stage: B
+label: confirmatory
+protocol_frozen: false
+event_config: configs/v3/bsm1_events.yaml
+
+systems:
+  - bsm1
+
+models:
+  - hold_last
+  - linear_narx
+  - mlp_state_space
+  - lstm_world
+  - ensemble_lstm
+  - recurrent_world
+
+learned_models:
+  - mlp_state_space
+  - lstm_world
+  - ensemble_lstm
+  - recurrent_world
+
+eligibility_split: judge_calibration_id
+
+eligibility_baselines:
+  - hold_last
+  - linear_narx
+
+primary_coverages:
+  - 0.05
+  - 0.10
+
+# Reported for every judge, and part of no decision rule. The task is easier at the primary coverages,
+# where the accepted set can be mostly in-distribution scenarios.
+descriptive_coverages:
+  - 0.25
+  - 0.50
+  - 0.75
+
+badness_targets:
+  - bad_rmse
+  - bad_event
+
+# Working value, not frozen. Standardized non-constant state RMSE (z-scored per active channel using
+# model_train std only, avoiding raw settler-solids dominance). 3 times the 99th percentile (0.1564)
+# of ensemble_lstm per-scenario standardized RMSE on judge_calibration_id, seeds 0-2 (240 scenarios).
+# 3 is the smallest whole multiple that no eligible model's in-distribution calibration scenario
+# exceeds (largest 0.3957, LSTM). Marks 46.6% of eligible calibration scenarios as bad. Calibration only.
+rmse_metric: standardized_state
+rmse_threshold:
+  bsm1: 0.4691
+
+# Refuse a threshold that marks under 1% or over 99% of eligible calibration scenarios as bad.
+check_threshold_share: true
+
+# Working decisions, drafted in docs/v3/protocol.md. Not frozen. The freeze has to accept each one.
+# A yes needs both the 5% and the 10% coverage to pass.
+coverage_rule: both
+
+# The BSM1 guard is the v2 guard with the uncertainty signal in place of invariant.
+event_guard_on_bsm1: event_guard_no_invariant
+
+# The 2000 scenarios per seed and model are 500 overlapping windows in each of four test splits.
+# The reserved data holds 4 dry and 8 rain independent windows, so the interval is conditional on them.
+overlapping_test_windows: true
+
+# Each control split reads the same influent days, with the same per-window factors, as the
+# nominal split of the same weather, so the pair differs in aeration only.
+control_split_influent: same_as_nominal_split
+
+event_guards:
+  event_guard_no_invariant:
+    - risk_support_only
+    - risk_uncertainty_only
+    - risk_disagreement_only
+
+seeds:
+  - 0
+  - 1
+  - 2
+  - 3
+  - 4
+  - 5
+  - 6
+  - 7
+  - 8
+  - 9
+
+bootstrap_samples: 500
+bootstrap_seed: 2025
+interval_width_limit: 0.10
+min_test_scenarios: 2000
+degenerate_share: 0.01
+
+data:
+  horizon: 480
+  history_minutes: 15
+  dt: 0.0006944444444444
+  n_model_train: 160
+  n_calibration_id: 80
+  n_calibration_ood: 80
+  n_test_per_split: 500
+  # Control-shifted aeration in the test, outside the 1.5 to 1.8 family the judges are calibrated on.
+  # Chosen on fresh windows from days that are not reserved. See the protocol.
+  test_control_scale: [1.8, 2.2]
+  uncertainty_samples: 5
+
+model_runtime:
+  ensemble_members: 5
+  mlp_max_iter: 80
+  lstm_epochs: 120
+  rssm_epochs: 120
+  early_stopping: true
+  validation_fraction: 0.15
+  validation_gap: 18
+  check_every: 5
+  patience: 3
